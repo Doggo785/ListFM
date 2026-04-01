@@ -36,7 +36,7 @@ def deduplicate(raw_tracks: list[dict]) -> list[dict]:
     for track in raw_tracks:
         artist = track.get('artist', {}).get('#text', 'Unknown Artist')
         title = track.get('name', 'Unknown Track')
-        identifier_key = f"{artist.strip().lower()}-{title.strip().lower()}"
+        identifier_key = f"{artist.strip().lower()}|{title.strip().lower()}"
         if identifier_key not in seen:
             seen.add(identifier_key)
             unique_tracks.append(track)
