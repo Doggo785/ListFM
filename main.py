@@ -33,13 +33,13 @@ def get_test_data():
 def deduplicate(raw_tracks: list[dict]) -> list[dict]:
     seen = set()
     unique_tracks = []
-    for track in raw_tracks:
-        artist = track.get('artist', {}).get('#text', 'Unknown Artist')
-        title = track.get('name', 'Unknown Track')
+    for item in raw_tracks:
+        artist = item.track.artist.name if item.track.artist else 'Unknown Artist'
+        title = item.track.title if item.track.title else 'Unknown Track'
         identifier_key = f"{artist.strip().lower()}|{title.strip().lower()}"
         if identifier_key not in seen:
             seen.add(identifier_key)
-            unique_tracks.append(track)
+            unique_tracks.append(item)
     return unique_tracks
 
 if __name__ == "__main__":
