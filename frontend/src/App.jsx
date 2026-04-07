@@ -3,7 +3,7 @@ import './App.css';
 function TopBar() {
   return(
     <header className='top-bar'>
-      <h1>My App</h1>
+      <h1>ListFM</h1>
     </header>
   );
 } 

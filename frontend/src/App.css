@@ -9,7 +9,7 @@ html, body, #root {
 .top-bar {
   background-color: #121111;
   color: white;
-  padding: 1rem 2rem;
+  padding: 0.3rem 2rem;
   display: flex;
   align-items: center;
   
