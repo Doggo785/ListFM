@@ -1,10 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const Input = () => {
+const SearchInput = () => {
   return (
     <StyledWrapper>
-      <div>
+      <div className="search-input-shell">
         <div className="grid" />
         <div id="poda">
           <div className="glow" />
@@ -47,6 +47,16 @@ const Input = () => {
 }
 
 const StyledWrapper = styled.div`
+  .search-input-shell {
+    position: relative;
+    width: min(100%, 360px);
+    height: 130px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+  }
+
   .grid {
     height: 800px;
     width: 800px;
@@ -72,6 +82,10 @@ const StyledWrapper = styled.div`
     /* Border Radius */
     border-radius: 12px;
     filter: blur(3px);
+    inset: 0;
+    margin: auto;
+    pointer-events: none;
+    z-index: 0;
   }
   .input {
     background-color: #010201;
@@ -85,9 +99,13 @@ const StyledWrapper = styled.div`
     font-size: 18px;
   }
   #poda {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 314px;
+    height: 70px;
+    isolation: isolate;
   }
   .input::placeholder {
     color: #c0b9c0;
@@ -120,11 +138,11 @@ const StyledWrapper = styled.div`
     left: 5px;
     filter: blur(20px);
     opacity: 0.8;
-    //animation:leftright 4s ease-in infinite;
+    /* animation: leftright 4s ease-in infinite; */
     transition: all 2s;
   }
   #main:hover > #pink-mask {
-    //animation: rotate 4s linear infinite;
+    /* animation: rotate 4s linear infinite; */
     opacity: 0;
   }
 
@@ -156,7 +174,7 @@ const StyledWrapper = styled.div`
       #dfa2da,
       rgba(0, 0, 0, 0) 58%
     );
-    //  animation: rotate 4s linear infinite;
+    /* animation: rotate 4s linear infinite; */
     transition: all 2s;
   }
   .border {
@@ -186,7 +204,7 @@ const StyledWrapper = styled.div`
       #cf30aa 60%,
       #1c191c 64%
     );
-    // animation: rotate 4s 0.1s linear infinite;
+    /* animation: rotate 4s 0.1s linear infinite; */
     transition: all 2s;
   }
   .darkBorderBg {
@@ -264,6 +282,7 @@ const StyledWrapper = styled.div`
     opacity: 0.4;
     max-height: 130px;
     max-width: 354px;
+    z-index: -1;
   }
   .glow:before {
     content: "";
@@ -287,7 +306,7 @@ const StyledWrapper = styled.div`
       #000 87%
     );
     /* change speed here */
-    //animation: rotate 4s 0.3s linear infinite;
+    /* animation: rotate 4s 0.3s linear infinite; */
     transition: all 2s;
   }
 
@@ -372,6 +391,7 @@ const StyledWrapper = styled.div`
   }
   #main {
     position: relative;
+    z-index: 2;
   }
   #search-icon {
     position: absolute;
