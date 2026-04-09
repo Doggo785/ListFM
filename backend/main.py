@@ -31,7 +31,14 @@ def get_user_recent(username: str):
     try:
         user = network.get_user(username)
         recent_tracks = user.get_recent_tracks(limit=100)
-        return {"tracks": [track.track.title for track in recent_tracks]}
+        formatted_tracks = [
+            {
+                "title": track.track.title,
+                "artist": track.track.artist.name if track.track.artist else "Unknown Artist"
+            }
+            for track in recent_tracks
+        ]
+        return {"tracks": formatted_tracks}
     except pylast.WSError as e:
         return {"error": f"Erreur lors de la récupération des données : {e}"}
 
@@ -46,6 +53,3 @@ def deduplicate(raw_tracks: list[dict]) -> list[dict]:
             seen.add(identifier_key)
             unique_tracks.append(item)
     return unique_tracks
-
-if __name__ == "__main__":
-    get_test_data()

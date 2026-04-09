@@ -15,12 +15,12 @@ function MainContent() {
 
   const get_user_recent = async () => {
     if (!username) {
-      alert('Please enter a username');
+      console.error('Error fetching recent tracks: No username provided');
       return;
     }
 
     try{
-      const response = await fetch(`http://localhost:3000/api/recent-tracks?username=${username}`);
+      const response = await fetch(`http://localhost:8000/api/recent-tracks/${username}`);
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
