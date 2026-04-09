@@ -1,7 +1,12 @@
 import React from 'react';
 import styled from 'styled-components';
 
-const SearchInput = () => {
+const SearchInput = ({value, onChange, onSearch}) => {
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      onSearch();
+    }
+  };
   return (
     <StyledWrapper>
       <div className="search-input-shell">
@@ -14,7 +19,15 @@ const SearchInput = () => {
           <div className="white" />
           <div className="border" />
           <div id="main">
-            <input placeholder="Search..." type="text" name="text" className="input" />
+            <input 
+              placeholder="Last.fm username..." 
+              type="text" 
+              name="text" 
+              className="input" 
+              value={value} 
+              onChange={(e) => onChange(e.target.value)} 
+              onKeyDown={handleKeyDown}
+            />
             <div id="input-mask" />
             <div id="pink-mask" />
             <div id="search-icon">
@@ -113,15 +126,6 @@ const StyledWrapper = styled.div`
     display: none;
   }
 
-  #input-mask {
-    pointer-events: none;
-    width: 100px;
-    height: 20px;
-    position: absolute;
-    background: linear-gradient(90deg, transparent, black);
-    top: 18px;
-    left: 70px;
-  }
   #pink-mask {
     pointer-events: none;
     width: 30px;
@@ -192,10 +196,10 @@ const StyledWrapper = styled.div`
     background-position: 0 0;
     background-image: conic-gradient(
       #1c191c,
-      #402fb5 5%,
+      #FF6817 5%,
       #1c191c 14%,
       #1c191c 50%,
-      #cf30aa 60%,
+      #17AEFF 60%,
       #1c191c 64%
     );
     /* animation: rotate 4s 0.1s linear infinite; */
@@ -219,10 +223,10 @@ const StyledWrapper = styled.div`
     background-position: 0 0;
     background-image: conic-gradient(
       rgba(0, 0, 0, 0),
-      #18116a,
+      #FF5900,
       rgba(0, 0, 0, 0) 10%,
       rgba(0, 0, 0, 0) 50%,
-      #6e1b60,
+      #17AEFF,
       rgba(0, 0, 0, 0) 60%
     );
     transition: all 2s;
@@ -293,10 +297,10 @@ const StyledWrapper = styled.div`
     /*border color, change middle color*/
     background-image: conic-gradient(
       #000,
-      #402fb5 5%,
+      #FF6817 5%,
       #000 38%,
       #000 50%,
-      #cf30aa 60%,
+      #17AEFF 60%,
       #000 87%
     );
     /* change speed here */

@@ -28,7 +28,6 @@ function MainContent() {
         const data = await response.json();
         console.log(data);
       }
-      console.log(data);
     } catch (error) {
       console.error('Error fetching recent tracks:', error);
     }
@@ -36,7 +35,11 @@ function MainContent() {
   return(
     <main className='main-content'>
       <div className="search-section">
-      <SearchInput />
+        <SearchInput 
+          value={username} 
+          onChange={setUsername} 
+          onSearch={get_user_recent} 
+        />
       </div>
     </main>
   );
