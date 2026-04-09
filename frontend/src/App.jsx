@@ -1,6 +1,6 @@
 import './App.css';
 import { useState } from 'react';
-import SearchInput from './comopnents/ui/Button';
+import SearchInput from './components/ui/Button';
 
 function TopBar() {
   return(
