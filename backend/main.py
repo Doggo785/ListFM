@@ -1,3 +1,5 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 import pylast
@@ -8,27 +10,37 @@ load_dotenv()
 LASTFM_API_KEY = os.getenv("LASTFM_API_KEY")
 LASTFM_API_SECRET = os.getenv("LASTFM_API_SECRET")
 
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 try:
     network = pylast.LastFMNetwork(api_key=LASTFM_API_KEY, api_secret=LASTFM_API_SECRET)
     print("Connexion à l'API Last.fm réussie !")
 except Exception as e:
     print(f"Erreur lors de la connexion à l'API Last.fm : {e}")
 
-def get_test_data():
+@app.get("/api/recent-tracks/{username}")
+def get_user_recent(username: str):
     try:
-        user = network.get_user("AssaWolf")
-        recent_tracks = user.get_recent_tracks(limit=300)
-        with open('test_data.csv', mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Artist', 'Track', 'Album'])
-            for track in recent_tracks:
-                artist = track.track.artist.name
-                track_name = track.track.title
-                album = track.album
-                writer.writerow([artist, track_name, album])
-    except Exception as e:
-        print(f"Erreur lors de la récupération des données : {e}")
-        return []
+        user = network.get_user(username)
+        recent_tracks = user.get_recent_tracks(limit=100)
+        formatted_tracks = [
+            {
+                "title": track.track.title,
+                "artist": track.track.artist.name if track.track.artist else "Unknown Artist"
+            }
+            for track in recent_tracks
+        ]
+        return {"tracks": formatted_tracks}
+    except pylast.WSError as e:
+        return {"error": f"Erreur lors de la récupération des données : {e}"}
 
 def deduplicate(raw_tracks: list[dict]) -> list[dict]:
     seen = set()
@@ -41,6 +53,3 @@ def deduplicate(raw_tracks: list[dict]) -> list[dict]:
             seen.add(identifier_key)
             unique_tracks.append(item)
     return unique_tracks
-
-if __name__ == "__main__":
-    get_test_data()
