@@ -1,6 +1,7 @@
+import { Routes, Route } from 'react-router-dom';
 import './App.css';
-import { useState } from 'react';
-import SearchInput from './components/ui/Button';
+import SearchHome from './views/SearchHome';
+
 
 function TopBar() {
   return(
@@ -10,47 +11,15 @@ function TopBar() {
   );
 }
 
-function MainContent() {
-  const [username, setUsername] = useState('');
-
-  const get_user_recent = async () => {
-    if (!username) {
-      console.error('Error fetching recent tracks: No username provided');
-      return;
-    }
-
-    try{
-      const response = await fetch(`http://localhost:8000/api/recent-tracks/${username}`);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      else {
-        const data = await response.json();
-        console.log(data);
-      }
-    } catch (error) {
-      console.error('Error fetching recent tracks:', error);
-    }
-    };
-  return(
-    <main className='main-content'>
-      <div className="search-section">
-        <SearchInput 
-          value={username} 
-          onChange={setUsername} 
-          onSearch={get_user_recent} 
-        />
-      </div>
-    </main>
-  );
-
-}
-
 function App() {
   return (
     <div className='app-container'>
       <TopBar />
-      <MainContent />
+      <div className='app-main'>
+        <Routes>
+          <Route path="/" element={<SearchHome />} />
+        </Routes>
+      </div>
     </div>
   );
 }
