@@ -34,7 +34,6 @@ html, body, #root {
   align-items: center; 
   
   /* --- INTEGRATION DU PATTERN UIVERSE --- */
-  /* Tu peux enlever la width et height 100% car flex: 1 s'en charge déjà */
   --color: rgba(114, 114, 114, 0.3);
   background-color: #191a1a;
   background-image: linear-gradient(0deg, transparent 24%, var(--color) 25%, var(--color) 26%, transparent 27%,transparent 74%, var(--color) 75%, var(--color) 76%, transparent 77%,transparent),

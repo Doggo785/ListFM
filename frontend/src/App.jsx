@@ -1,4 +1,6 @@
 import './App.css';
+import { useState } from 'react';
+import SearchInput from './comopnents/ui/Button';
 
 function TopBar() {
   return(
@@ -6,17 +8,39 @@ function TopBar() {
       <h1>ListFM</h1>
     </header>
   );
-} 
+}
 
 function MainContent() {
+  const [username, setUsername] = useState('');
+
+  const get_user_recent = async () => {
+    if (!username) {
+      alert('Please enter a username');
+      return;
+    }
+
+    try{
+      const response = await fetch(`http://localhost:3000/api/recent-tracks?username=${username}`);
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      else {
+        const data = await response.json();
+        console.log(data);
+      }
+      console.log(data);
+    } catch (error) {
+      console.error('Error fetching recent tracks:', error);
+    }
+    };
   return(
     <main className='main-content'>
-<h2>On prépare ta prochaine playlist !</h2>
-      <div className="dashboard-placeholder">
-        <p>Zone de travail en construction...</p>
+      <div className="search-section">
+      <SearchInput />
       </div>
     </main>
   );
+
 }
 
 function App() {
