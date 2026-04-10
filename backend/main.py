@@ -30,7 +30,7 @@ except Exception as e:
 def get_user_recent(username: str):
     try:
         user = network.get_user(username)
-        recent_tracks = user.get_recent_tracks(limit=100)
+        recent_tracks = user.get_recent_tracks(limit=5)
         formatted_tracks = [
             {
                 "title": track.track.title,
