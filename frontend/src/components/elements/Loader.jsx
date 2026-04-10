@@ -1,5 +1,5 @@
-import React from 'react';
-import styled from 'styled-components';
+import React from "react";
+import styled from "styled-components";
 
 const Loader = () => {
   return (
@@ -9,7 +9,7 @@ const Loader = () => {
       </div>
     </StyledWrapper>
   );
-}
+};
 
 const StyledWrapper = styled.div`
   .loader {
@@ -18,7 +18,7 @@ const StyledWrapper = styled.div`
     height: 150px;
     background: transparent;
     border-radius: 50%;
-    box-shadow: 25px 25px 75px rgba(0,0,0,0.55);
+    box-shadow: 25px 25px 75px rgba(0, 0, 0, 0.55);
     border: 1px solid #333;
     display: flex;
     align-items: center;
@@ -27,25 +27,27 @@ const StyledWrapper = styled.div`
   }
 
   .loader::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: 20px;
     background: transparent;
     border: 1px dashed#444;
     border-radius: 50%;
-    box-shadow: inset -5px -5px 25px rgba(0,0,0,0.25),
-    inset 5px 5px 35px rgba(0,0,0,0.25);
+    box-shadow:
+      inset -5px -5px 25px rgba(0, 0, 0, 0.25),
+      inset 5px 5px 35px rgba(0, 0, 0, 0.25);
   }
 
   .loader::after {
-    content: '';
+    content: "";
     position: absolute;
     width: 50px;
     height: 50px;
     border-radius: 50%;
     border: 1px dashed#444;
-    box-shadow: inset -5px -5px 25px rgba(0,0,0,0.25),
-    inset 5px 5px 35px rgba(0,0,0,0.25);
+    box-shadow:
+      inset -5px -5px 25px rgba(0, 0, 0, 0.25),
+      inset 5px 5px 35px rgba(0, 0, 0, 0.25);
   }
 
   .loader span {
@@ -61,16 +63,16 @@ const StyledWrapper = styled.div`
   }
 
   .loader span::before {
-    content: '';
+    content: "";
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: seagreen;
+    background: #ff6817;
     transform-origin: top left;
     transform: rotate(-55deg);
-    filter: blur(30px) drop-shadow(20px 20px 20px seagreen);
+    filter: blur(30px) drop-shadow(20px 20px 20px #ff6817);
   }
 
   @keyframes radar81 {
@@ -81,6 +83,7 @@ const StyledWrapper = styled.div`
     100% {
       transform: rotate(360deg);
     }
-  }`;
+  }
+`;
 
 export default Loader;
