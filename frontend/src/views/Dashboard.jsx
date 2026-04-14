@@ -46,13 +46,13 @@ function Dashboard() {
         );
         if (!response.ok)
           throw new Error(
-            "Erreur réseau : Impossible de récupérer les morceaux",
+            "Network error: Unable to fetch tracks",
           );
 
         const data = await response.json();
-        setPlaylist(data.tracks); // On cible le tableau tracks
+        setPlaylist(data.tracks); // target the tracks array
       } catch (error) {
-        setError("Échec de la récupération des données.");
+        setError("Failed to fetch data.");
         console.error("Error fetching recent tracks:", error);
       } finally {
         setIsLoading(false);
@@ -112,25 +112,54 @@ function Dashboard() {
         <div className="max-w-5xl mx-auto">
           <header className="mb-10">
             <h2 className="text-4xl font-black text-white">
-              Dashboard de <span className="text-[#17AEFF]">{username}</span>
+              <span className="text-[#17AEFF]">{username}</span>'s Dashboard
             </h2>
             <p className="text-neutral-400 mt-2">
-              Analyse des {playlist.length} derniers morceaux écoutés.
+              Analysis of the last {playlist.length} tracks.
             </p>
           </header>
 
-          {/* Card component */}
-          <section className="grid grid-cols-1 gap-4">
-            {playlist.map((track, index) => (
-              <Card key={index} neonColor="orange">
-                <div className="flex justify-between items-center w-full px-2">
-                  <span className="text-white font-bold">{track.title}</span>
-                  <span className="text-neutral-500 text-sm italic">
-                    {track.artist}
-                  </span>
+          {/* Top: two side-by-side cards; Bottom: full-width card for later info */}
+          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Left: 5 latest listens */}
+            <div>
+              <Card neonColor="orange">
+                <div className="p-4">
+                  <h3 className="text-lg font-bold text-white mb-2">5 Most Recent Plays</h3>
+                  <ul className="space-y-2">
+                    {playlist.slice(0, 5).map((track, idx) => (
+                      <li key={idx} className="flex justify-between items-center text-white">
+                        <span className="font-semibold truncate">{track.title}</span>
+                        <span className="text-neutral-500 text-sm italic ml-4 truncate">{track.artist}</span>
+                      </li>
+                    ))}
+                    {playlist.length === 0 && (
+                      <li className="text-neutral-500">No listens found</li>
+                    )}
+                  </ul>
                 </div>
               </Card>
-            ))}
+            </div>
+
+            {/* Right: placeholder for other info */}
+            <div>
+              <Card neonColor="orange">
+                <div className="p-4">
+                  <h3 className="text-lg font-bold text-white mb-2">Overview</h3>
+                  <p className="text-neutral-400">Additional information coming soon...</p>
+                </div>
+              </Card>
+            </div>
+
+            {/* Bottom full-width card spanning both columns */}
+            <div className="md:col-span-2">
+              <Card neonColor="orange">
+                <div className="p-4">
+                  <h3 className="text-lg font-bold text-white mb-2">Summary</h3>
+                  <p className="text-neutral-400">Bottom area spanning both cards — additional information will appear here.</p>
+                </div>
+              </Card>
+            </div>
           </section>
 
           <footer className="mt-12">
