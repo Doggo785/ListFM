@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import "./App.css";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
@@ -12,9 +12,10 @@ function TopBar() {
 }
 
 function App() {
+  const location = useLocation();
   return (
     <div className="app-container">
-      <TopBar />
+      {location.pathname === "/" && <TopBar />}
       <div className="app-main">
         <Routes>
           <Route path="/" element={<SearchHome />} />
