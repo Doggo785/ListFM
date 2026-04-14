@@ -1,17 +1,41 @@
-import { useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import Loader from "../components/elements/Loader";
 import Card from "../components/ui/Card";
+import { Sidebar, SidebarBody, SidebarLink } from "../components/ui/Sidebar";
+import {
+  IconHome,
+  IconChartBar,
+  IconArrowLeft,
+  IconUser,
+} from "@tabler/icons-react"; // Sidebar icons
 
 function Dashboard() {
   const { username } = useParams();
   const navigate = useNavigate();
 
+  const [open, setOpen] = useState(false); // Sidebar state
   const [playlist, setPlaylist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const links = [
+    {
+      label: "Home",
+      href: "/",
+      icon: <IconHome className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+    },
+    {
+      label: "Stats",
+      href: "#",
+      icon: <IconChartBar className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+    },
+    {
+      label: "Profile",
+      href: "#",
+      icon: <IconUser className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+    },
+  ];
 
   useEffect(() => {
     const fetchRecentTracks = async () => {
@@ -21,12 +45,14 @@ function Dashboard() {
           `http://localhost:8000/api/recent-tracks/${username}`,
         );
         if (!response.ok)
-          throw new Error("Network error: Failed to fetch recent tracks");
+          throw new Error(
+            "Erreur réseau : Impossible de récupérer les morceaux",
+          );
 
         const data = await response.json();
-        setPlaylist(data.tracks);
+        setPlaylist(data.tracks); // On cible le tableau tracks
       } catch (error) {
-        setError("Failed to fetch recent tracks");
+        setError("Échec de la récupération des données.");
         console.error("Error fetching recent tracks:", error);
       } finally {
         setIsLoading(false);
@@ -34,73 +60,91 @@ function Dashboard() {
     };
     fetchRecentTracks();
   }, [username]);
+
   if (isLoading) {
     return (
-      <main className="main-content" style={{ justifyContent: "center" }}>
+      <div className="flex h-screen w-full items-center justify-center bg-[#191a1a]">
         <Loader />
-      </main>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <main className="main-content" style={{ justifyContent: "center" }}>
+      <div className="flex h-screen w-full items-center justify-center bg-[#191a1a]">
         <h2 style={{ color: "#FF5900" }}>{error}</h2>
-        <button
-          onClick={() => navigate("/")}
-          style={{ padding: "10px 20px", marginTop: "1rem", cursor: "pointer" }}
-        >
-          Retour
-        </button>
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="main-content">
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "1000px",
-          backgroundColor: "rgba(0,0,0,0.5)",
-          padding: "2rem",
-          borderRadius: "15px",
-          color: "white",
-        }}
-      >
-        <h2>
-          Dashboard de <span style={{ color: "#17AEFF" }}>{username}</span>
-        </h2>
-
-        <div style={{ marginTop: "2rem" }}>
-          <h3>Historique brut ({playlist.length} éléments)</h3>
-          {/* Rendu temporaire de ta liste. À remplacer par Recharts plus tard. */}
-          <pre
-            style={{
-              background: "#111",
-              padding: "1rem",
-              borderRadius: "8px",
-              overflowX: "auto",
-            }}
-          >
-            {playlist.map((track, index) => (
-              <div key={index}>
-                <Card neonColor="orange" className="mb-4">
-                  <strong>{track.title}</strong> - {track.artist}
-                </Card>
+    <div className="flex flex-col md:flex-row bg-[#121212] w-full h-screen overflow-hidden">
+      {/* SIDEBAR */}
+      <Sidebar open={open} setOpen={setOpen} animate={true}>
+        <SidebarBody className="justify-between gap-10 border-r border-neutral-800 bg-[#1c1c1c]">
+          <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="mt-4 mb-8 px-4">
+              <h1 className="text-2xl font-black text-[#ff530b]">ListFM</h1>
+            </div>
+            <div className="flex flex-col gap-2">
+              {links.map((link, idx) => (
+                <SidebarLink key={idx} link={link} />
+              ))}
+            </div>
+          </div>
+          <div className="px-4 py-4 border-t border-neutral-800">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-[#ff530b] flex items-center justify-center text-white font-bold text-xs">
+                {username.charAt(0).toUpperCase()}
               </div>
-            ))}
-          </pre>
-        </div>
+              {open && (
+                <span className="text-white text-sm font-medium truncate">
+                  {username}
+                </span>
+              )}
+            </div>
+          </div>
+        </SidebarBody>
+      </Sidebar>
 
-        <button
-          onClick={() => navigate("/")}
-          style={{ padding: "10px 20px", marginTop: "2rem", cursor: "pointer" }}
-        >
-          Nouvelle recherche
-        </button>
-      </div>
-    </main>
+      {/* MAIN CONTENT */}
+      <main className="flex-1 overflow-y-auto p-6 md:p-10 bg-[#121212]">
+        <div className="max-w-5xl mx-auto">
+          <header className="mb-10">
+            <h2 className="text-4xl font-black text-white">
+              Dashboard de <span className="text-[#17AEFF]">{username}</span>
+            </h2>
+            <p className="text-neutral-400 mt-2">
+              Analyse des {playlist.length} derniers morceaux écoutés.
+            </p>
+          </header>
+
+          {/* Card component */}
+          <section className="grid grid-cols-1 gap-4">
+            {playlist.map((track, index) => (
+              <Card key={index} neonColor="orange">
+                <div className="flex justify-between items-center w-full px-2">
+                  <span className="text-white font-bold">{track.title}</span>
+                  <span className="text-neutral-500 text-sm italic">
+                    {track.artist}
+                  </span>
+                </div>
+              </Card>
+            ))}
+          </section>
+
+          <footer className="mt-12">
+            <button
+              onClick={() => navigate("/")}
+              className="px-6 py-3 bg-neutral-800 text-white rounded-lg hover:bg-[#ff530b] transition-all flex items-center gap-2 font-bold"
+            >
+              <IconArrowLeft size={18} />
+              New Search
+            </button>
+          </footer>
+        </div>
+      </main>
+    </div>
   );
 }
 
