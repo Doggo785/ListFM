@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/elements/Loader";
+import Card from "../components/ui/Card";
 
 function Dashboard() {
   const { username } = useParams();
@@ -82,7 +83,13 @@ function Dashboard() {
               overflowX: "auto",
             }}
           >
-            {JSON.stringify(playlist.slice(0, 5), null, 2)}
+            {playlist.map((track, index) => (
+              <div key={index}>
+                <Card neonColor="orange" className="mb-4">
+                  <strong>{track.title}</strong> - {track.artist}
+                </Card>
+              </div>
+            ))}
           </pre>
         </div>
 
