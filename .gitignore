@@ -225,3 +225,4 @@ __marimo__/
 .streamlit/secrets.toml
 
 test_data.csv
+dev.sh
