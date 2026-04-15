@@ -2,6 +2,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import "./App.css";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
+import Playlist from "./views/Playlist";
 
 function TopBar() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Routes>
           <Route path="/" element={<SearchHome />} />
           <Route path="/dashboard/:username" element={<Dashboard />} />
+          <Route path="/playlists" element={<Playlist />} />
         </Routes>
       </div>
     </div>
