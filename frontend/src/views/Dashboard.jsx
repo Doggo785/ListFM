@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Loader from "../components/elements/Loader";
-import BorderGlow from "../components/ui/Card";
+import BorderGlow from "../components/ui/BorderGlow";
 import { Sidebar, SidebarBody, SidebarLink } from "../components/ui/Sidebar";
 import {
   IconHome,
