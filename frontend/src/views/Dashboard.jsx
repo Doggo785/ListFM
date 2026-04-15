@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Loader from "../components/elements/Loader";
-import Card from "../components/ui/Card";
+import BorderGlow from "../components/ui/Card";
 import { Sidebar, SidebarBody, SidebarLink } from "../components/ui/Sidebar";
 import {
   IconHome,
@@ -45,9 +45,7 @@ function Dashboard() {
           `http://localhost:8000/api/recent-tracks/${username}`,
         );
         if (!response.ok)
-          throw new Error(
-            "Network error: Unable to fetch tracks",
-          );
+          throw new Error("Network error: Unable to fetch tracks");
 
         const data = await response.json();
         setPlaylist(data.tracks); // target the tracks array
@@ -123,14 +121,33 @@ function Dashboard() {
           <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Left: 5 latest listens */}
             <div>
-              <Card neonColor="orange">
+              <BorderGlow
+                edgeSensitivity={30}
+                glowColor="40 80 80"
+                backgroundColor="#000000"
+                borderRadius={28}
+                glowRadius={40}
+                glowIntensity={1}
+                coneSpread={25}
+                animated
+                colors={["#c084fc", "#f472b6", "#38bdf8"]}
+              >
                 <div className="p-4">
-                  <h3 className="text-lg font-bold text-white mb-2">5 Most Recent Plays</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">
+                    5 Most Recent Plays
+                  </h3>
                   <ul className="space-y-2">
                     {playlist.slice(0, 5).map((track, idx) => (
-                      <li key={idx} className="flex justify-between items-center text-white">
-                        <span className="font-semibold truncate">{track.title}</span>
-                        <span className="text-neutral-500 text-sm italic ml-4 truncate">{track.artist}</span>
+                      <li
+                        key={idx}
+                        className="flex justify-between items-center text-white"
+                      >
+                        <span className="font-semibold truncate">
+                          {track.title}
+                        </span>
+                        <span className="text-neutral-500 text-sm italic ml-4 truncate">
+                          {track.artist}
+                        </span>
                       </li>
                     ))}
                     {playlist.length === 0 && (
@@ -138,27 +155,51 @@ function Dashboard() {
                     )}
                   </ul>
                 </div>
-              </Card>
+              </BorderGlow>
             </div>
 
             {/* Right: placeholder for other info */}
             <div>
-              <Card neonColor="orange">
+              <BorderGlow
+                edgeSensitivity={30}
+                glowColor="40 80 80"
+                backgroundColor="#000000"
+                borderRadius={28}
+                glowRadius={40}
+                glowIntensity={1}
+                coneSpread={25}
+                animated
+                colors={["#c084fc", "#f472b6", "#38bdf8"]}
+              >
                 <div className="p-4">
-                  <h3 className="text-lg font-bold text-white mb-2">Overview</h3>
-                  <p className="text-neutral-400">Additional information coming soon...</p>
+                  <h3 className="text-lg font-bold text-white mb-2">
+                    Overview
+                  </h3>
+                  <p className="text-neutral-400">
+                    Additional information coming soon...
+                  </p>
                 </div>
-              </Card>
+              </BorderGlow>
             </div>
 
             {/* Bottom full-width card spanning both columns */}
             <div className="md:col-span-2">
-              <Card neonColor="orange">
-                <div className="p-4">
-                  <h3 className="text-lg font-bold text-white mb-2">Summary</h3>
-                  <p className="text-neutral-400">Bottom area spanning both cards — additional information will appear here.</p>
+              <BorderGlow
+                edgeSensitivity={30}
+                glowColor="40 80 80"
+                backgroundColor="#000000"
+                borderRadius={28}
+                glowRadius={40}
+                glowIntensity={1}
+                coneSpread={25}
+                animated
+                colors={["#c084fc", "#f472b6", "#38bdf8"]}
+              >
+                <div style={{ padding: "2em" }}>
+                  <h2>Your Content Here</h2>
+                  <p>Hover near the edges to see the glow.</p>
                 </div>
-              </Card>
+              </BorderGlow>
             </div>
           </section>
 
