@@ -1,5 +1,6 @@
 import { useState } from "react";
 import TiltedCard from "../components/ui/PlaylistCard";
+import AddImage from "@/assets/add.png";
 
 const INITIAL_AUTOMATIONS = [
   {
@@ -52,6 +53,21 @@ export default function Playlist() {
                   />
                 </div>
               ))}
+              <TiltedCard
+                imageSrc={AddImage}
+                altText="+"
+                captionText="New automated playlist"
+                countdownText=""
+                containerHeight="420px"
+                containerWidth="300px"
+                imageHeight="420px"
+                imageWidth="300px"
+                rotateAmplitude={6}
+                scaleOnHover={1.04}
+                showMobileWarning={false}
+                showTooltip={false}
+                displayOverlayContent
+              />
               <div className="w-2 shrink-0 md:w-4" aria-hidden="true" />
             </div>
           </div>
