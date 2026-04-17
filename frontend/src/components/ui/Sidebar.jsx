@@ -76,17 +76,26 @@ export const DesktopSidebar = ({
   ...props
 }) => {
   const { open, setOpen, animate } = useSidebar();
+  const desktopWidth = animate ? (open ? "300px" : "60px") : "300px";
 
   return (
     <>
       <motion.div
+        className="hidden md:block shrink-0"
+        aria-hidden="true"
+        animate={{
+          width: desktopWidth,
+        }}
+      />
+
+      <motion.div
         className={cn(
-          "h-full px-4 py-4 hidden  md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
+          "fixed left-0 top-0 z-30 h-screen px-4 py-4 hidden md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800",
 
           className,
         )}
         animate={{
-          width: animate ? (open ? "300px" : "60px") : "300px",
+          width: desktopWidth,
         }}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}

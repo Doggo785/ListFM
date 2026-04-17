@@ -4,6 +4,7 @@ import AppSidebar from "./components/ui/AppSidebar";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
 import Playlist from "./views/Playlist";
+import PlaylistBuilder from "./views/PlaylistBuilder";
 
 function TopBar() {
   return (
@@ -23,11 +24,14 @@ function App() {
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >
         {showSidebar && <AppSidebar />}
-        <Routes>
-          <Route path="/" element={<SearchHome />} />
-          <Route path="/dashboard/:username" element={<Dashboard />} />
-          <Route path="/playlists" element={<Playlist />} />
-        </Routes>
+        <div className="min-w-0 flex-1">
+          <Routes>
+            <Route path="/" element={<SearchHome />} />
+            <Route path="/dashboard/:username" element={<Dashboard />} />
+            <Route path="/playlists" element={<Playlist />} />
+            <Route path="/playlists/new" element={<PlaylistBuilder />} />
+          </Routes>
+        </div>
       </div>
     </div>
   );
