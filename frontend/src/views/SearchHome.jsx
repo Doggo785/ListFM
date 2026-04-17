@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import SearchInput from "../components/ui/Button";
+import SearchInput from "../components/ui/SearchBar";
 
 function SearchHome() {
   const [username, setUsername] = useState("");
