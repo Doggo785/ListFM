@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TiltedCard from "../components/ui/PlaylistCard";
 import AddImage from "@/assets/add.png";
 
@@ -13,6 +14,7 @@ const INITIAL_AUTOMATIONS = [
 
 export default function Playlist() {
   const [automations] = useState(INITIAL_AUTOMATIONS);
+  const navigate = useNavigate();
 
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
@@ -53,21 +55,28 @@ export default function Playlist() {
                   />
                 </div>
               ))}
-              <TiltedCard
-                imageSrc={AddImage}
-                altText="+"
-                captionText="New automated playlist"
-                countdownText=""
-                containerHeight="420px"
-                containerWidth="300px"
-                imageHeight="420px"
-                imageWidth="300px"
-                rotateAmplitude={6}
-                scaleOnHover={1.04}
-                showMobileWarning={false}
-                showTooltip={false}
-                displayOverlayContent
-              />
+              <button
+                type="button"
+                onClick={() => navigate("/playlists/new")}
+                className="shrink-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
+                aria-label="Create a new automated playlist"
+              >
+                <TiltedCard
+                  imageSrc={AddImage}
+                  altText="+"
+                  captionText="New automated playlist"
+                  countdownText=""
+                  containerHeight="420px"
+                  containerWidth="300px"
+                  imageHeight="420px"
+                  imageWidth="300px"
+                  rotateAmplitude={6}
+                  scaleOnHover={1.04}
+                  showMobileWarning={false}
+                  showTooltip={false}
+                  displayOverlayContent
+                />
+              </button>
               <div className="w-2 shrink-0 md:w-4" aria-hidden="true" />
             </div>
           </div>
