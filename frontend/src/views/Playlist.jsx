@@ -7,9 +7,7 @@ import {
   RECURRENCE_UNIT_LABELS,
   PERIOD_OPTIONS,
 } from "@/lib/automation-rules";
-
-const PLACEHOLDER_IMAGE =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23374151'/%3E%3Cstop offset='100%25' stop-color='%23111827'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='300' fill='url(%23g)'/%3E%3Ctext x='150' y='160' text-anchor='middle' font-family='system-ui' font-size='64' font-weight='bold' fill='%236b7280'%3E%25%3C/text%3E%3C/svg%3E";
+import { getPlaylistImageSrc } from "@/components/ui/PlaylistLogo";
 
 function buildDescription(auto) {
   const source = SOURCE_TYPE_LABELS[auto.source?.type] || auto.source?.type;
@@ -22,10 +20,6 @@ function buildDescription(auto) {
     return `Every ${auto.recurrence.interval} ${unit} · ${source} · ${period}`;
   }
   return `${source} · ${period}`;
-}
-
-function getInitial(name) {
-  return (name || "?").charAt(0).toUpperCase();
 }
 
 const INITIAL_AUTOMATIONS = [
@@ -46,7 +40,7 @@ export default function Playlist() {
     const userCards = saved.map((auto) => ({
       id: auto.id,
       title: auto.name || "Untitled",
-      image: PLACEHOLDER_IMAGE,
+      image: getPlaylistImageSrc(auto.name || "Untitled", auto.source?.type),
       description: buildDescription(auto),
     }));
     setAutomations([...INITIAL_AUTOMATIONS, ...userCards]);
@@ -88,15 +82,6 @@ export default function Playlist() {
                     showMobileWarning={false}
                     showTooltip={false}
                     displayOverlayContent
-                    overlayContent={
-                      auto.initial ? (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <span className="text-7xl font-black text-white/20">
-                            {auto.initial}
-                          </span>
-                        </div>
-                      ) : null
-                    }
                   />
                 </div>
               ))}
