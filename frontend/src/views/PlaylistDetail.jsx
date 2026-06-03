@@ -77,6 +77,8 @@ export default function PlaylistDetail() {
   const [notFound, setNotFound] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const [previewTracks, setPreviewTracks] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
@@ -125,7 +127,7 @@ export default function PlaylistDetail() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleDelete = () => {
+  const confirmDelete = () => {
     const stored = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
     const updated = stored.filter((a) => a.id !== automation.id);
     localStorage.setItem("listfm_automations", JSON.stringify(updated));
@@ -212,7 +214,7 @@ export default function PlaylistDetail() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleDelete}
+                onClick={() => setShowDeleteConfirm(true)}
                 className="border-red-900/50 bg-transparent text-red-400 hover:bg-red-950 hover:text-red-300"
               >
                 <IconTrash size={14} className="mr-1.5" />
@@ -506,6 +508,45 @@ export default function PlaylistDetail() {
             </BorderGlow>
           </motion.div>
         </div>
+
+        {/* Delete confirmation modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setShowDeleteConfirm(false)}
+            />
+            <div className="relative z-10 w-full max-w-sm rounded-2xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="rounded-lg bg-red-500/10 p-2">
+                  <IconTrash size={18} className="text-red-400" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Delete automation</h3>
+              </div>
+              <p className="text-sm text-neutral-400 mb-6">
+                Are you sure you want to delete <span className="text-white font-medium">{automation.name || "this automation"}</span>? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="border-neutral-700 bg-transparent text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={confirmDelete}
+                  className="bg-red-600 text-white hover:bg-red-700"
+                >
+                  <IconTrash size={14} className="mr-1.5" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
