@@ -66,25 +66,52 @@ export default function Playlist() {
 
             <div className="flex h-full items-center gap-6 overflow-x-auto overflow-y-visible pb-8 pt-2">
               <div className="w-2 shrink-0 md:w-4" aria-hidden="true" />
-              {automations.map((auto) => (
-                <div key={auto.id} className="group relative shrink-0 py-2">
-                  <TiltedCard
-                    imageSrc={auto.image}
-                    altText={auto.title}
-                    captionText={auto.title}
-                    countdownText={auto.description}
-                    containerHeight="420px"
-                    containerWidth="300px"
-                    imageHeight="420px"
-                    imageWidth="300px"
-                    rotateAmplitude={6}
-                    scaleOnHover={1.04}
-                    showMobileWarning={false}
-                    showTooltip={false}
-                    displayOverlayContent
-                  />
-                </div>
-              ))}
+              {automations.map((auto) => {
+                const isUserAutomation = !auto.id.startsWith("auto-");
+                return (
+                  <div
+                    key={auto.id}
+                    className={`group relative shrink-0 py-2 ${
+                      isUserAutomation
+                        ? "cursor-pointer"
+                        : ""
+                    }`}
+                    onClick={
+                      isUserAutomation
+                        ? () => navigate(`/playlists/${auto.id}`)
+                        : undefined
+                    }
+                    role={isUserAutomation ? "button" : undefined}
+                    tabIndex={isUserAutomation ? 0 : undefined}
+                    onKeyDown={
+                      isUserAutomation
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              navigate(`/playlists/${auto.id}`);
+                            }
+                          }
+                        : undefined
+                    }
+                  >
+                    <TiltedCard
+                      imageSrc={auto.image}
+                      altText={auto.title}
+                      captionText={auto.title}
+                      countdownText={auto.description}
+                      containerHeight="420px"
+                      containerWidth="300px"
+                      imageHeight="420px"
+                      imageWidth="300px"
+                      rotateAmplitude={6}
+                      scaleOnHover={1.04}
+                      showMobileWarning={false}
+                      showTooltip={false}
+                      displayOverlayContent
+                    />
+                  </div>
+                );
+              })}
               <button
                 type="button"
                 onClick={() => navigate("/playlists/new")}
