@@ -39,53 +39,6 @@ function renderIcon(sourceType) {
   );
 }
 
-export default function PlaylistLogo({ name = "", sourceType, size = 300 }) {
-  const [color1, color2] = GRADIENTS[hashName(name) % GRADIENTS.length];
-  const gradId = `grad-${hashName(name)}`;
-  const Icon = ICONS[sourceType] || IconBolt;
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 300 300"
-      xmlns="http://www.w3.org/2000/svg"
-      className="rounded-[15px]"
-    >
-      <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={color1} />
-          <stop offset="100%" stopColor={color2} />
-        </linearGradient>
-      </defs>
-      <rect width="300" height="300" fill={`url(#${gradId})`} opacity="0.15" />
-      <rect
-        width="300"
-        height="300"
-        fill="none"
-        stroke={`url(#${gradId})`}
-        strokeWidth="3"
-        opacity="0.3"
-      />
-      <circle cx="150" cy="150" r="60" fill="white" opacity="0.1" />
-      <foreignObject x="100" y="100" width="100" height="100">
-        <div
-          xmlns="http://www.w3.org/1999/xhtml"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            height: "100%",
-          }}
-        >
-          <Icon size={60} stroke={1.5} color="white" opacity="0.9" />
-        </div>
-      </foreignObject>
-    </svg>
-  );
-}
-
 export function getPlaylistImageSrc(name, sourceType) {
   const [color1, color2] = GRADIENTS[hashName(name) % GRADIENTS.length];
   const gradId = `g${hashName(name)}`;
