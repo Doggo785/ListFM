@@ -17,7 +17,6 @@ import {
   SOURCE_TYPES,
   SOURCE_TYPE_LABELS,
   PERIOD_OPTIONS,
-  RECURRENCE_UNITS,
   RECURRENCE_UNIT_LABELS,
   createDefaultAutomation,
 } from "@/lib/automation-rules";
