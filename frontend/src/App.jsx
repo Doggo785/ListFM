@@ -4,6 +4,7 @@ import AppSidebar from "./components/ui/AppSidebar";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
 import Playlist from "./views/Playlist";
+import PlaylistNew from "./views/PlaylistNew";
 
 function TopBar() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="/" element={<SearchHome />} />
             <Route path="/dashboard/:username" element={<Dashboard />} />
             <Route path="/playlists" element={<Playlist />} />
+            <Route path="/playlists/new" element={<PlaylistNew />} />
           </Routes>
         </div>
       </div>
