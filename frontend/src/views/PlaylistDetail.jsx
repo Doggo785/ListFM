@@ -16,10 +16,12 @@ import {
   IconSettings,
   IconEye,
   IconMusic,
+  IconFilter,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import BorderGlow from "@/components/ui/BorderGlow";
 import Loader from "@/components/elements/Loader";
+import FilterBuilder from "@/components/builder/FilterBuilder";
 import { previewAutomation } from "@/lib/api";
 import {
   SOURCE_TYPES,
@@ -27,6 +29,7 @@ import {
   PERIOD_OPTIONS,
   RECURRENCE_UNIT_LABELS,
 } from "@/lib/automation-rules";
+import { applyFilters } from "@/lib/filter-engine";
 
 const SOURCE_OPTIONS = [
   { type: SOURCE_TYPES.TOP_TRACKS, icon: IconBolt, description: "Most played tracks" },
@@ -79,6 +82,7 @@ export default function PlaylistDetail() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const [rawTracks, setRawTracks] = useState(null);
   const [previewTracks, setPreviewTracks] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
@@ -118,6 +122,15 @@ export default function PlaylistDetail() {
     setSaved(false);
   }, []);
 
+  const updateFilters = useCallback((filterGroups) => {
+    setAutomation((prev) => ({
+      ...prev,
+      filterGroups,
+      updatedAt: new Date().toISOString(),
+    }));
+    setSaved(false);
+  }, []);
+
   const handleSave = () => {
     const stored = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
     const updated = stored.map((a) => (a.id === automation.id ? automation : a));
@@ -139,12 +152,22 @@ export default function PlaylistDetail() {
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewTracks(null);
+    setRawTracks(null);
     try {
       const data = await previewAutomation(username.trim(), automation);
       if (data.error) {
         setPreviewError(data.error);
       } else {
-        setPreviewTracks(data.tracks || []);
+        const enriched = data.tracks || [];
+        setRawTracks(enriched);
+        const groups = automation.filterGroups;
+        const hasFilters = groups && groups.length > 0 &&
+          groups.some(g => g.conditions && g.conditions.length > 0);
+        if (hasFilters) {
+          setPreviewTracks(applyFilters(enriched, groups));
+        } else {
+          setPreviewTracks(enriched);
+        }
       }
     } catch (err) {
       setPreviewError(err.message || "Failed to load preview");
@@ -152,6 +175,18 @@ export default function PlaylistDetail() {
       setPreviewLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!rawTracks) return;
+    const groups = automation?.filterGroups;
+    const hasFilters = groups && groups.length > 0 &&
+      groups.some(g => g.conditions && g.conditions.length > 0);
+    if (hasFilters) {
+      setPreviewTracks(applyFilters(rawTracks, groups));
+    } else {
+      setPreviewTracks(rawTracks);
+    }
+  }, [automation?.filterGroups, rawTracks]);
 
   if (notFound) {
     return (
@@ -381,6 +416,17 @@ export default function PlaylistDetail() {
                 </motion.div>
               )}
             </SectionCard>
+
+            {/* Filters */}
+            <SectionCard title="Filters" icon={IconFilter} delay={0.4}>
+              <p className="text-xs text-neutral-500 mb-3">
+                Add conditions to refine which tracks appear in your playlist.
+              </p>
+              <FilterBuilder
+                value={automation.filterGroups || []}
+                onChange={updateFilters}
+              />
+            </SectionCard>
           </div>
 
           {/* Right: Preview */}
@@ -439,6 +485,11 @@ export default function PlaylistDetail() {
                   </FieldRow>
                   <p className="text-xs text-neutral-500 leading-relaxed">
                     One API call to Last.fm. Limited to your configured max tracks.
+                    {rawTracks && previewTracks && rawTracks.length !== previewTracks.length && (
+                      <span className="block mt-1 text-[#ff530b]">
+                        {previewTracks.length} of {rawTracks.length} tracks match filters
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -494,7 +545,7 @@ export default function PlaylistDetail() {
                               {track.artist}
                             </div>
                           </div>
-                          {track.playcount && (
+                          {track.playcount != null && (
                             <span className="text-xs text-neutral-600 font-mono shrink-0 tabular-nums">
                               {track.playcount}
                             </span>

@@ -1,5 +1,12 @@
 from fastapi import APIRouter
-from services.lastfm import get_top_tracks, get_recent_tracks, get_loved_tracks, get_top_artists_tracks, deduplicate
+from services.lastfm import (
+    get_top_tracks,
+    get_recent_tracks,
+    get_loved_tracks,
+    get_top_artists_tracks,
+    enrich_tracks,
+    deduplicate,
+)
 
 router = APIRouter(prefix="/api/automations", tags=["automations"])
 
@@ -11,7 +18,7 @@ def preview_automation(body: dict):
     source = automation.get("source", {})
     source_type = source.get("type", "top_tracks")
     period = source.get("period", "3m")
-    limit = automation.get("output", {}).get("maxSize", 50)
+    limit = min(automation.get("output", {}).get("maxSize", 15), 15)
 
     if not username:
         return {"error": "username is required"}
@@ -30,6 +37,7 @@ def preview_automation(body: dict):
                 return {"error": f"Unknown source type: {source_type}"}
 
         tracks = deduplicate(tracks)
+        tracks = enrich_tracks(username, tracks, max_enrich=limit)
         return {"tracks": tracks, "total": len(tracks)}
     except Exception as e:
         return {"error": str(e)}

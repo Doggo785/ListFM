@@ -11,8 +11,10 @@ import {
   IconCalendarRepeat,
   IconBolt,
   IconSparkles,
+  IconFilter,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import FilterBuilder from "@/components/builder/FilterBuilder";
 import {
   SOURCE_TYPES,
   SOURCE_TYPE_LABELS,
@@ -20,12 +22,14 @@ import {
   RECURRENCE_UNIT_LABELS,
   createDefaultAutomation,
 } from "@/lib/automation-rules";
+import { countActiveConditions } from "@/lib/filter-engine";
 
 const STEPS = [
   { id: 1, label: "Identity", icon: IconSparkles },
   { id: 2, label: "Source", icon: IconMusic },
   { id: 3, label: "Recurrence", icon: IconCalendarRepeat },
-  { id: 4, label: "Summary", icon: IconCheck },
+  { id: 4, label: "Filters", icon: IconFilter },
+  { id: 5, label: "Summary", icon: IconCheck },
 ];
 
 const SOURCE_OPTIONS = [
@@ -316,12 +320,36 @@ function StepRecurrence({ data, onChange }) {
   );
 }
 
+function StepFilters({ data, onChange }) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-white mb-2">
+          Filter your tracks
+        </h3>
+        <p className="text-neutral-400 text-sm">
+          Add conditions to refine which tracks appear in your playlist.
+          You can skip this step for no filters.
+        </p>
+      </div>
+
+      <div className="max-w-2xl mx-auto">
+        <FilterBuilder
+          value={data.filterGroups}
+          onChange={(filterGroups) => onChange({ ...data, filterGroups })}
+        />
+      </div>
+    </div>
+  );
+}
+
 function StepSummary({ data }) {
   const sourceLabel =
     SOURCE_TYPE_LABELS[data.source.type] || data.source.type;
   const periodLabel =
     PERIOD_OPTIONS.find((p) => p.value === data.source.period)?.label ||
     data.source.period;
+  const filterCount = countActiveConditions(data.filterGroups);
 
   return (
     <div className="space-y-6">
@@ -350,7 +378,7 @@ function StepSummary({ data }) {
             )}
           </div>
 
-          <div className="grid grid-cols-2 divide-x divide-neutral-700">
+          <div className="grid grid-cols-3 divide-x divide-neutral-700">
             <div className="p-5">
               <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
                 Source
@@ -377,6 +405,17 @@ function StepSummary({ data }) {
                   : "No auto-update"}
               </div>
             </div>
+            <div className="p-5">
+              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
+                Filters
+              </div>
+              <div className="text-sm font-semibold text-white">
+                {filterCount > 0 ? `${filterCount} condition${filterCount > 1 ? "s" : ""}` : "None"}
+              </div>
+              <div className="text-xs text-neutral-400 mt-0.5">
+                {filterCount > 0 ? "Active filters" : "All tracks pass"}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -388,6 +427,8 @@ export default function PlaylistNew() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [data, setData] = useState(createDefaultAutomation());
+
+  const totalSteps = STEPS.length;
 
   const canGoNext = () => {
     if (step === 1) return data.name.trim().length > 0;
@@ -410,6 +451,8 @@ export default function PlaylistNew() {
       case 3:
         return <StepRecurrence data={data} onChange={setData} />;
       case 4:
+        return <StepFilters data={data} onChange={setData} />;
+      case 5:
         return <StepSummary data={data} />;
       default:
         return null;
@@ -456,7 +499,7 @@ export default function PlaylistNew() {
               {step > 1 ? "Back" : "Cancel"}
             </Button>
 
-            {step < 4 ? (
+            {step < totalSteps ? (
               <Button
                 size="lg"
                 disabled={!canGoNext()}

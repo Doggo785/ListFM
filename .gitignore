@@ -206,6 +206,7 @@ cython_debug/
 !.vscode/extensions.json
 !.vscode/*.code-snippets
 !*.code-workspace
+.vscode/launch.json
 
 # Built Visual Studio Code Extensions
 *.vsix
