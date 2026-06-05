@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import TiltedCard from "../components/ui/PlaylistCard";
 import {
   SOURCE_TYPE_LABELS,
-  RECURRENCE_UNIT_LABELS,
   PERIOD_OPTIONS,
+  describeCron,
+  isValidCron,
 } from "@/lib/automation-rules";
 import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
 import { IconPlus } from "@tabler/icons-react";
@@ -15,9 +16,9 @@ function buildDescription(auto) {
     PERIOD_OPTIONS.find((p) => p.value === auto.source?.period)?.label ||
     auto.source?.period;
 
-  if (auto.recurrence?.enabled) {
-    const unit = RECURRENCE_UNIT_LABELS[auto.recurrence.unit] || auto.recurrence.unit;
-    return `Every ${auto.recurrence.interval} ${unit} · ${source} · ${period}`;
+  if (isValidCron(auto.cron)) {
+    const schedule = describeCron(auto.cron);
+    return `${schedule} · ${source} · ${period}`;
   }
   return `${source} · ${period}`;
 }

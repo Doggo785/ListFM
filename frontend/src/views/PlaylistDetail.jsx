@@ -22,12 +22,12 @@ import { Button } from "@/components/ui/button";
 import BorderGlow from "@/components/ui/BorderGlow";
 import Loader from "@/components/elements/Loader";
 import FilterBuilder from "@/components/builder/FilterBuilder";
+import CronEditor from "@/components/builder/CronEditor";
 import { previewAutomation } from "@/lib/api";
 import {
   SOURCE_TYPES,
   SOURCE_TYPE_LABELS,
   PERIOD_OPTIONS,
-  RECURRENCE_UNIT_LABELS,
 } from "@/lib/automation-rules";
 import { applyFilters } from "@/lib/filter-engine";
 
@@ -113,10 +113,10 @@ export default function PlaylistDetail() {
     setSaved(false);
   }, []);
 
-  const updateRecurrence = useCallback((patch) => {
+  const updateCron = useCallback((cron) => {
     setAutomation((prev) => ({
       ...prev,
-      recurrence: { ...prev.recurrence, ...patch },
+      cron,
       updatedAt: new Date().toISOString(),
     }));
     setSaved(false);
@@ -373,82 +373,13 @@ export default function PlaylistDetail() {
               </FieldRow>
             </SectionCard>
 
-            {/* Recurrence */}
-            <SectionCard title="Recurrence" icon={IconCalendarRepeat} delay={0.3}>
-              <button
-                type="button"
-                onClick={() => updateRecurrence({ enabled: !automation.recurrence?.enabled })}
-                className={`w-full flex items-center justify-between rounded-xl border px-5 py-4 transition-all ${
-                  automation.recurrence?.enabled
-                    ? "border-[#ff530b] bg-[#ff530b]/10 shadow-[0_0_20px_rgba(255,83,11,0.1)]"
-                    : "border-neutral-700 bg-[#141414] hover:border-neutral-500"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <IconCalendarRepeat
-                    size={18}
-                    className={automation.recurrence?.enabled ? "text-[#ff530b]" : "text-neutral-400"}
-                  />
-                  <div className="text-left">
-                    <div className="text-sm font-semibold text-white">Auto-update</div>
-                    <div className="text-xs text-neutral-400">
-                      {automation.recurrence?.enabled
-                        ? "Playlist regenerates automatically"
-                        : "Static — no auto-update"}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  className={`w-11 h-6 rounded-full p-0.5 transition-colors ${
-                    automation.recurrence?.enabled ? "bg-[#ff530b]" : "bg-neutral-600"
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${
-                      automation.recurrence?.enabled ? "translate-x-5" : "translate-x-0"
-                    }`}
-                  />
-                </div>
-              </button>
-
-              {automation.recurrence?.enabled && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2.5"
-                >
-                  <span className="text-sm text-neutral-400 shrink-0">Every</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={automation.recurrence?.interval || 1}
-                    onChange={(e) =>
-                      updateRecurrence({ interval: parseInt(e.target.value) || 1 })
-                    }
-                    className="w-16 rounded-xl border border-neutral-700 bg-[#141414] px-3 py-2.5 text-center text-base text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all shadow-inner"
-                  />
-                  <select
-                    value={automation.recurrence?.unit || "monthly"}
-                    onChange={(e) => updateRecurrence({ unit: e.target.value })}
-                    className="flex-1 rounded-xl border border-neutral-700 bg-[#141414] px-4 py-2.5 text-base text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all appearance-none shadow-inner"
-                  >
-                    {Object.entries(RECURRENCE_UNIT_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </motion.div>
-              )}
+            {/* Schedule */}
+            <SectionCard title="Schedule" icon={IconCalendarRepeat} delay={0.3}>
+              <CronEditor value={automation.cron || ""} onChange={updateCron} />
             </SectionCard>
 
             {/* Filters */}
             <SectionCard title="Filters" icon={IconFilter} delay={0.4}>
-              <p className="text-xs text-neutral-500 pb-4 mb-4">
-                Refine which tracks appear in your playlist. Conditions within a group are combined with the selected logic (All/Any).
-              </p>
               <FilterBuilder
                 value={automation.filterGroups || []}
                 onChange={updateFilters}
