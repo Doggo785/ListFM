@@ -15,6 +15,7 @@ import {
   IconGitBranch,
   IconListCheck,
   IconSearch,
+  IconHelp,
 } from "@tabler/icons-react";
 import {
   FILTER_FIELDS,
@@ -283,6 +284,13 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
           </div>
           <div className="flex items-center gap-2">
             <span className="text-neutral-600 text-xs">Min reliability:</span>
+            <span className="group/tooltip relative flex items-center">
+              <IconHelp size={12} className="text-neutral-600 hover:text-neutral-400 transition-colors cursor-help" />
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-2 text-[11px] text-neutral-300 leading-relaxed shadow-[0_8px_24px_rgba(0,0,0,0.5)] opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto transition-opacity z-50">
+                Minimum percentage of tracks by this {tagSource === "artist" ? "artist" : "album"} that carry this tag. For example, 80% means 8 out of 10 tracks are associated with this genre.
+                <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#1a1a1a]" />
+              </span>
+            </span>
             <input
               type="number"
               value={condition.countMin ?? 0}
