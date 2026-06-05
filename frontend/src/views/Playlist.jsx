@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TiltedCard from "../components/ui/PlaylistCard";
-import AddImage from "@/assets/add.png";
 import {
   SOURCE_TYPE_LABELS,
   RECURRENCE_UNIT_LABELS,
   PERIOD_OPTIONS,
 } from "@/lib/automation-rules";
 import { getPlaylistImageSrc } from "@/components/ui/PlaylistLogo";
+import { IconPlus } from "@tabler/icons-react";
 
 function buildDescription(auto) {
   const source = SOURCE_TYPE_LABELS[auto.source?.type] || auto.source?.type;
@@ -22,15 +22,6 @@ function buildDescription(auto) {
   return `${source} · ${period}`;
 }
 
-const INITIAL_AUTOMATIONS = [
-  {
-    id: "auto-1",
-    title: "Weekly Discovery Sync",
-    image: "https://i.scdn.co/image/ab67616d0000b273d9985092cd88bffd97653b58",
-    description: "Saves your weekly discovery radar every Monday.",
-  },
-];
-
 export default function Playlist() {
   const [automations, setAutomations] = useState([]);
   const navigate = useNavigate();
@@ -43,7 +34,7 @@ export default function Playlist() {
       image: getPlaylistImageSrc(auto.name || "Untitled", auto.source?.type),
       description: buildDescription(auto),
     }));
-    setAutomations([...INITIAL_AUTOMATIONS, ...userCards]);
+    setAutomations(userCards);
   }, []);
 
   return (
@@ -119,7 +110,7 @@ export default function Playlist() {
                 aria-label="Create a new automated playlist"
               >
                 <TiltedCard
-                  imageSrc={AddImage}
+                  icon={IconPlus}
                   altText="+"
                   captionText="New automated playlist"
                   countdownText=""
