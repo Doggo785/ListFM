@@ -248,11 +248,11 @@ export default function PlaylistDetail() {
     : { artist: [], album: [] };
 
   return (
-    <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
-      <div className="mx-auto max-w-[1400px] flex h-full flex-col">
+    <div className="w-full min-w-0 flex-1 bg-[#121212] p-5 md:p-10">
+      <div className="mx-auto max-w-[1400px]">
         {/* Header */}
         <motion.header
-          className="mb-8 shrink-0"
+          className="mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -304,9 +304,9 @@ export default function PlaylistDetail() {
         </motion.header>
 
         {/* Content: two columns on large screens */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start">
           {/* Left: Settings */}
-          <div className="space-y-6 overflow-y-auto pr-2 pb-4">
+          <div className="space-y-6 pb-16">
             {/* Identity */}
             <SectionCard title="Identity" icon={IconSettings} delay={0.1}>
               <FieldRow label="Playlist name">
@@ -392,144 +392,146 @@ export default function PlaylistDetail() {
             </SectionCard>
           </div>
 
-          {/* Right: Preview */}
-          <motion.div
-            className="flex flex-col"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <BorderGlow
-              edgeSensitivity={30}
-              glowColor="40 80 80"
-              backgroundColor="#000000"
-              borderRadius={28}
-              glowRadius={40}
-              glowIntensity={1}
-              coneSpread={25}
-              animated
-              colors={GLOW_COLORS}
-              className="flex flex-col h-full"
+          {/* Right: Preview (sticky) */}
+          <div className="lg:sticky lg:top-8">
+            <motion.div
+              className="flex flex-col"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <div className="flex flex-col h-full min-h-[600px]">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-[#ff530b]/10 p-2">
-                      <IconEye size={16} className="text-[#ff530b]" />
+              <BorderGlow
+                edgeSensitivity={30}
+                glowColor="40 80 80"
+                backgroundColor="#000000"
+                borderRadius={28}
+                glowRadius={40}
+                glowIntensity={1}
+                coneSpread={25}
+                animated
+                colors={GLOW_COLORS}
+                className="flex flex-col"
+              >
+                <div className="flex flex-col max-h-[calc(100vh-8rem)]">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-lg bg-[#ff530b]/10 p-2">
+                        <IconEye size={16} className="text-[#ff530b]" />
+                      </div>
+                      <h3 className="text-base font-bold text-white">Preview</h3>
                     </div>
-                    <h3 className="text-base font-bold text-white">Preview</h3>
+                  </div>
+
+                  <div className="p-5 space-y-3 shrink-0 border-b border-white/5">
+                    <FieldRow label="Last.fm username">
+                      <div className="flex gap-2.5">
+                        <input
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="e.g. john_doe"
+                          className="flex-1 h-12 rounded-xl border border-neutral-700 bg-[#141414] px-4 text-base text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all shadow-inner"
+                        />
+                        <Button
+                          size="default"
+                          onClick={loadPreview}
+                          disabled={previewLoading || !username.trim()}
+                          className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
+                        >
+                          {previewLoading ? (
+                            <IconRefresh size={16} className="animate-spin" />
+                          ) : (
+                            <IconPlayerPlay size={16} className="mr-1.5" />
+                          )}
+                          {previewTracks ? "Refresh" : "Load"}
+                        </Button>
+                      </div>
+                    </FieldRow>
+                    <p className="text-xs text-neutral-500 leading-relaxed">
+                      One API call to Last.fm. Limited to your configured max tracks.
+                      {rawTracks && previewTracks && rawTracks.length !== previewTracks.length && (
+                        <span className="block mt-1 text-[#ff530b]">
+                          {previewTracks.length} of {rawTracks.length} tracks match filters
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Track list */}
+                  <div className="flex-1 overflow-y-auto p-5 min-h-0">
+                    {previewLoading && (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader />
+                      </div>
+                    )}
+
+                    {previewError && (
+                      <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center">
+                        <p className="text-sm text-red-400">{previewError}</p>
+                      </div>
+                    )}
+
+                    {!previewLoading && !previewError && !previewTracks && (
+                      <div className="flex flex-col items-center justify-center py-16 text-center">
+                        <div className="rounded-2xl bg-neutral-800/40 p-4 mb-4">
+                          <IconEye size={28} className="text-neutral-600" />
+                        </div>
+                        <p className="text-sm text-neutral-500 font-medium">
+                          Click <span className="text-[#ff530b]">Load</span> to preview
+                        </p>
+                        <p className="text-xs text-neutral-600 mt-1">
+                          See what this automation produces right now
+                        </p>
+                      </div>
+                    )}
+
+                    {previewTracks && previewTracks.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-16 text-center">
+                        <div className="rounded-2xl bg-neutral-800/40 p-4 mb-4">
+                          <IconMusic size={28} className="text-neutral-600" />
+                        </div>
+                        <p className="text-sm text-neutral-500 font-medium">No tracks found</p>
+                        <p className="text-xs text-neutral-600 mt-1">
+                          Try adjusting your filters or source settings
+                        </p>
+                      </div>
+                    )}
+
+                    {previewTracks && previewTracks.length > 0 && (
+                      <div className="space-y-0.5">
+                        {previewTracks.slice(0, 15).map((track, i) => (
+                          <motion.div
+                            key={`${track.artist}-${track.title}-${i}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2, delay: i * 0.03 }}
+                            className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-white/5 transition-colors group"
+                          >
+                            <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 group-hover:text-neutral-400 tabular-nums">
+                              {i + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-base text-white/90 truncate group-hover:text-white transition-colors">
+                                {track.title}
+                              </div>
+                              <div className="text-xs text-neutral-500 truncate italic">
+                                {track.artist}
+                              </div>
+                            </div>
+                            {track.playcount != null && (
+                              <span className="text-xs text-neutral-600 font-mono shrink-0 tabular-nums">
+                                {track.playcount}
+                              </span>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                <div className="p-5 space-y-3 shrink-0 border-b border-white/5">
-                  <FieldRow label="Last.fm username">
-                    <div className="flex gap-2.5">
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="e.g. john_doe"
-                        className="flex-1 h-12 rounded-xl border border-neutral-700 bg-[#141414] px-4 text-base text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all shadow-inner"
-                      />
-                      <Button
-                        size="default"
-                        onClick={loadPreview}
-                        disabled={previewLoading || !username.trim()}
-                        className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
-                      >
-                        {previewLoading ? (
-                          <IconRefresh size={16} className="animate-spin" />
-                        ) : (
-                          <IconPlayerPlay size={16} className="mr-1.5" />
-                        )}
-                        {previewTracks ? "Refresh" : "Load"}
-                      </Button>
-                    </div>
-                  </FieldRow>
-                  <p className="text-xs text-neutral-500 leading-relaxed">
-                    One API call to Last.fm. Limited to your configured max tracks.
-                    {rawTracks && previewTracks && rawTracks.length !== previewTracks.length && (
-                      <span className="block mt-1 text-[#ff530b]">
-                        {previewTracks.length} of {rawTracks.length} tracks match filters
-                      </span>
-                    )}
-                  </p>
-                </div>
-
-                {/* Track list */}
-                <div className="flex-1 overflow-y-auto p-5">
-                  {previewLoading && (
-                    <div className="flex items-center justify-center py-12">
-                      <Loader />
-                    </div>
-                  )}
-
-                  {previewError && (
-                    <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center">
-                      <p className="text-sm text-red-400">{previewError}</p>
-                    </div>
-                  )}
-
-                  {!previewLoading && !previewError && !previewTracks && (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <div className="rounded-2xl bg-neutral-800/40 p-4 mb-4">
-                        <IconEye size={28} className="text-neutral-600" />
-                      </div>
-                      <p className="text-sm text-neutral-500 font-medium">
-                        Click <span className="text-[#ff530b]">Load</span> to preview
-                      </p>
-                      <p className="text-xs text-neutral-600 mt-1">
-                        See what this automation produces right now
-                      </p>
-                    </div>
-                  )}
-
-                  {previewTracks && previewTracks.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <div className="rounded-2xl bg-neutral-800/40 p-4 mb-4">
-                        <IconMusic size={28} className="text-neutral-600" />
-                      </div>
-                      <p className="text-sm text-neutral-500 font-medium">No tracks found</p>
-                      <p className="text-xs text-neutral-600 mt-1">
-                        Try adjusting your filters or source settings
-                      </p>
-                    </div>
-                  )}
-
-                  {previewTracks && previewTracks.length > 0 && (
-                    <div className="space-y-0.5">
-                      {previewTracks.slice(0, 15).map((track, i) => (
-                        <motion.div
-                          key={`${track.artist}-${track.title}-${i}`}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.2, delay: i * 0.03 }}
-                          className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-white/5 transition-colors group"
-                        >
-                          <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 group-hover:text-neutral-400 tabular-nums">
-                            {i + 1}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-base text-white/90 truncate group-hover:text-white transition-colors">
-                              {track.title}
-                            </div>
-                            <div className="text-xs text-neutral-500 truncate italic">
-                              {track.artist}
-                            </div>
-                          </div>
-                          {track.playcount != null && (
-                            <span className="text-xs text-neutral-600 font-mono shrink-0 tabular-nums">
-                              {track.playcount}
-                            </span>
-                          )}
-                        </motion.div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </BorderGlow>
-          </motion.div>
+              </BorderGlow>
+            </motion.div>
+          </div>
         </div>
 
         {/* Delete confirmation modal */}
