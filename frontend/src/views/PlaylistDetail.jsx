@@ -48,7 +48,7 @@ function SectionCard({ title, icon, children, delay = 0 }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
     >
-      <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+      <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:border-neutral-700 transition-colors">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-neutral-800/80">
           <div className="rounded-lg bg-[#ff530b]/10 p-2">
             <IconComp size={16} className="text-[#ff530b]" />
@@ -63,8 +63,8 @@ function SectionCard({ title, icon, children, delay = 0 }) {
 
 function FieldRow({ label, children }) {
   return (
-    <div className="space-y-1.5">
-      <label className="block text-xs font-medium text-neutral-500 uppercase tracking-wider">
+    <div className="space-y-2">
+      <label className="block text-xs font-medium text-neutral-400 uppercase tracking-wider">
         {label}
       </label>
       {children}
@@ -190,8 +190,11 @@ export default function PlaylistDetail() {
 
   if (notFound) {
     return (
-      <div className="main-content h-screen w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
+      <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
         <div className="mx-auto max-w-3xl text-center py-20">
+          <div className="rounded-2xl bg-neutral-800/40 p-4 mb-6 inline-flex">
+            <IconMusic size={32} className="text-neutral-600" />
+          </div>
           <h2 className="text-2xl font-bold text-white mb-3">Automation not found</h2>
           <p className="text-neutral-400 mb-6">
             This automation may have been deleted or the link is invalid.
@@ -245,11 +248,11 @@ export default function PlaylistDetail() {
     : { artist: [], album: [] };
 
   return (
-    <div className="main-content h-screen w-full min-w-0 flex-1 overflow-y-auto p-6 md:p-12">
+    <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
       <div className="mx-auto max-w-[1400px] flex h-full flex-col">
         {/* Header */}
         <motion.header
-          className="mb-10 shrink-0"
+          className="mb-8 shrink-0"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -257,9 +260,9 @@ export default function PlaylistDetail() {
           <button
             type="button"
             onClick={() => navigate("/playlists")}
-            className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm mb-4"
+            className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm mb-4 group"
           >
-            <IconArrowLeft size={16} />
+            <IconArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
             Back to playlists
           </button>
 
@@ -268,7 +271,7 @@ export default function PlaylistDetail() {
               <h2 className="text-3xl md:text-4xl font-black text-white">
                 <span className="text-[#17AEFF]">Edit</span> automation
               </h2>
-              <p className="mt-1 text-neutral-400 text-sm">
+              <p className="mt-2 text-neutral-400 text-sm">
                 {sourceLabel} · {periodLabel}
               </p>
             </div>
@@ -301,7 +304,7 @@ export default function PlaylistDetail() {
         </motion.header>
 
         {/* Content: two columns on large screens */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_520px] gap-8">
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8">
           {/* Left: Settings */}
           <div className="space-y-6 overflow-y-auto pr-2 pb-4">
             {/* Identity */}
@@ -339,12 +342,12 @@ export default function PlaylistDetail() {
                       className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
                         isSelected
                           ? "border-[#ff530b] bg-[#ff530b]/10 shadow-[0_0_20px_rgba(255,83,11,0.1)]"
-                          : "border-neutral-700 bg-[#141414] hover:border-neutral-500 hover:bg-[#1a1a1a]"
+                          : "border-neutral-700 bg-[#141414] hover:border-neutral-500 hover:bg-[#1a1a1a] hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)]"
                       }`}
                     >
                       <div
-                        className={`rounded-lg p-1.5 ${
-                          isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400"
+                        className={`rounded-lg p-1.5 transition-colors ${
+                          isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400 group-hover:text-neutral-300"
                         }`}
                       >
                         <Icon size={16} />
@@ -482,16 +485,25 @@ export default function PlaylistDetail() {
                   )}
 
                   {previewTracks && previewTracks.length === 0 && (
-                    <div className="text-center py-12">
-                      <p className="text-sm text-neutral-500">No tracks found</p>
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="rounded-2xl bg-neutral-800/40 p-4 mb-4">
+                        <IconMusic size={28} className="text-neutral-600" />
+                      </div>
+                      <p className="text-sm text-neutral-500 font-medium">No tracks found</p>
+                      <p className="text-xs text-neutral-600 mt-1">
+                        Try adjusting your filters or source settings
+                      </p>
                     </div>
                   )}
 
                   {previewTracks && previewTracks.length > 0 && (
                     <div className="space-y-0.5">
                       {previewTracks.slice(0, 15).map((track, i) => (
-                        <div
+                        <motion.div
                           key={`${track.artist}-${track.title}-${i}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.2, delay: i * 0.03 }}
                           className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-white/5 transition-colors group"
                         >
                           <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 group-hover:text-neutral-400 tabular-nums">
@@ -510,7 +522,7 @@ export default function PlaylistDetail() {
                               {track.playcount}
                             </span>
                           )}
-                        </div>
+                        </motion.div>
                       ))}
                     </div>
                   )}
@@ -527,7 +539,12 @@ export default function PlaylistDetail() {
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
               onClick={() => setShowDeleteConfirm(false)}
             />
-            <div className="relative z-10 w-full max-w-sm rounded-2xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-6">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="relative z-10 w-full max-w-sm rounded-2xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-6"
+            >
               <div className="flex items-center gap-3 mb-4">
                 <div className="rounded-lg bg-red-500/10 p-2">
                   <IconTrash size={18} className="text-red-400" />
@@ -555,7 +572,7 @@ export default function PlaylistDetail() {
                   Delete
                 </Button>
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
       </div>
