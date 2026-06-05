@@ -35,6 +35,7 @@ const springValues = {
 export default function TiltedCard({
   imageSrc,
   icon: IconComponent,
+  glowColor,
   altText = "Tilted card image",
   captionText = "",
   countdownText = "Next generation in 3 days",
@@ -60,6 +61,7 @@ export default function TiltedCard({
   const subtitleX = useSpring(useMotionValue(0), springValues);
   const subtitleY = useSpring(useMotionValue(0), springValues);
   const opacity = useSpring(0);
+  const glowOpacity = useSpring(0, { stiffness: 200, damping: 30 });
   const rotateFigcaption = useSpring(0, {
     stiffness: 350,
     damping: 30,
@@ -98,11 +100,13 @@ export default function TiltedCard({
   function handleMouseEnter() {
     scale.set(scaleOnHover);
     opacity.set(1);
+    glowOpacity.set(1);
   }
 
   function handleMouseLeave() {
     opacity.set(0);
     scale.set(1);
+    glowOpacity.set(0);
     rotateX.set(0);
     rotateY.set(0);
     titleX.set(0);
@@ -130,8 +134,25 @@ export default function TiltedCard({
         </div>
       )}
 
+      {glowColor && (
+        <motion.div
+          className="absolute rounded-full blur-[60px] [transform-style:preserve-3d]"
+          style={{
+            width: `calc(${imageWidth} + 80px)`,
+            height: `calc(${imageHeight} + 80px)`,
+            top: "50%",
+            left: "50%",
+            translateX: "-50%",
+            translateY: "-50%",
+            background: glowColor,
+            opacity: glowOpacity,
+            zIndex: 0,
+          }}
+        />
+      )}
+
       <motion.div
-        className="relative overflow-hidden rounded-[22px] border border-neutral-700/70 bg-gradient-to-b from-[#1d1d1d] to-[#0f0f0f] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.45)] [transform-style:preserve-3d]"
+        className="relative z-[1] overflow-hidden rounded-[22px] border border-neutral-700/70 bg-gradient-to-b from-[#1d1d1d] to-[#0f0f0f] p-3 shadow-[0_12px_30px_rgba(0,0,0,0.45)] [transform-style:preserve-3d]"
         style={{
           width: imageWidth,
           height: imageHeight,

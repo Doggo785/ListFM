@@ -2,7 +2,7 @@ import { SOURCE_TYPES } from "@/lib/automation-rules";
 import { IconBolt, IconClock, IconHeart, IconUsers } from "@tabler/icons-react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const GRADIENTS = [
+export const GRADIENTS = [
   ["#f97316", "#ef4444"],
   ["#8b5cf6", "#ec4899"],
   ["#06b6d4", "#3b82f6"],
@@ -24,7 +24,7 @@ const ICONS = {
   [SOURCE_TYPES.TOP_ARTISTS]: IconUsers,
 };
 
-function hashName(name) {
+export function hashName(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) | 0;
