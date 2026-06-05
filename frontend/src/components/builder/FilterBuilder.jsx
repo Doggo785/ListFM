@@ -9,12 +9,12 @@ import {
   IconUsers,
   IconList,
   IconTag,
-  IconSparkles,
   IconClock,
   IconChevronDown,
   IconFilter,
   IconGitBranch,
   IconListCheck,
+  IconSearch,
 } from "@tabler/icons-react";
 import {
   FILTER_FIELDS,
@@ -31,11 +31,22 @@ const FIELD_ICONS = {
   listeners: IconUsers,
   rank: IconList,
   tags: IconTag,
-  match: IconSparkles,
   timestamp: IconClock,
 };
 
 const FIELD_ENTRIES = Object.entries(FILTER_FIELDS);
+
+const COMMON_TAGS = [
+  "rock", "pop", "electronic", "indie", "alternative", "hip-hop", "rap",
+  "metal", "jazz", "classical", "r&b", "soul", "funk", "disco",
+  "punk", "grunge", "lo-fi", "synthwave", "ambient", "folk",
+  "country", "reggae", "blues", "latin", "k-pop", "j-pop",
+  "edm", "house", "techno", "drum and bass", "trance",
+  "acoustic", "singer-songwriter", "post-punk", "shoegaze",
+  "dream pop", "noise rock", "math rock", "progressive rock",
+  "psychedelic", "garage rock", "indie rock", "indie pop",
+  "art pop", "chamber pop", "baroque pop", "new wave",
+];
 
 function CustomSelect({ value, onChange, options, placeholder, className = "" }) {
   const [open, setOpen] = useState(false);
@@ -126,6 +137,24 @@ function FilterRow({ condition, onChange, onRemove }) {
   const isDate = fieldDef.type === "date";
   const needsMax = condition.operator === "between";
 
+  const [tagSearch, setTagSearch] = useState(condition.field === "tags" ? (condition.value || "") : "");
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const tagInputRef = useRef(null);
+
+  const filteredTags = COMMON_TAGS.filter(
+    (t) => t.includes(tagSearch.toLowerCase()) && t !== condition.value
+  ).slice(0, 10);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (tagInputRef.current && !tagInputRef.current.contains(e.target)) {
+        setShowTagDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const fieldOptions = FIELD_ENTRIES.map(([key, def]) => ({
     value: key,
     label: def.label,
@@ -136,6 +165,180 @@ function FilterRow({ condition, onChange, onRemove }) {
     value: op.value,
     label: op.label,
   }));
+
+  const renderValueInput = () => {
+    // Boolean field: Yes / No toggle
+    if (isBoolean) {
+      return (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onChange({ ...condition, value: true })}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
+              condition.value === true
+                ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
+                : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
+            }`}
+          >
+            Yes
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...condition, value: false })}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
+              condition.value === false
+                ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
+                : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
+            }`}
+          >
+            No
+          </button>
+        </div>
+      );
+    }
+
+    // Tags field: searchable dropdown with common tags
+    if (condition.field === "tags") {
+      return (
+        <div className="space-y-2">
+          <div className="relative" ref={tagInputRef}>
+            <div className="flex items-center gap-2 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5">
+              <IconSearch size={14} className="text-neutral-500 shrink-0" />
+              <input
+                type="text"
+                value={tagSearch}
+                onChange={(e) => {
+                  setTagSearch(e.target.value);
+                  setShowTagDropdown(true);
+                  if (e.target.value) {
+                    onChange({ ...condition, value: e.target.value });
+                  }
+                }}
+                onFocus={() => setShowTagDropdown(true)}
+                placeholder="Search tags..."
+                className="flex-1 bg-transparent text-sm text-white placeholder:text-neutral-600 focus:outline-none min-w-0"
+              />
+            </div>
+            {showTagDropdown && (
+              <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
+                <div className="max-h-48 overflow-y-auto p-1">
+                  {filteredTags.length === 0 ? (
+                    <div className="px-3 py-2.5 text-sm text-neutral-500">
+                      Press Enter to use "{tagSearch}"
+                    </div>
+                  ) : (
+                    filteredTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          onChange({ ...condition, value: tag });
+                          setTagSearch(tag);
+                          setShowTagDropdown(false);
+                        }}
+                        className={`flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors text-left ${
+                          condition.value === tag
+                            ? "bg-[#ff530b]/15 text-[#ff530b]"
+                            : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                        }`}
+                      >
+                        <IconTag size={12} className="shrink-0 text-neutral-500" />
+                        <span>{tag}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-600 text-xs">Minimum tag count:</span>
+            <input
+              type="number"
+              value={condition.countMin ?? 0}
+              onChange={(e) => onChange({ ...condition, countMin: Number(e.target.value) })}
+              className="w-20 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    // Last Listened: days ago input with unit label
+    if (isDate) {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 relative">
+            <input
+              type="number"
+              value={condition.value ?? ""}
+              onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
+              placeholder="e.g. 30"
+              min="0"
+              className="w-full rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+            />
+          </div>
+          <span className="text-neutral-500 text-sm font-medium shrink-0">days ago</span>
+        </div>
+      );
+    }
+
+    // Rank: number with # prefix
+    if (condition.field === "rank") {
+      return (
+        <div className="flex items-center gap-2">
+          <span className="text-neutral-500 text-sm font-medium shrink-0">#</span>
+          <input
+            type="number"
+            value={condition.value ?? ""}
+            onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
+            placeholder="e.g. 10"
+            min="1"
+            className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+          />
+          {needsMax && (
+            <>
+              <span className="text-neutral-600 text-xs font-medium">to</span>
+              <span className="text-neutral-500 text-sm font-medium">#</span>
+              <input
+                type="number"
+                value={condition.valueMax ?? ""}
+                onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
+                placeholder="e.g. 50"
+                min="1"
+                className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+              />
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // Default: number or text input
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type={isText ? "text" : "number"}
+          value={condition.value ?? ""}
+          onChange={(e) => onChange({ ...condition, value: isText ? e.target.value : (e.target.value === "" ? "" : Number(e.target.value)) })}
+          placeholder={isText ? "Enter value..." : "Min"}
+          className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+        />
+        {needsMax && (
+          <>
+            <span className="text-neutral-600 text-xs font-medium">to</span>
+            <input
+              type="number"
+              value={condition.valueMax ?? ""}
+              onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
+              placeholder="Max"
+              className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+            />
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all">
@@ -175,75 +378,7 @@ function FilterRow({ condition, onChange, onRemove }) {
         <p className="text-[11px] text-neutral-600 mb-2.5 leading-relaxed">
           {fieldDef.description}
         </p>
-
-        {isBoolean ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onChange({ ...condition, value: true })}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
-                condition.value === true
-                  ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
-                  : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
-              }`}
-            >
-              Yes
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ ...condition, value: false })}
-              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
-                condition.value === false
-                  ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
-                  : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
-              }`}
-            >
-              No
-            </button>
-          </div>
-        ) : isText ? (
-          <input
-            type="text"
-            value={condition.value || ""}
-            onChange={(e) => onChange({ ...condition, value: e.target.value })}
-            placeholder={isDate ? "e.g. rock, electronic" : "Enter value..."}
-            className="w-full rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all"
-          />
-        ) : (
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              value={condition.value ?? ""}
-              onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
-              placeholder={isDate ? "days" : "Min"}
-              className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
-            />
-            {needsMax && (
-              <>
-                <span className="text-neutral-600 text-xs font-medium">to</span>
-                <input
-                  type="number"
-                  value={condition.valueMax ?? ""}
-                  onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
-                  placeholder="Max"
-                  className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
-                />
-              </>
-            )}
-          </div>
-        )}
-
-        {condition.field === "tags" && (
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-neutral-600 text-xs">Minimum tag count:</span>
-            <input
-              type="number"
-              value={condition.countMin ?? 0}
-              onChange={(e) => onChange({ ...condition, countMin: Number(e.target.value) })}
-              className="w-20 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
-            />
-          </div>
-        )}
+        {renderValueInput()}
       </div>
     </div>
   );

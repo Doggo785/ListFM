@@ -136,22 +136,6 @@ def get_track_full_info(network: pylast.LastFMNetwork, username: str, artist: st
     return result
 
 
-def get_similar_tracks(network: pylast.LastFMNetwork, artist: str, title: str) -> list[dict]:
-    try:
-        track = network.get_track(artist, title)
-        similar = track.get_similar(limit=10)
-        return [
-            {
-                "artist": t.item.artist.name if t.item.artist else "Unknown",
-                "title": t.item.title,
-                "match": round(float(t.match), 3),
-            }
-            for t in similar
-        ]
-    except Exception:
-        return []
-
-
 def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> list[dict]:
     network = get_network()
     to_enrich = tracks[:max_enrich]
