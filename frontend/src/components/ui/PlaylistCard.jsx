@@ -34,6 +34,7 @@ const springValues = {
 
 export default function TiltedCard({
   imageSrc,
+  icon: IconComponent,
   altText = "Tilted card image",
   captionText = "",
   countdownText = "Next generation in 3 days",
@@ -141,15 +142,21 @@ export default function TiltedCard({
       >
         <div className="flex h-full w-full flex-col gap-3">
           <div className="relative aspect-square w-full overflow-hidden rounded-[15px] bg-neutral-900">
-            <motion.img
-              src={imageSrc}
-              alt={altText}
-              className="absolute inset-0 h-full w-full object-cover will-change-transform [transform:translateZ(0)]"
-              style={{
-                width: "100%",
-                height: "100%",
-              }}
-            />
+            {IconComponent ? (
+              <div className="absolute inset-0 flex items-center justify-center will-change-transform [transform:translateZ(0)]">
+                <IconComponent size={80} strokeWidth={1.5} className="text-neutral-600" />
+              </div>
+            ) : (
+              <motion.img
+                src={imageSrc}
+                alt={altText}
+                className="absolute inset-0 h-full w-full object-cover will-change-transform [transform:translateZ(0)]"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                }}
+              />
+            )}
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
           </div>
