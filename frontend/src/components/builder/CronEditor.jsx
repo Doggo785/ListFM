@@ -54,8 +54,6 @@ export default function CronEditor({ value, onChange }) {
     const expr = buildCron(updated);
     if (isValidCron(expr)) {
       onChange(expr);
-    } else {
-      onChange(expr);
     }
   };
 
