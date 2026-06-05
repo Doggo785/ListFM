@@ -15,19 +15,21 @@ import {
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import FilterBuilder from "@/components/builder/FilterBuilder";
+import CronEditor from "@/components/builder/CronEditor";
 import {
   SOURCE_TYPES,
   SOURCE_TYPE_LABELS,
   PERIOD_OPTIONS,
-  RECURRENCE_UNIT_LABELS,
   createDefaultAutomation,
+  describeCron,
+  isValidCron,
 } from "@/lib/automation-rules";
 import { countActiveConditions } from "@/lib/filter-engine";
 
 const STEPS = [
   { id: 1, label: "Identity", icon: IconSparkles },
   { id: 2, label: "Source", icon: IconMusic },
-  { id: 3, label: "Recurrence", icon: IconCalendarRepeat },
+  { id: 3, label: "Schedule", icon: IconCalendarRepeat },
   { id: 4, label: "Filters", icon: IconFilter },
   { id: 5, label: "Summary", icon: IconCheck },
 ];
@@ -215,111 +217,6 @@ function StepSource({ data, onChange }) {
   );
 }
 
-function StepRecurrence({ data, onChange }) {
-  const toggleRecurrence = () => {
-    onChange({
-      ...data,
-      recurrence: { ...data.recurrence, enabled: !data.recurrence.enabled },
-    });
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">
-          How often should it update?
-        </h3>
-        <p className="text-neutral-400 text-sm">
-          Schedule automatic updates for your playlist.
-        </p>
-      </div>
-
-      <div className="max-w-lg mx-auto space-y-6">
-        <button
-          type="button"
-          onClick={toggleRecurrence}
-          className={`w-full flex items-center justify-between rounded-xl border p-5 transition-all ${
-            data.recurrence.enabled
-              ? "border-[#ff530b] bg-[#ff530b]/10"
-              : "border-neutral-700 bg-[#1c1c1c] hover:border-neutral-500"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <IconCalendarRepeat
-              size={22}
-              className={data.recurrence.enabled ? "text-[#ff530b]" : "text-neutral-400"}
-            />
-            <div className="text-left">
-              <div className="text-sm font-semibold text-white">
-                Auto-update
-              </div>
-              <div className="text-xs text-neutral-400 mt-0.5">
-                {data.recurrence.enabled
-                  ? "Enabled — playlist regenerates automatically"
-                  : "Disabled — static playlist"}
-              </div>
-            </div>
-          </div>
-          <div
-            className={`w-11 h-6 rounded-full p-0.5 transition-colors ${
-              data.recurrence.enabled ? "bg-[#ff530b]" : "bg-neutral-600"
-            }`}
-          >
-            <div
-              className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                data.recurrence.enabled ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </div>
-        </button>
-
-        {data.recurrence.enabled && (
-          <div className="flex items-center gap-3 rounded-xl border border-neutral-700 bg-[#1c1c1c] p-5">
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-neutral-400">Every</label>
-              <input
-                type="number"
-                min={1}
-                max={365}
-                value={data.recurrence.interval}
-                onChange={(e) =>
-                  onChange({
-                    ...data,
-                    recurrence: {
-                      ...data.recurrence,
-                      interval: parseInt(e.target.value) || 1,
-                    },
-                  })
-                }
-                className="w-16 rounded-lg border border-neutral-600 bg-[#121212] px-3 py-2 text-center text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors"
-              />
-            </div>
-            <select
-              value={data.recurrence.unit}
-              onChange={(e) =>
-                onChange({
-                  ...data,
-                  recurrence: {
-                    ...data.recurrence,
-                    unit: e.target.value,
-                  },
-                })
-              }
-              className="flex-1 rounded-lg border border-neutral-600 bg-[#121212] px-3 py-2 text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors appearance-none"
-            >
-              {Object.entries(RECURRENCE_UNIT_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function StepFilters({ data, onChange }) {
   const filterCount = countActiveConditions(data.filterGroups);
 
@@ -403,15 +300,15 @@ function StepSummary({ data }) {
             </div>
             <div className="p-5">
               <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
-                Recurrence
+                Schedule
               </div>
               <div className="text-sm font-semibold text-white">
-                {data.recurrence.enabled
-                  ? `Every ${data.recurrence.interval} ${RECURRENCE_UNIT_LABELS[data.recurrence.unit]}`
+                {isValidCron(data.cron)
+                  ? describeCron(data.cron)
                   : "Static"}
               </div>
               <div className="text-xs text-neutral-400 mt-0.5">
-                {data.recurrence.enabled
+                {isValidCron(data.cron)
                   ? "Auto-updated"
                   : "No auto-update"}
               </div>
@@ -460,7 +357,7 @@ export default function PlaylistNew() {
       case 2:
         return <StepSource data={data} onChange={setData} />;
       case 3:
-        return <StepRecurrence data={data} onChange={setData} />;
+        return <CronEditor value={data.cron} onChange={(cron) => setData({ ...data, cron })} />;
       case 4:
         return <StepFilters data={data} onChange={setData} />;
       case 5:
