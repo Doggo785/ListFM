@@ -407,9 +407,19 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [] }) {
       </div>
 
       <div className="px-4 pb-3.5 pt-0">
-        <p className="text-[11px] text-neutral-600 mb-2.5 leading-relaxed">
-          {fieldDef.description}
-        </p>
+        {disabledFields.includes(condition.field) ? (
+          <p className="text-[11px] text-amber-500/80 mb-2.5 leading-relaxed">
+            This filter is not available with the current source. Change the source to "Recent Tracks" to use it.
+          </p>
+        ) : (
+          <p className="text-[11px] text-neutral-600 mb-2.5 leading-relaxed">
+            {condition.field === "tags"
+              ? tagSource === "artist"
+                ? "Genre or mood tag associated with the artist of the track"
+                : "Genre or mood tag associated with the album of the track"
+              : fieldDef.description}
+          </p>
+        )}
         {renderValueInput()}
       </div>
     </div>
