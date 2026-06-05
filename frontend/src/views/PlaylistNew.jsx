@@ -347,6 +347,7 @@ function StepFilters({ data, onChange }) {
         <FilterBuilder
           value={data.filterGroups}
           onChange={(filterGroups) => onChange({ ...data, filterGroups })}
+          disabledFields={data.source?.type !== "recent_tracks" ? ["timestamp"] : []}
         />
       </div>
     </div>

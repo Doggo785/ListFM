@@ -453,6 +453,7 @@ export default function PlaylistDetail() {
                 value={automation.filterGroups || []}
                 onChange={updateFilters}
                 availableTags={availableTags}
+                disabledFields={automation.source?.type !== "recent_tracks" ? ["timestamp"] : []}
               />
             </SectionCard>
           </div>
