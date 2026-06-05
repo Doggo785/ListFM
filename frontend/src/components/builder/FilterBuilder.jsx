@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   IconPlus,
   IconTrash,
@@ -11,6 +11,10 @@ import {
   IconTag,
   IconSparkles,
   IconClock,
+  IconChevronDown,
+  IconFilter,
+  IconGitBranch,
+  IconListCheck,
 } from "@tabler/icons-react";
 import {
   FILTER_FIELDS,
@@ -33,131 +37,229 @@ const FIELD_ICONS = {
 
 const FIELD_ENTRIES = Object.entries(FILTER_FIELDS);
 
+function CustomSelect({ value, onChange, options, placeholder, className = "" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = options.find((o) => o.value === value);
+
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 w-full rounded-xl border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white hover:border-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all"
+      >
+        <span className="truncate flex-1 text-left">{selected?.label || placeholder}</span>
+        <IconChevronDown size={14} className={`text-neutral-500 transition-transform shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
+          <div className="max-h-56 overflow-y-auto p-1">
+            {options.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+                className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-lg transition-colors text-left ${
+                  opt.value === value
+                    ? "bg-[#ff530b]/15 text-[#ff530b]"
+                    : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
+                }`}
+              >
+                {opt.icon && <opt.icon size={14} className="shrink-0" />}
+                <span className="truncate">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LogicToggle({ value, onChange }) {
   return (
-    <button
-      type="button"
-      onClick={() => onChange(value === "AND" ? "OR" : "AND")}
-      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
-        value === "AND"
-          ? "bg-[#ff530b]/15 text-[#ff530b] border border-[#ff530b]/30"
-          : "bg-purple-500/15 text-purple-400 border border-purple-500/30"
-      }`}
-    >
-      <IconSwitch2 size={12} />
-      {value}
-    </button>
+    <div className="flex items-center rounded-xl border border-neutral-700/60 bg-[#111] p-0.5 shrink-0">
+      <button
+        type="button"
+        onClick={() => onChange("AND")}
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
+          value === "AND"
+            ? "bg-[#ff530b]/20 text-[#ff530b] shadow-[0_0_12px_rgba(255,83,11,0.15)]"
+            : "text-neutral-500 hover:text-neutral-300"
+        }`}
+      >
+        <IconListCheck size={12} />
+        All
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("OR")}
+        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
+          value === "OR"
+            ? "bg-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.15)]"
+            : "text-neutral-500 hover:text-neutral-300"
+        }`}
+      >
+        <IconSwitch2 size={12} />
+        Any
+      </button>
+    </div>
   );
 }
 
 function FilterRow({ condition, onChange, onRemove }) {
-  const fieldDef = FILTER_FIELDS[condition.field] || { type: "number" };
+  const fieldDef = FILTER_FIELDS[condition.field] || { type: "number", description: "" };
   const operators = FILTER_OPERATORS[fieldDef.type] || FILTER_OPERATORS.number;
   const FieldIcon = FIELD_ICONS[condition.field] || IconBolt;
   const isBoolean = fieldDef.type === "boolean";
   const isText = fieldDef.type === "text";
+  const isDate = fieldDef.type === "date";
   const needsMax = condition.operator === "between";
 
+  const fieldOptions = FIELD_ENTRIES.map(([key, def]) => ({
+    value: key,
+    label: def.label,
+    icon: FIELD_ICONS[key] || IconBolt,
+  }));
+
+  const operatorOptions = operators.map((op) => ({
+    value: op.value,
+    label: op.label,
+  }));
+
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-neutral-800 bg-[#141414] px-3 py-2.5 group/row hover:border-neutral-600 transition-colors">
-      <div className="rounded-md bg-neutral-800/60 p-1.5 shrink-0">
-        <FieldIcon size={14} className="text-neutral-400" />
-      </div>
+    <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <div className="rounded-lg bg-neutral-800/60 p-2 shrink-0">
+          <FieldIcon size={14} className="text-neutral-400 group-hover/row:text-[#ff530b] transition-colors" />
+        </div>
 
-      <select
-        value={condition.field}
-        onChange={(e) => {
-          const newField = e.target.value;
-          const newType = FILTER_FIELDS[newField]?.type || "number";
-          const defaultOp = FILTER_OPERATORS[newType]?.[0]?.value || "eq";
-          onChange({ ...condition, field: newField, operator: defaultOp });
-        }}
-        className="rounded-lg border border-neutral-700 bg-[#1a1a1a] px-2.5 py-1.5 text-sm text-white focus:border-[#ff530b] focus:outline-none appearance-none min-w-[120px]"
-      >
-        {FIELD_ENTRIES.map(([key, def]) => (
-          <option key={key} value={key}>{def.label}</option>
-        ))}
-      </select>
+        <CustomSelect
+          value={condition.field}
+          onChange={(newField) => {
+            const newType = FILTER_FIELDS[newField]?.type || "number";
+            const defaultOp = FILTER_OPERATORS[newType]?.[0]?.value || "eq";
+            onChange({ ...condition, field: newField, operator: defaultOp });
+          }}
+          options={fieldOptions}
+          className="flex-1 min-w-0"
+        />
 
-      <select
-        value={condition.operator}
-        onChange={(e) => onChange({ ...condition, operator: e.target.value })}
-        className="rounded-lg border border-neutral-700 bg-[#1a1a1a] px-2.5 py-1.5 text-sm text-white focus:border-[#ff530b] focus:outline-none appearance-none w-24"
-      >
-        {operators.map((op) => (
-          <option key={op.value} value={op.value}>{op.label}</option>
-        ))}
-      </select>
+        <CustomSelect
+          value={condition.operator}
+          onChange={(op) => onChange({ ...condition, operator: op })}
+          options={operatorOptions}
+          className="w-32 shrink-0"
+        />
 
-      {isBoolean ? (
         <button
           type="button"
-          onClick={() => onChange({ ...condition, value: condition.value === true ? false : true })}
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-            condition.value
-              ? "bg-[#ff530b]/15 text-[#ff530b] border border-[#ff530b]/30"
-              : "bg-neutral-800 text-neutral-400 border border-neutral-700"
-          }`}
+          onClick={onRemove}
+          className="shrink-0 rounded-lg p-2 text-neutral-700 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/row:opacity-100"
         >
-          {condition.value ? "Yes" : "No"}
+          <IconTrash size={14} />
         </button>
-      ) : isText ? (
-        <input
-          type="text"
-          value={condition.value || ""}
-          onChange={(e) => onChange({ ...condition, value: e.target.value })}
-          placeholder="value"
-          className="flex-1 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-1.5 text-sm text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none min-w-0"
-        />
-      ) : (
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <input
-            type="number"
-            value={condition.value ?? ""}
-            onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
-            placeholder="min"
-            className="w-20 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-1.5 text-sm text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none tabular-nums"
-          />
-          {needsMax && (
-            <>
-              <span className="text-neutral-500 text-xs">and</span>
-              <input
-                type="number"
-                value={condition.valueMax ?? ""}
-                onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
-                placeholder="max"
-                className="w-20 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-1.5 text-sm text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none tabular-nums"
-              />
-            </>
-          )}
-        </div>
-      )}
+      </div>
 
-      {condition.field === "tags" && (
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-neutral-500 text-xs">count≥</span>
-          <input
-            type="number"
-            value={condition.countMin ?? 0}
-            onChange={(e) => onChange({ ...condition, countMin: Number(e.target.value) })}
-            className="w-14 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-2 py-1.5 text-sm text-white focus:border-[#ff530b] focus:outline-none tabular-nums"
-          />
-        </div>
-      )}
+      <div className="px-4 pb-3.5 pt-0">
+        <p className="text-[11px] text-neutral-600 mb-2.5 leading-relaxed">
+          {fieldDef.description}
+        </p>
 
-      <button
-        type="button"
-        onClick={onRemove}
-        className="shrink-0 rounded-lg p-1.5 text-neutral-600 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover/row:opacity-100"
-      >
-        <IconTrash size={14} />
-      </button>
+        {isBoolean ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onChange({ ...condition, value: true })}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
+                condition.value === true
+                  ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
+                  : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ ...condition, value: false })}
+              className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
+                condition.value === false
+                  ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
+                  : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
+              }`}
+            >
+              No
+            </button>
+          </div>
+        ) : isText ? (
+          <input
+            type="text"
+            value={condition.value || ""}
+            onChange={(e) => onChange({ ...condition, value: e.target.value })}
+            placeholder={isDate ? "e.g. rock, electronic" : "Enter value..."}
+            className="w-full rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all"
+          />
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={condition.value ?? ""}
+              onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
+              placeholder={isDate ? "days" : "Min"}
+              className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+            />
+            {needsMax && (
+              <>
+                <span className="text-neutral-600 text-xs font-medium">to</span>
+                <input
+                  type="number"
+                  value={condition.valueMax ?? ""}
+                  onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
+                  placeholder="Max"
+                  className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+                />
+              </>
+            )}
+          </div>
+        )}
+
+        {condition.field === "tags" && (
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-neutral-600 text-xs">Minimum tag count:</span>
+            <input
+              type="number"
+              value={condition.countMin ?? 0}
+              onChange={(e) => onChange({ ...condition, countMin: Number(e.target.value) })}
+              className="w-20 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowAddMenu(false);
+    };
+    if (showAddMenu) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showAddMenu]);
 
   const updateCondition = (idx, newCondition) => {
     const conditions = [...group.conditions];
@@ -195,27 +297,53 @@ function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
     onChange({ ...group, groups: (group.groups || []).filter((_, i) => i !== idx) });
   };
 
-  const hasContent = group.conditions.length > 0 || (group.groups || []).length > 0;
+  const logicLabel = group.logic === "AND" ? "all" : "any";
+  const isNested = depth > 0;
 
   return (
-    <div className={`rounded-2xl border ${depth > 0 ? "border-neutral-700 bg-[#111]" : "border-neutral-800 bg-[#1a1a1a]"} overflow-hidden`}>
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800/60">
+    <div
+      className={`rounded-2xl overflow-hidden transition-all ${
+        isNested
+          ? "border border-purple-500/20 bg-[#131316] shadow-[inset_3px_0_0_rgba(168,85,247,0.4)]"
+          : "border border-neutral-800/80 bg-[#1a1a1a] shadow-[0_4px_24px_rgba(0,0,0,0.3)]"
+      }`}
+    >
+      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-neutral-800/50">
         <LogicToggle value={group.logic} onChange={(val) => onChange({ ...group, logic: val })} />
-        {depth === 0 && (
-          <span className="text-xs text-neutral-500">Match tracks where</span>
-        )}
+
+        <span className="text-xs text-neutral-500 flex-1">
+          Match tracks where{" "}
+          <span className={`font-semibold ${group.logic === "AND" ? "text-[#ff530b]/70" : "text-purple-400/70"}`}>
+            {logicLabel}
+          </span>{" "}
+          of these conditions are met
+        </span>
+
         {onRemove && (
           <button
             type="button"
             onClick={onRemove}
-            className="ml-auto rounded-lg p-1.5 text-neutral-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+            className="rounded-lg p-2 text-neutral-700 hover:text-red-400 hover:bg-red-400/10 transition-all"
+            title="Remove group"
           >
             <IconTrash size={14} />
           </button>
         )}
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="p-4 space-y-3">
+        {group.conditions.length === 0 && (group.groups || []).length === 0 && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="rounded-2xl bg-neutral-800/30 p-3 mb-3">
+              <IconFilter size={20} className="text-neutral-600" />
+            </div>
+            <p className="text-sm text-neutral-500 font-medium">No conditions yet</p>
+            <p className="text-xs text-neutral-600 mt-1">
+              Click the button below to add your first filter
+            </p>
+          </div>
+        )}
+
         {group.conditions.map((cond, i) => (
           <FilterRow
             key={cond.id}
@@ -226,55 +354,45 @@ function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
         ))}
 
         {(group.groups || []).map((sub, i) => (
-          <div key={sub.id} className="relative">
-            <div className="absolute left-5 top-0 bottom-0 w-px bg-neutral-800" />
-            <div className="pl-4">
-              <FilterGroup
-                group={sub}
-                onChange={(g) => updateSubGroup(i, g)}
-                onRemove={() => removeSubGroup(i)}
-                depth={depth + 1}
-              />
-            </div>
-          </div>
+          <FilterGroup
+            key={sub.id}
+            group={sub}
+            onChange={(g) => updateSubGroup(i, g)}
+            onRemove={() => removeSubGroup(i)}
+            depth={depth + 1}
+          />
         ))}
-
-        {!hasContent && (
-          <p className="text-xs text-neutral-600 text-center py-2">
-            No conditions yet. Add one below.
-          </p>
-        )}
       </div>
 
-      <div className="px-4 pb-4 relative">
-        <button
-          type="button"
-          onClick={() => setShowAddMenu(!showAddMenu)}
-          className="flex items-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-transparent px-4 py-2.5 text-sm text-neutral-400 hover:border-[#ff530b]/50 hover:text-[#ff530b] transition-all w-full justify-center"
-        >
-          <IconPlus size={14} />
-          Add
-        </button>
-
-        {showAddMenu && (
-          <div className="absolute bottom-full left-4 right-4 mb-2 rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_-8px_30px_rgba(0,0,0,0.5)] overflow-hidden z-10">
+      <div className="px-4 pb-4 relative" ref={menuRef}>
+        {showAddMenu ? (
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={addCondition}
-              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-[#ff530b]/30 bg-[#ff530b]/10 px-4 py-3 text-sm font-medium text-[#ff530b] hover:bg-[#ff530b]/15 transition-all"
             >
-              <IconPlus size={14} className="text-[#ff530b]" />
+              <IconPlus size={14} />
               Add condition
             </button>
             <button
               type="button"
               onClick={addSubGroup}
-              className="flex items-center gap-2 w-full px-4 py-3 text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors border-t border-neutral-800"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/15 transition-all"
             >
-              <IconPlus size={14} className="text-purple-400" />
+              <IconGitBranch size={14} />
               Add sub-group
             </button>
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowAddMenu(true)}
+            className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700/60 bg-transparent px-4 py-3 text-sm text-neutral-500 hover:border-[#ff530b]/40 hover:text-[#ff530b] hover:bg-[#ff530b]/5 transition-all w-full"
+          >
+            <IconPlus size={14} />
+            Add
+          </button>
         )}
       </div>
     </div>
@@ -299,28 +417,28 @@ export default function FilterBuilder({ value, onChange }) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {groups.map((group, i) => (
-        <FilterGroup
-          key={group.id}
-          group={group}
-          onChange={(g) => updateGroup(i, g)}
-          onRemove={groups.length > 1 ? () => removeGroup(i) : undefined}
-        />
-      ))}
-
-      {groups.length > 1 && (
-        <div className="flex items-center gap-2 justify-center py-1">
-          <div className="h-px flex-1 bg-neutral-800" />
-          <span className="text-[10px] text-neutral-600 uppercase tracking-widest font-medium">OR</span>
-          <div className="h-px flex-1 bg-neutral-800" />
+        <div key={group.id}>
+          {i > 0 && (
+            <div className="flex items-center gap-3 justify-center py-2 mb-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-neutral-700 to-transparent" />
+              <span className="text-[10px] text-neutral-600 uppercase tracking-[0.2em] font-bold px-2">OR</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-neutral-700 to-transparent" />
+            </div>
+          )}
+          <FilterGroup
+            group={group}
+            onChange={(g) => updateGroup(i, g)}
+            onRemove={groups.length > 1 ? () => removeGroup(i) : undefined}
+          />
         </div>
-      )}
+      ))}
 
       <button
         type="button"
         onClick={addGroup}
-        className="flex items-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-transparent px-4 py-3 text-sm text-neutral-400 hover:border-purple-500/50 hover:text-purple-400 transition-all w-full justify-center"
+        className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700/60 bg-transparent px-4 py-3 text-sm text-neutral-500 hover:border-purple-500/40 hover:text-purple-400 hover:bg-purple-500/5 transition-all w-full"
       >
         <IconPlus size={14} />
         Add filter group

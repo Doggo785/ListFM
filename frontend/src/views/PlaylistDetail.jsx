@@ -419,8 +419,8 @@ export default function PlaylistDetail() {
 
             {/* Filters */}
             <SectionCard title="Filters" icon={IconFilter} delay={0.4}>
-              <p className="text-xs text-neutral-500 mb-3">
-                Add conditions to refine which tracks appear in your playlist.
+              <p className="text-xs text-neutral-500 pb-4 mb-4">
+                Refine which tracks appear in your playlist. Conditions within a group are combined with the selected logic (All/Any).
               </p>
               <FilterBuilder
                 value={automation.filterGroups || []}
