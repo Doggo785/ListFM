@@ -116,7 +116,7 @@ function LogicToggle({ value, onChange }) {
   );
 }
 
-function FilterRow({ condition, onChange, onRemove, availableTags = [] }) {
+function FilterRow({ condition, onChange, onRemove, availableTags = [], disabledFields = [] }) {
   const fieldDef = FILTER_FIELDS[condition.field] || { type: "number", description: "" };
   const operators = FILTER_OPERATORS[fieldDef.type] || FILTER_OPERATORS.number;
   const FieldIcon = FIELD_ICONS[condition.field] || IconBolt;
@@ -145,11 +145,13 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [] }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const fieldOptions = FIELD_ENTRIES.map(([key, def]) => ({
-    value: key,
-    label: def.label,
-    icon: FIELD_ICONS[key] || IconBolt,
-  }));
+  const fieldOptions = FIELD_ENTRIES
+    .filter(([key]) => !disabledFields.includes(key))
+    .map(([key, def]) => ({
+      value: key,
+      label: def.label,
+      icon: FIELD_ICONS[key] || IconBolt,
+    }));
 
   const operatorOptions = operators.map((op) => ({
     value: op.value,
@@ -426,7 +428,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [] }) {
   );
 }
 
-function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [] }) {
+function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [], disabledFields = [] }) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -528,6 +530,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [] 
             onChange={(c) => updateCondition(i, c)}
             onRemove={() => removeCondition(i)}
             availableTags={availableTags}
+            disabledFields={disabledFields}
           />
         ))}
 
@@ -539,6 +542,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [] 
             onRemove={() => removeSubGroup(i)}
             depth={depth + 1}
             availableTags={availableTags}
+            disabledFields={disabledFields}
           />
         ))}
       </div>
@@ -578,7 +582,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [] 
   );
 }
 
-export default function FilterBuilder({ value, onChange, availableTags = [] }) {
+export default function FilterBuilder({ value, onChange, availableTags = [], disabledFields = [] }) {
   const groups = value || [];
 
   const updateGroup = (idx, newGroup) => {
@@ -611,6 +615,7 @@ export default function FilterBuilder({ value, onChange, availableTags = [] }) {
             onChange={(g) => updateGroup(i, g)}
             onRemove={groups.length > 1 ? () => removeGroup(i) : undefined}
             availableTags={availableTags}
+            disabledFields={disabledFields}
           />
         </div>
       ))}
