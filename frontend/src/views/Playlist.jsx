@@ -54,14 +54,13 @@ export default function Playlist() {
           </p>
         </header>
 
-        <section className="min-h-[calc(100vh-240px)] rounded-3xl border border-neutral-800 bg-[#171717] p-5 md:p-7 overflow-x-auto">
-          <div className="h-full overflow-visible py-3">
+        <section className="rounded-3xl border border-neutral-800 bg-[#171717] p-5 md:p-7">
+          <div className="py-3">
             <h3 className="mb-6 text-lg font-bold text-white">
               My automations
             </h3>
 
-            <div className="flex h-full items-center gap-6 pb-8 pt-2">
-              <div className="w-2 shrink-0 md:w-4" aria-hidden="true" />
+            <div className="flex flex-wrap items-start gap-6 pb-8 pt-2">
               {automations.map((auto) => {
                 const isUserAutomation = !auto.id.startsWith("auto-");
                 return (
@@ -131,7 +130,6 @@ export default function Playlist() {
                   displayOverlayContent
                 />
               </button>
-              <div className="w-2 shrink-0 md:w-4" aria-hidden="true" />
             </div>
           </div>
         </section>
