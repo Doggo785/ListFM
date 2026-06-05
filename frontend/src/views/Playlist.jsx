@@ -44,7 +44,7 @@ export default function Playlist() {
 
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
-      <div className="mx-auto flex h-full max-w-7xl flex-col">
+      <div className="mx-auto flex max-w-7xl flex-col">
         <header className="mb-8">
           <h2 className="text-4xl font-black text-white">
             <span className="text-[#17AEFF]">Automated</span> Playlists
@@ -54,7 +54,7 @@ export default function Playlist() {
           </p>
         </header>
 
-        <section className="rounded-3xl border border-neutral-800 bg-[#171717] p-5 md:p-7">
+        <section className="rounded-3xl border border-neutral-800 bg-[#171717] p-5 md:p-7 mb-10">
           <div className="py-3">
             <h3 className="mb-6 text-lg font-bold text-white">
               My automations
