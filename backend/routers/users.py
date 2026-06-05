@@ -14,9 +14,6 @@ def legacy_recent_tracks(username: str, limit: int = 5):
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
-@router.get("/users/{username}/recent-tracks", response_model=RecentTracksResponse)
-
-
 @router.get("/{username}/recent-tracks", response_model=RecentTracksResponse)
 def user_recent_tracks(username: str, limit: int = 5):
     try:
