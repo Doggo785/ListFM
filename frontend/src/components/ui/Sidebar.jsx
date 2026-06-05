@@ -4,13 +4,13 @@ import { cn } from "@/lib/utils";
 
 import { useState, createContext, useContext } from "react";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react"; // eslint-disable-line no-unused-vars
 
 import { IconMenu2, IconX } from "@tabler/icons-react";
 
 const SidebarContext = createContext(undefined);
 
-export const useSidebar = () => {
+export const useSidebar = () => { // eslint-disable-line react-refresh/only-export-components
   const context = useContext(SidebarContext);
 
   if (!context) {

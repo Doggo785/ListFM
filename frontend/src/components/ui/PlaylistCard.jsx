@@ -24,7 +24,7 @@
 }
 
 import { useRef, useState } from "react";
-import { motion, useMotionValue, useSpring } from "motion/react";
+import { motion, useMotionValue, useSpring } from "motion/react"; // eslint-disable-line no-unused-vars
 
 const springValues = {
   damping: 30,
