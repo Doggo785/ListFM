@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TiltedCard from "../components/ui/PlaylistCard";
 import {
@@ -22,25 +22,24 @@ function buildDescription(auto) {
   return `${source} · ${period}`;
 }
 
-export default function Playlist() {
-  const [automations, setAutomations] = useState([]);
-  const navigate = useNavigate();
+function loadAutomations() {
+  const saved = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
+  return saved.map((auto) => {
+    const name = auto.name || "Untitled";
+    const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
+    return {
+      id: auto.id,
+      title: name,
+      image: getPlaylistImageSrc(name, auto.source?.type),
+      description: buildDescription(auto),
+      glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
+    };
+  });
+}
 
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
-    const userCards = saved.map((auto) => {
-      const name = auto.name || "Untitled";
-      const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
-      return {
-        id: auto.id,
-        title: name,
-        image: getPlaylistImageSrc(name, auto.source?.type),
-        description: buildDescription(auto),
-        glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
-      };
-    });
-    setAutomations(userCards);
-  }, []);
+export default function Playlist() {
+  const [automations] = useState(loadAutomations);
+  const navigate = useNavigate();
 
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">

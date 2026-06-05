@@ -156,8 +156,11 @@ const BorderGlow = ({
     if (!animated) return;
     const angleStart = 110;
     const angleEnd = 465;
-    setSweepActive(true);
-    setCursorAngle(angleStart);
+
+    const rafId = requestAnimationFrame(() => {
+      setSweepActive(true);
+      setCursorAngle(angleStart);
+    });
 
     animateValue({ duration: 500, onUpdate: (v) => setEdgeProximity(v / 100) });
     animateValue({
@@ -187,6 +190,8 @@ const BorderGlow = ({
       onUpdate: (v) => setEdgeProximity(v / 100),
       onEnd: () => setSweepActive(false),
     });
+
+    return () => cancelAnimationFrame(rafId);
   }, [animated]);
 
   const colorSensitivity = edgeSensitivity + 20;
