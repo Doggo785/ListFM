@@ -499,32 +499,38 @@ export default function PlaylistDetail() {
 
                     {previewTracks && previewTracks.length > 0 && (
                       <div className="space-y-0.5">
-                        {previewTracks.slice(0, 15).map((track, i) => (
-                          <motion.div
-                            key={`${track.artist}-${track.title}-${i}`}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.2, delay: i * 0.03 }}
-                            className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-white/5 transition-colors group"
-                          >
-                            <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 group-hover:text-neutral-400 tabular-nums">
-                              {i + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-base text-white/90 truncate group-hover:text-white transition-colors">
-                                {track.title}
-                              </div>
-                              <div className="text-xs text-neutral-500 truncate italic">
-                                {track.artist}
-                              </div>
-                            </div>
-                            {track.playcount != null && (
-                              <span className="text-xs text-neutral-600 font-mono shrink-0 tabular-nums">
-                                {track.playcount}
+                        {previewTracks.slice(0, 15).map((track, i) => {
+                          const lastfmUrl = `https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.title)}`;
+                          return (
+                            <motion.a
+                              key={`${track.artist}-${track.title}-${i}`}
+                              href={lastfmUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.2, delay: i * 0.03 }}
+                              className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-white/5 transition-colors group"
+                            >
+                              <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 group-hover:text-neutral-400 tabular-nums">
+                                {i + 1}
                               </span>
-                            )}
-                          </motion.div>
-                        ))}
+                              <div className="min-w-0 flex-1">
+                                <div className="text-base text-white/90 truncate group-hover:text-[#17AEFF] transition-colors">
+                                  {track.title}
+                                </div>
+                                <div className="text-xs text-neutral-500 truncate italic group-hover:text-neutral-400 transition-colors">
+                                  {track.artist}
+                                </div>
+                              </div>
+                              {track.playcount != null && (
+                                <span className="text-xs text-neutral-600 font-mono shrink-0 tabular-nums">
+                                  {track.playcount}
+                                </span>
+                              )}
+                            </motion.a>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
