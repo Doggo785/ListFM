@@ -36,18 +36,6 @@ const FIELD_ICONS = {
 
 const FIELD_ENTRIES = Object.entries(FILTER_FIELDS);
 
-const COMMON_TAGS = [
-  "rock", "pop", "electronic", "indie", "alternative", "hip-hop", "rap",
-  "metal", "jazz", "classical", "r&b", "soul", "funk", "disco",
-  "punk", "grunge", "lo-fi", "synthwave", "ambient", "folk",
-  "country", "reggae", "blues", "latin", "k-pop", "j-pop",
-  "edm", "house", "techno", "drum and bass", "trance",
-  "acoustic", "singer-songwriter", "post-punk", "shoegaze",
-  "dream pop", "noise rock", "math rock", "progressive rock",
-  "psychedelic", "garage rock", "indie rock", "indie pop",
-  "art pop", "chamber pop", "baroque pop", "new wave",
-];
-
 function CustomSelect({ value, onChange, options, placeholder, className = "" }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -128,7 +116,7 @@ function LogicToggle({ value, onChange }) {
   );
 }
 
-function FilterRow({ condition, onChange, onRemove }) {
+function FilterRow({ condition, onChange, onRemove, availableTags = [] }) {
   const fieldDef = FILTER_FIELDS[condition.field] || { type: "number", description: "" };
   const operators = FILTER_OPERATORS[fieldDef.type] || FILTER_OPERATORS.number;
   const FieldIcon = FIELD_ICONS[condition.field] || IconBolt;
@@ -139,11 +127,13 @@ function FilterRow({ condition, onChange, onRemove }) {
 
   const [tagSearch, setTagSearch] = useState(condition.field === "tags" ? (condition.value || "") : "");
   const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [tagSource, setTagSource] = useState(condition.tagSource || "artist");
   const tagInputRef = useRef(null);
 
-  const filteredTags = COMMON_TAGS.filter(
-    (t) => t.includes(tagSearch.toLowerCase()) && t !== condition.value
-  ).slice(0, 10);
+  const currentTags = availableTags[tagSource] || [];
+  const filteredTags = currentTags.filter(
+    (t) => t.name.includes(tagSearch.toLowerCase()) && t.name !== condition.value
+  ).slice(0, 12);
 
   useEffect(() => {
     const handler = (e) => {
@@ -197,10 +187,37 @@ function FilterRow({ condition, onChange, onRemove }) {
       );
     }
 
-    // Tags field: searchable dropdown with common tags
+    // Tags field: searchable dropdown with artist/album source toggle
     if (condition.field === "tags") {
+      const tagSourceLabel = tagSource === "artist" ? "Artist" : "Album";
       return (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => { setTagSource("artist"); onChange({ ...condition, tagSource: "artist" }); }}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                tagSource === "artist"
+                  ? "bg-[#ff530b]/15 text-[#ff530b] border border-[#ff530b]/30"
+                  : "text-neutral-500 border border-transparent hover:text-neutral-300"
+              }`}
+            >
+              <IconBolt size={11} />
+              Artist
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTagSource("album"); onChange({ ...condition, tagSource: "album" }); }}
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                tagSource === "album"
+                  ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                  : "text-neutral-500 border border-transparent hover:text-neutral-300"
+              }`}
+            >
+              <IconTag size={11} />
+              Album
+            </button>
+          </div>
           <div className="relative" ref={tagInputRef}>
             <div className="flex items-center gap-2 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5">
               <IconSearch size={14} className="text-neutral-500 shrink-0" />
@@ -215,35 +232,46 @@ function FilterRow({ condition, onChange, onRemove }) {
                   }
                 }}
                 onFocus={() => setShowTagDropdown(true)}
-                placeholder="Search tags..."
+                placeholder={`Search ${tagSourceLabel.toLowerCase()} tags...`}
                 className="flex-1 bg-transparent text-sm text-white placeholder:text-neutral-600 focus:outline-none min-w-0"
               />
             </div>
             {showTagDropdown && (
               <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
-                <div className="max-h-48 overflow-y-auto p-1">
-                  {filteredTags.length === 0 ? (
+                <div className="max-h-56 overflow-y-auto p-1">
+                  {currentTags.length === 0 ? (
                     <div className="px-3 py-2.5 text-sm text-neutral-500">
-                      Press Enter to use "{tagSearch}"
+                      {tagSearch
+                        ? `Use "${tagSearch}"`
+                        : "Load a preview to see available tags"}
+                    </div>
+                  ) : filteredTags.length === 0 ? (
+                    <div className="px-3 py-2.5 text-sm text-neutral-500">
+                      {tagSearch ? `Use "${tagSearch}"` : "No matching tags"}
                     </div>
                   ) : (
                     filteredTags.map((tag) => (
                       <button
-                        key={tag}
+                        key={tag.name}
                         type="button"
                         onClick={() => {
-                          onChange({ ...condition, value: tag });
-                          setTagSearch(tag);
+                          onChange({ ...condition, value: tag.name, tagSource });
+                          setTagSearch(tag.name);
                           setShowTagDropdown(false);
                         }}
                         className={`flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors text-left ${
-                          condition.value === tag
+                          condition.value === tag.name
                             ? "bg-[#ff530b]/15 text-[#ff530b]"
                             : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
                         }`}
                       >
                         <IconTag size={12} className="shrink-0 text-neutral-500" />
-                        <span>{tag}</span>
+                        <span className="flex-1 truncate">{tag.name}</span>
+                        <span className={`text-[10px] font-mono tabular-nums shrink-0 ${
+                          tag.count >= 70 ? "text-[#ff530b]" : tag.count >= 40 ? "text-neutral-400" : "text-neutral-600"
+                        }`}>
+                          {tag.count}%
+                        </span>
                       </button>
                     ))
                   )}
@@ -252,13 +280,17 @@ function FilterRow({ condition, onChange, onRemove }) {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-neutral-600 text-xs">Minimum tag count:</span>
+            <span className="text-neutral-600 text-xs">Min reliability:</span>
             <input
               type="number"
               value={condition.countMin ?? 0}
               onChange={(e) => onChange({ ...condition, countMin: Number(e.target.value) })}
-              className="w-20 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+              min="0"
+              max="100"
+              placeholder="0"
+              className="w-16 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-2.5 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
             />
+            <span className="text-neutral-600 text-xs">%</span>
           </div>
         </div>
       );
@@ -384,7 +416,7 @@ function FilterRow({ condition, onChange, onRemove }) {
   );
 }
 
-function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
+function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [] }) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef(null);
 
@@ -485,6 +517,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
             condition={cond}
             onChange={(c) => updateCondition(i, c)}
             onRemove={() => removeCondition(i)}
+            availableTags={availableTags}
           />
         ))}
 
@@ -495,6 +528,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
             onChange={(g) => updateSubGroup(i, g)}
             onRemove={() => removeSubGroup(i)}
             depth={depth + 1}
+            availableTags={availableTags}
           />
         ))}
       </div>
@@ -534,7 +568,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
   );
 }
 
-export default function FilterBuilder({ value, onChange }) {
+export default function FilterBuilder({ value, onChange, availableTags = [] }) {
   const groups = value || [];
 
   const updateGroup = (idx, newGroup) => {
@@ -566,6 +600,7 @@ export default function FilterBuilder({ value, onChange }) {
             group={group}
             onChange={(g) => updateGroup(i, g)}
             onRemove={groups.length > 1 ? () => removeGroup(i) : undefined}
+            availableTags={availableTags}
           />
         </div>
       ))}
