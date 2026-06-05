@@ -138,7 +138,7 @@ function FilterRow({ condition, onChange, onRemove }) {
   }));
 
   return (
-    <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all overflow-hidden">
+    <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all">
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div className="rounded-lg bg-neutral-800/60 p-2 shrink-0">
           <FieldIcon size={14} className="text-neutral-400 group-hover/row:text-[#ff530b] transition-colors" />
@@ -302,7 +302,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0 }) {
 
   return (
     <div
-      className={`rounded-2xl overflow-hidden transition-all ${
+      className={`rounded-2xl transition-all ${
         isNested
           ? "border border-purple-500/20 bg-[#131316] shadow-[inset_3px_0_0_rgba(168,85,247,0.4)]"
           : "border border-neutral-800/80 bg-[#1a1a1a] shadow-[0_4px_24px_rgba(0,0,0,0.3)]"
