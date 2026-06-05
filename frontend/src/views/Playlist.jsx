@@ -111,7 +111,7 @@ export default function Playlist() {
               <button
                 type="button"
                 onClick={() => navigate("/playlists/new")}
-                className="shrink-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
+                className="shrink-0 py-2 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
                 aria-label="Create a new automated playlist"
               >
                 <TiltedCard
