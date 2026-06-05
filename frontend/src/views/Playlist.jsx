@@ -6,7 +6,7 @@ import {
   RECURRENCE_UNIT_LABELS,
   PERIOD_OPTIONS,
 } from "@/lib/automation-rules";
-import { getPlaylistImageSrc } from "@/components/ui/PlaylistLogo";
+import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
 import { IconPlus } from "@tabler/icons-react";
 
 function buildDescription(auto) {
@@ -28,12 +28,17 @@ export default function Playlist() {
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
-    const userCards = saved.map((auto) => ({
-      id: auto.id,
-      title: auto.name || "Untitled",
-      image: getPlaylistImageSrc(auto.name || "Untitled", auto.source?.type),
-      description: buildDescription(auto),
-    }));
+    const userCards = saved.map((auto) => {
+      const name = auto.name || "Untitled";
+      const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
+      return {
+        id: auto.id,
+        title: name,
+        image: getPlaylistImageSrc(name, auto.source?.type),
+        description: buildDescription(auto),
+        glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
+      };
+    });
     setAutomations(userCards);
   }, []);
 
@@ -49,13 +54,13 @@ export default function Playlist() {
           </p>
         </header>
 
-        <section className="min-h-[calc(100vh-240px)] rounded-3xl border border-neutral-800 bg-[#171717] p-5 md:p-7">
+        <section className="min-h-[calc(100vh-240px)] rounded-3xl border border-neutral-800 bg-[#171717] p-5 md:p-7 overflow-x-auto">
           <div className="h-full overflow-visible py-3">
             <h3 className="mb-6 text-lg font-bold text-white">
               My automations
             </h3>
 
-            <div className="flex h-full items-center gap-6 overflow-x-auto overflow-y-visible pb-8 pt-2">
+            <div className="flex h-full items-center gap-6 pb-8 pt-2">
               <div className="w-2 shrink-0 md:w-4" aria-hidden="true" />
               {automations.map((auto) => {
                 const isUserAutomation = !auto.id.startsWith("auto-");
@@ -87,6 +92,7 @@ export default function Playlist() {
                   >
                     <TiltedCard
                       imageSrc={auto.image}
+                      glowColor={auto.glowColor}
                       altText={auto.title}
                       captionText={auto.title}
                       countdownText={auto.description}
