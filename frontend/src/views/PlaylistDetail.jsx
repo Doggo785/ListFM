@@ -217,6 +217,33 @@ export default function PlaylistDetail() {
     PERIOD_OPTIONS.find((p) => p.value === automation.source?.period)?.label ||
     automation.source?.period;
 
+  const availableTags = rawTracks
+    ? {
+        artist: Object.values(
+          rawTracks
+            .flatMap((t) => t.artist_tags || [])
+            .reduce((acc, tag) => {
+              const key = tag.name.toLowerCase();
+              if (!acc[key] || tag.count > acc[key].count) {
+                acc[key] = { name: tag.name.toLowerCase(), count: tag.count };
+              }
+              return acc;
+            }, {})
+        ).sort((a, b) => b.count - a.count),
+        album: Object.values(
+          rawTracks
+            .flatMap((t) => t.album_tags || [])
+            .reduce((acc, tag) => {
+              const key = tag.name.toLowerCase();
+              if (!acc[key] || tag.count > acc[key].count) {
+                acc[key] = { name: tag.name.toLowerCase(), count: tag.count };
+              }
+              return acc;
+            }, {})
+        ).sort((a, b) => b.count - a.count),
+      }
+    : { artist: [], album: [] };
+
   return (
     <div className="main-content h-screen w-full min-w-0 flex-1 overflow-y-auto p-6 md:p-12">
       <div className="mx-auto max-w-[1400px] flex h-full flex-col">
@@ -425,6 +452,7 @@ export default function PlaylistDetail() {
               <FilterBuilder
                 value={automation.filterGroups || []}
                 onChange={updateFilters}
+                availableTags={availableTags}
               />
             </SectionCard>
           </div>
