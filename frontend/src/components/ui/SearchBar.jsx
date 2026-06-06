@@ -111,6 +111,15 @@ const StyledWrapper = styled.div`
     border-color: rgba(255, 104, 23, 0.3);
   }
 
+  .input:-webkit-autofill,
+  .input:-webkit-autofill:hover,
+  .input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #141414 inset;
+    -webkit-text-fill-color: #ffffff;
+    caret-color: #ffffff;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
   #main:focus-within > #input-mask {
     display: none;
   }
