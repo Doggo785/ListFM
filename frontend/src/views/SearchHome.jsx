@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+// eslint-disable-next-line no-unused-vars -- motion is used as JSX (<motion.div>)
+import { motion } from "motion/react";
 import SearchInput from "../components/ui/SearchBar";
 import Grainient from "../components/ui/Grainient";
 
@@ -10,13 +12,12 @@ function SearchHome() {
   const handleSearch = () => {
     if (username.trim()) {
       navigate(`/dashboard/${username}`);
-      return;
     }
   };
 
   return (
-    <main className="main-content" style={{ position: "relative" }}>
-      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+    <main className="homepage">
+      <div className="homepage__bg">
         <Grainient
           color1="#FF6817"
           color2="#17AEFF"
@@ -42,12 +43,41 @@ function SearchHome() {
           zoom={1}
         />
       </div>
-      <div className="search-section" style={{ position: "relative", zIndex: 1 }}>
-        <SearchInput
-          value={username}
-          onChange={setUsername}
-          onSearch={handleSearch}
-        />
+
+      <div className="homepage__content">
+        <motion.div
+          className="homepage__hero"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <h1 className="homepage__brand">ListFM</h1>
+          <p className="homepage__tagline">
+            Create automated playlists that evolve with your listening habits
+          </p>
+        </motion.div>
+
+        <motion.div
+          className="homepage__search"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <SearchInput
+            value={username}
+            onChange={setUsername}
+            onSearch={handleSearch}
+          />
+        </motion.div>
+
+        <motion.div
+          className="homepage__hint"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.7, delay: 0.4 }}
+        >
+          <span>Start by entering your Last.fm username</span>
+        </motion.div>
       </div>
     </main>
   );
