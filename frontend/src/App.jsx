@@ -1,12 +1,21 @@
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
-import Playlist from "./views/Playlist";
 import PlaylistNew from "./views/PlaylistNew";
 import PlaylistDetail from "./views/PlaylistDetail";
+
+function getLastUsername() {
+  try {
+    const data = JSON.parse(localStorage.getItem("listfm_last_visit") || "{}");
+    const usernames = Object.keys(data);
+    return usernames.length > 0 ? usernames[usernames.length - 1] : null;
+  } catch {
+    return null;
+  }
+}
 
 function TopBar() {
   return (
@@ -38,7 +47,15 @@ function App() {
               <Routes location={location}>
                 <Route path="/" element={<SearchHome />} />
                 <Route path="/dashboard/:username" element={<Dashboard />} />
-                <Route path="/playlists" element={<Playlist />} />
+                <Route
+                  path="/playlists"
+                  element={
+                    <Navigate
+                      to={getLastUsername() ? `/dashboard/${getLastUsername()}` : "/"}
+                      replace
+                    />
+                  }
+                />
                 <Route path="/playlists/new" element={<PlaylistNew />} />
                 <Route path="/playlists/:id" element={<PlaylistDetail />} />
               </Routes>
