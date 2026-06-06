@@ -22,7 +22,6 @@ function App() {
   const showSidebar = location.pathname !== "/";
   return (
     <div className="app-container">
-      {location.pathname === "/" && <TopBar />}
       <div
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >
