@@ -1,5 +1,4 @@
 import { Routes, Route, useLocation } from "react-router-dom";
-// eslint-disable-next-line no-unused-vars -- motion is used as JSX (<motion.div>)
 import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";

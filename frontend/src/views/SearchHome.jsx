@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-// eslint-disable-next-line no-unused-vars -- motion is used as JSX (<motion.div>)
 import { motion } from "motion/react";
 import SearchInput from "../components/ui/SearchBar";
 import Grainient from "../components/ui/Grainient";
