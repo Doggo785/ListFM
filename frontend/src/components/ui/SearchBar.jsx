@@ -34,12 +34,12 @@ const SearchInput = ({value, onChange, onSearch}) => {
                 <line stroke="url(#searchl)" y2="16.65" y1={22} x2="16.65" x1={22} />
                 <defs>
                   <linearGradient gradientTransform="rotate(50)" id="search">
-                    <stop stopColor="#f8e7f8" offset="0%" />
-                    <stop stopColor="#b6a9b7" offset="50%" />
+                    <stop stopColor="#ffffff" offset="0%" />
+                    <stop stopColor="#737373" offset="50%" />
                   </linearGradient>
                   <linearGradient id="searchl">
-                    <stop stopColor="#b6a9b7" offset="0%" />
-                    <stop stopColor="#837484" offset="50%" />
+                    <stop stopColor="#737373" offset="0%" />
+                    <stop stopColor="#525252" offset="50%" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -82,8 +82,8 @@ const StyledWrapper = styled.div`
     z-index: 0;
   }
   .input {
-    background-color: #010201;
-    border: none;
+    background-color: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.06);
     /* padding:7px; */
     width: 301px;
     height: 56px;
@@ -91,6 +91,7 @@ const StyledWrapper = styled.div`
     color: white;
     padding-inline: 59px;
     font-size: 18px;
+    transition: border-color 0.3s ease;
   }
   #poda {
     position: relative;
@@ -102,11 +103,12 @@ const StyledWrapper = styled.div`
     isolation: isolate;
   }
   .input::placeholder {
-    color: #c0b9c0;
+    color: #737373;
   }
 
   .input:focus {
     outline: none;
+    border-color: rgba(255, 104, 23, 0.3);
   }
 
   #main:focus-within > #input-mask {
@@ -118,11 +120,11 @@ const StyledWrapper = styled.div`
     width: 30px;
     height: 20px;
     position: absolute;
-    background: #cf30aa;
+    background: #FF6817;
     top: 10px;
     left: 5px;
     filter: blur(20px);
-    opacity: 0.8;
+    opacity: 0.6;
     /* animation: leftright 4s ease-in infinite; */
     transition: all 2s;
   }
@@ -153,10 +155,10 @@ const StyledWrapper = styled.div`
     filter: brightness(1.4);
     background-image: conic-gradient(
       rgba(0, 0, 0, 0) 0%,
-      #a099d8,
+      rgba(255, 104, 23, 0.4),
       rgba(0, 0, 0, 0) 8%,
       rgba(0, 0, 0, 0) 50%,
-      #dfa2da,
+      rgba(23, 174, 255, 0.4),
       rgba(0, 0, 0, 0) 58%
     );
     /* animation: rotate 4s linear infinite; */
