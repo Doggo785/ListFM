@@ -19,7 +19,6 @@ import {
   formatRelativeTime,
 } from "../lib/dashboard-helpers";
 import {
-  IconPlaylistAdd,
   IconSearch,
   IconHeadphones,
   IconPlus,
@@ -204,17 +203,10 @@ function Dashboard() {
 
           {/* Automations Grid */}
           <motion.section variants={fadeUp}>
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6">
               <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                 Your automations
               </h2>
-              <button
-                onClick={() => navigate("/playlists/new")}
-                className="flex items-center gap-1.5 text-xs text-[#ff530b] hover:text-[#ff530b]/80 transition-colors font-medium"
-              >
-                <IconPlaylistAdd size={13} strokeWidth={1.5} />
-                New
-              </button>
             </div>
 
             <div className="flex flex-wrap items-start justify-center gap-5">
@@ -284,14 +276,7 @@ function Dashboard() {
           </motion.section>
 
           {/* Footer */}
-          <motion.div variants={fadeUp} className="flex justify-center gap-3 pt-4">
-            <button
-              onClick={() => navigate("/playlists/new")}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#ff530b] text-white text-sm font-medium rounded-lg hover:bg-[#ff530b]/90 transition-colors shadow-[0_4px_14px_rgba(255,83,11,0.2)]"
-            >
-              <IconPlaylistAdd size={16} strokeWidth={1.5} />
-              New Automation
-            </button>
+          <motion.div variants={fadeUp} className="flex justify-center pt-4">
             <button
               onClick={() => navigate("/")}
               className="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 hover:text-white transition-colors"
