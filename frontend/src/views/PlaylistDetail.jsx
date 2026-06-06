@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-// eslint-disable-next-line no-unused-vars -- motion is used as JSX (<motion.div>)
 import { motion } from "motion/react";
 import {
   IconArrowLeft,
