@@ -217,7 +217,7 @@ function Dashboard() {
               </button>
             </div>
 
-            <div className="flex flex-wrap items-start gap-5">
+            <div className="flex flex-wrap items-start justify-center gap-5">
               {automationCards.map((auto) => {
                 const isUserAutomation = !auto.id.startsWith("auto-");
                 return (
