@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
+import ScrollToTop from "./components/ScrollToTop";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
 import PlaylistNew from "./views/PlaylistNew";
@@ -30,6 +31,7 @@ function App() {
   const showSidebar = location.pathname !== "/";
   return (
     <div className="app-container">
+      <ScrollToTop />
       <div
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >

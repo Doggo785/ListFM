@@ -247,7 +247,7 @@ export default function PlaylistDetail() {
     : { artist: [], album: [] };
 
   return (
-    <div className="w-full min-w-0 flex-1 bg-[#121212] p-5 md:p-10">
+    <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
       <div className="mx-auto max-w-[1400px]">
         {/* Header */}
         <motion.header
