@@ -76,7 +76,7 @@ export const DesktopSidebar = ({
   ...props
 }) => {
   const { open, setOpen, animate } = useSidebar();
-  const desktopWidth = animate ? (open ? "300px" : "60px") : "300px";
+  const desktopWidth = (!animate || open) ? "300px" : "60px";
 
   return (
     <>
@@ -186,9 +186,9 @@ export const SidebarLink = ({
 
       <motion.span
         animate={{
-          display: animate ? (open ? "inline-block" : "none") : "inline-block",
+          display: (!animate || open) ? "inline-block" : "none",
 
-          opacity: animate ? (open ? 1 : 0) : 1,
+          opacity: (!animate || open) ? 1 : 0,
         }}
         className="text-neutral-300 dark:text-neutral-200 text-sm group-hover/sidebar:text-white group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
       >

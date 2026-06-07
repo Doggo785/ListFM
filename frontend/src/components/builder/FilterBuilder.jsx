@@ -132,8 +132,9 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
   const tagInputRef = useRef(null);
 
   const currentTags = availableTags[tagSource] || [];
+  const searchLower = tagSearch.toLowerCase();
   const filteredTags = currentTags.filter(
-    (t) => t.name.includes(tagSearch.toLowerCase()) && t.name !== condition.value
+    (t) => t.name.includes(searchLower) && t.name !== condition.value
   ).slice(0, 12);
 
   useEffect(() => {
@@ -439,6 +440,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
 function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [], disabledFields = [] }) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef(null);
+  const subGroups = group.groups || [];
 
   useEffect(() => {
     const handler = (e) => {
@@ -469,19 +471,19 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
   const addSubGroup = () => {
     onChange({
       ...group,
-      groups: [...(group.groups || []), createGroup()],
+      groups: [...subGroups, createGroup()],
     });
     setShowAddMenu(false);
   };
 
   const updateSubGroup = (idx, newGroup) => {
-    const groups = [...(group.groups || [])];
-    groups[idx] = newGroup;
-    onChange({ ...group, groups });
+    const updated = [...subGroups];
+    updated[idx] = newGroup;
+    onChange({ ...group, groups: updated });
   };
 
   const removeSubGroup = (idx) => {
-    onChange({ ...group, groups: (group.groups || []).filter((_, i) => i !== idx) });
+    onChange({ ...group, groups: subGroups.filter((_, i) => i !== idx) });
   };
 
   const logicLabel = group.logic === "AND" ? "all" : "any";
@@ -519,7 +521,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
       </div>
 
       <div className="p-4 space-y-3">
-        {group.conditions.length === 0 && (group.groups || []).length === 0 && (
+        {group.conditions.length === 0 && subGroups.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="rounded-2xl bg-neutral-800/30 p-3 mb-3">
               <IconFilter size={20} className="text-neutral-600" />
@@ -542,7 +544,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
           />
         ))}
 
-        {(group.groups || []).map((sub, i) => (
+        {subGroups.map((sub, i) => (
           <FilterGroup
             key={sub.id}
             group={sub}

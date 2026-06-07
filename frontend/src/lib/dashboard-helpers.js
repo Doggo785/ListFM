@@ -2,7 +2,6 @@ import { SOURCE_TYPE_LABELS } from "./automation-rules";
 
 const LAST_VISIT_KEY = "listfm_last_visit";
 
-// ── Time helpers ───────────────────────────────────────────────
 export function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -38,7 +37,6 @@ export function formatFutureTime(iso) {
   return `in ${days}d`;
 }
 
-// ── Last visit tracking ────────────────────────────────────────
 export function getLastVisit(username) {
   try {
     const data = JSON.parse(localStorage.getItem(LAST_VISIT_KEY) || "{}");
@@ -56,7 +54,6 @@ export function setLastVisit(username) {
   } catch { /* ignore */ }
 }
 
-// ── Automation helpers ─────────────────────────────────────────
 export function computeAutomationStats(automations) {
   const active = automations.filter((a) => a.enabled);
   const totalMatched = active.reduce((sum, a) => {
@@ -129,7 +126,6 @@ function matchCronField(field, value) {
   return parseInt(field) === value;
 }
 
-// ── Listening pulse helpers ────────────────────────────────────
 export function computeListeningPulse(tracks) {
   if (!tracks.length) return { topArtist: null, newArtists: [], diversity: 0 };
 

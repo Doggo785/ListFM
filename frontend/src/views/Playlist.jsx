@@ -38,6 +38,18 @@ function loadAutomations() {
   });
 }
 
+const CARD_PROPS = {
+  containerHeight: "420px",
+  containerWidth: "300px",
+  imageHeight: "420px",
+  imageWidth: "300px",
+  rotateAmplitude: 6,
+  scaleOnHover: 1.04,
+  showMobileWarning: false,
+  showTooltip: false,
+  displayOverlayContent: true,
+};
+
 export default function Playlist() {
   const [automations] = useState(loadAutomations);
   const navigate = useNavigate();
@@ -95,15 +107,7 @@ export default function Playlist() {
                       altText={auto.title}
                       captionText={auto.title}
                       countdownText={auto.description}
-                      containerHeight="420px"
-                      containerWidth="300px"
-                      imageHeight="420px"
-                      imageWidth="300px"
-                      rotateAmplitude={6}
-                      scaleOnHover={1.04}
-                      showMobileWarning={false}
-                      showTooltip={false}
-                      displayOverlayContent
+                      {...CARD_PROPS}
                     />
                   </div>
                 );
@@ -119,15 +123,7 @@ export default function Playlist() {
                   altText="+"
                   captionText="New automated playlist"
                   countdownText=""
-                  containerHeight="420px"
-                  containerWidth="300px"
-                  imageHeight="420px"
-                  imageWidth="300px"
-                  rotateAmplitude={6}
-                  scaleOnHover={1.04}
-                  showMobileWarning={false}
-                  showTooltip={false}
-                  displayOverlayContent
+                  {...CARD_PROPS}
                 />
               </button>
             </div>

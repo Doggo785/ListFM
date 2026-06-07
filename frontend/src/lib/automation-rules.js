@@ -50,38 +50,39 @@ export function isValidCron(expr) {
   return parts.length === 5;
 }
 
+const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export function describeCron(expr) {
   if (!isValidCron(expr)) return null;
   const [min, hour, day, month, weekday] = expr.trim().split(/\s+/);
 
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const months = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
   const time = `${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
 
   if (weekday !== "*" && day === "*" && month === "*") {
-    const dayName = days[parseInt(weekday)] || weekday;
+    const dayName = WEEKDAY_NAMES[parseInt(weekday)] || weekday;
     return `Every ${dayName} at ${time}`;
   }
   if (day !== "*" && month === "*" && weekday === "*") {
     return `Every ${day}${nthSuffix(day)} at ${time}`;
   }
   if (month !== "*" && day === "*" && weekday === "*") {
-    const monthName = months[parseInt(month)] || month;
+    const monthName = MONTH_NAMES[parseInt(month)] || month;
     return `Every ${monthName} at ${time}`;
   }
   if (month !== "*" && day !== "*" && weekday === "*") {
-    const monthName = months[parseInt(month)] || month;
+    const monthName = MONTH_NAMES[parseInt(month)] || month;
     return `${monthName} ${day}${nthSuffix(day)} at ${time}`;
   }
 
   return expr;
 }
 
+const SUFFIXES = ["th", "st", "nd", "rd"];
+
 function nthSuffix(n) {
-  const s = ["th", "st", "nd", "rd"];
   const v = parseInt(n) % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
+  return SUFFIXES[(v - 20) % 10] || SUFFIXES[v] || SUFFIXES[0];
 }
 
 // ── Filter fields ────────────────────────────────────────────────
