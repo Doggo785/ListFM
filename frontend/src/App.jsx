@@ -35,7 +35,7 @@ function App() {
       <div
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >
-        {showSidebar && <AppSidebar />}
+        {showSidebar && <AppSidebar username={getLastUsername()} />}
         <div className="min-w-0 flex-1">
           <AnimatePresence mode="wait">
             <motion.div
