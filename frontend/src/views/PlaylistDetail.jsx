@@ -259,7 +259,7 @@ export default function PlaylistDetail() {
 
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <h2 className="text-3xl md:text-4xl font-black text-white">
+              <h2 className="text-3xl md:text-4xl font-black text-white text-left">
                 <span className="text-[#17AEFF]">Edit</span> automation
               </h2>
               <p className="mt-2 text-neutral-400 text-sm">
