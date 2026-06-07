@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
-import CountUp from "../components/CountUp";
+import CountUp from "../components/elements/CountUp";
 import TiltedCard from "../components/ui/PlaylistCard";
 import { loadAutomationsFromStorage } from "../lib/automation-rules";
 import {

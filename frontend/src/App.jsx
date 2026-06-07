@@ -2,7 +2,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
-import ScrollToTop from "./components/ScrollToTop";
+import ScrollToTop from "./components/elements/ScrollToTop";
 import SearchHome from "./views/SearchHome";
 import Dashboard from "./views/Dashboard";
 import PlaylistNew from "./views/PlaylistNew";
