@@ -1,8 +1,17 @@
 from fastapi import APIRouter, HTTPException
-from services.lastfm import get_recent_tracks, get_top_tags, get_top_tracks, get_loved_tracks
-from schemas import RecentTracksResponse, Track
+from services.lastfm import get_recent_tracks, get_top_tags, get_top_tracks, get_loved_tracks, get_user_info
+from schemas import RecentTracksResponse, Track, UserInfo
 
 router = APIRouter(prefix="/api", tags=["users"])
+
+
+@router.get("/{username}/info", response_model=UserInfo)
+def user_info(username: str):
+    try:
+        info = get_user_info(username)
+        return UserInfo(**info)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
 @router.get("/recent-tracks/{username}", response_model=RecentTracksResponse)

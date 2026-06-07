@@ -12,6 +12,19 @@ PERIOD_MAP = {
 }
 
 
+def get_user_info(username: str) -> dict:
+    network = get_network()
+    user = network.get_user(username)
+    try:
+        image_url = user.get_image(size=pylast.SIZE_LARGE)
+    except Exception:
+        image_url = None
+    return {
+        "username": username,
+        "image": image_url,
+    }
+
+
 def get_network() -> pylast.LastFMNetwork:
     settings = get_settings()
     return pylast.LastFMNetwork(
