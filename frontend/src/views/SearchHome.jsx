@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import SearchInput from "../components/ui/SearchBar";
@@ -7,6 +7,10 @@ import Grainient from "../components/ui/Grainient";
 function SearchHome() {
   const [username, setUsername] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.title = "ListFM";
+  }, []);
 
   const handleSearch = () => {
     if (username.trim()) {

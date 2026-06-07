@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconArrowLeft,
@@ -335,6 +335,10 @@ export default function PlaylistNew() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [data, setData] = useState(createDefaultAutomation());
+
+  useEffect(() => {
+    document.title = "New Playlist - ListFM";
+  }, []);
 
   const totalSteps = STEPS.length;
 

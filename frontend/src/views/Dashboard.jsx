@@ -71,6 +71,10 @@ function Dashboard() {
   const automations = useMemo(() => loadAutomationsFromStorage(), []);
 
   useEffect(() => {
+    document.title = `${username} - ListFM`;
+  }, [username]);
+
+  useEffect(() => {
     setLastVisit(username);
     sessionStorage.setItem("listfm_current_username", username);
   }, [username]);
