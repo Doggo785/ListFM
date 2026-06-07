@@ -65,6 +65,7 @@ function Dashboard() {
   const [playlist, setPlaylist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [avatar, setAvatar] = useState(null);
 
   const lastVisit = useMemo(() => getLastVisit(username), [username]);
   const isFirstVisit = lastVisit === null;
@@ -77,6 +78,13 @@ function Dashboard() {
   useEffect(() => {
     setLastVisit(username);
     sessionStorage.setItem("listfm_current_username", username);
+  }, [username]);
+
+  useEffect(() => {
+    fetch(`http://localhost:8000/api/${username}/info`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setAvatar(data?.image || null))
+      .catch(() => setAvatar(null));
   }, [username]);
 
   useEffect(() => {
@@ -161,6 +169,24 @@ function Dashboard() {
         >
           {/* Header */}
           <motion.header variants={fadeUp} className="text-center">
+            {avatar && (
+              <motion.div
+                className="relative inline-block mb-6"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#ff530b] via-[#c084fc] to-[#17AEFF] blur-xl opacity-40 animate-pulse" />
+                <div className="absolute inset-[-3px] rounded-full bg-gradient-to-r from-[#ff530b] via-[#c084fc] to-[#17AEFF] animate-spin" style={{ animationDuration: '8s' }} />
+                <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#121212] p-[3px]">
+                  <img
+                    src={avatar}
+                    alt={username}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                </div>
+              </motion.div>
+            )}
             <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
               {getGreeting()}, <span className="text-[#17AEFF]">{username}</span>
             </h1>
