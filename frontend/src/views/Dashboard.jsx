@@ -72,6 +72,7 @@ function Dashboard() {
 
   useEffect(() => {
     setLastVisit(username);
+    sessionStorage.setItem("listfm_current_username", username);
   }, [username]);
 
   useEffect(() => {
