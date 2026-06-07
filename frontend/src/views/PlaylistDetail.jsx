@@ -92,6 +92,10 @@ export default function PlaylistDetail() {
   });
 
   useEffect(() => {
+    document.title = automation?.name ? `${automation.name} - ListFM` : "Playlist - ListFM";
+  }, [automation?.name]);
+
+  useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
     const found = stored.find((a) => a.id === id);
     if (found) {
