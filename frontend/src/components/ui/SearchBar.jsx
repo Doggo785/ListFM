@@ -72,8 +72,6 @@ const StyledWrapper = styled.div`
     width: 100%;
     position: absolute;
     overflow: hidden;
-    z-index: -1;
-    /* Border Radius */
     border-radius: 12px;
     filter: blur(3px);
     inset: 0;
@@ -84,7 +82,6 @@ const StyledWrapper = styled.div`
   .input {
     background-color: #141414;
     border: 1px solid rgba(255, 255, 255, 0.06);
-    /* padding:7px; */
     width: 301px;
     height: 56px;
     border-radius: 10px;
@@ -134,11 +131,9 @@ const StyledWrapper = styled.div`
     left: 5px;
     filter: blur(20px);
     opacity: 0.6;
-    /* animation: leftright 4s ease-in infinite; */
     transition: all 2s;
   }
   #main:hover > #pink-mask {
-    /* animation: rotate 4s linear infinite; */
     opacity: 0;
   }
 
@@ -170,7 +165,6 @@ const StyledWrapper = styled.div`
       rgba(23, 174, 255, 0.4),
       rgba(0, 0, 0, 0) 58%
     );
-    /* animation: rotate 4s linear infinite; */
     transition: all 2s;
   }
   .border {
@@ -200,7 +194,6 @@ const StyledWrapper = styled.div`
       #17AEFF 60%,
       #1c191c 64%
     );
-    /* animation: rotate 4s 0.1s linear infinite; */
     transition: all 2s;
   }
   .darkBorderBg {
@@ -292,7 +285,6 @@ const StyledWrapper = styled.div`
     height: 999px;
     background-repeat: no-repeat;
     background-position: 0 0;
-    /*border color, change middle color*/
     background-image: conic-gradient(
       #000,
       #FF6817 5%,
@@ -301,35 +293,7 @@ const StyledWrapper = styled.div`
       #17AEFF 60%,
       #000 87%
     );
-    /* change speed here */
-    /* animation: rotate 4s 0.3s linear infinite; */
     transition: all 2s;
-  }
-
-  @keyframes rotate {
-    100% {
-      transform: translate(-50%, -50%) rotate(450deg);
-    }
-  }
-  @keyframes leftright {
-    0% {
-      transform: translate(0px, 0px);
-      opacity: 1;
-    }
-
-    49% {
-      transform: translate(250px, 0px);
-      opacity: 0;
-    }
-    80% {
-      transform: translate(-40px, 0px);
-      opacity: 0;
-    }
-
-    100% {
-      transform: translate(0px, 0px);
-      opacity: 1;
-    }
   }
 
   #main {

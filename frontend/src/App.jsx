@@ -30,6 +30,7 @@ function App() {
   const location = useLocation();
   const showSidebar = location.pathname !== "/";
   const usernameFromUrl = getUsernameFromPath(location.pathname);
+  const lastUsername = getLastUsername();
 
   return (
     <div className="app-container">
@@ -38,7 +39,7 @@ function App() {
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >
         {showSidebar && (
-          <AppSidebar username={usernameFromUrl || getLastUsername()} />
+          <AppSidebar username={usernameFromUrl || lastUsername} />
         )}
         <div className="min-w-0 flex-1">
           <AnimatePresence mode="wait">
@@ -57,7 +58,7 @@ function App() {
                   path="/playlists"
                   element={
                     <Navigate
-                      to={getLastUsername() ? `/dashboard/${getLastUsername()}` : "/"}
+                      to={lastUsername ? `/dashboard/${lastUsername}` : "/"}
                       replace
                     />
                   }

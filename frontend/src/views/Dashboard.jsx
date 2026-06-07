@@ -35,6 +35,18 @@ const stagger = {
   show: { opacity: 1, transition: { staggerChildren: 0.08 } },
 };
 
+const CARD_DEFAULTS = {
+  containerHeight: "420px",
+  containerWidth: "300px",
+  imageHeight: "420px",
+  imageWidth: "300px",
+  rotateAmplitude: 6,
+  scaleOnHover: 1.04,
+  showMobileWarning: false,
+  showTooltip: false,
+  displayOverlayContent: true,
+};
+
 function StatBlock({ value, label, color, delay = 0 }) {
   return (
     <motion.div variants={fadeUp} className="text-center">
@@ -176,7 +188,6 @@ function Dashboard() {
           animate="show"
           className="space-y-14"
         >
-          {/* Header */}
           <motion.header variants={fadeUp} className="text-center">
             {avatar && (
               <motion.div
@@ -215,7 +226,6 @@ function Dashboard() {
             </p>
           </motion.header>
 
-          {/* Counters */}
           <motion.div
             variants={stagger}
             className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4"
@@ -226,12 +236,10 @@ function Dashboard() {
             <StatBlock value={automations.length} label="Automations" color="#22c55e" delay={0.3} />
           </motion.div>
 
-          {/* Separator */}
           <motion.div variants={fadeUp}>
             <div className="w-12 h-px bg-neutral-800 mx-auto" />
           </motion.div>
 
-          {/* Top Artist */}
           {stats.topArtist && (
             <motion.section variants={fadeUp} className="text-center">
               <p className="text-xs text-neutral-500 uppercase tracking-wider font-medium mb-2">
@@ -245,12 +253,10 @@ function Dashboard() {
             </motion.section>
           )}
 
-          {/* Separator */}
           <motion.div variants={fadeUp}>
             <div className="w-12 h-px bg-neutral-800 mx-auto" />
           </motion.div>
 
-          {/* Automations Grid */}
           <motion.section variants={fadeUp}>
             <div className="mb-6">
               <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
@@ -280,20 +286,12 @@ function Dashboard() {
                     }
                   >
                     <TiltedCard
+                      {...CARD_DEFAULTS}
                       imageSrc={auto.image}
                       glowColor={auto.glowColor}
                       altText={auto.title}
                       captionText={auto.title}
                       countdownText={auto.description}
-                      containerHeight="420px"
-                      containerWidth="300px"
-                      imageHeight="420px"
-                      imageWidth="300px"
-                      rotateAmplitude={6}
-                      scaleOnHover={1.04}
-                      showMobileWarning={false}
-                      showTooltip={false}
-                      displayOverlayContent
                     />
                   </div>
                 );
@@ -306,25 +304,16 @@ function Dashboard() {
                 aria-label="Create a new automated playlist"
               >
                 <TiltedCard
+                  {...CARD_DEFAULTS}
                   icon={IconPlus}
                   altText="+"
                   captionText="New playlist"
                   countdownText=""
-                  containerHeight="420px"
-                  containerWidth="300px"
-                  imageHeight="420px"
-                  imageWidth="300px"
-                  rotateAmplitude={6}
-                  scaleOnHover={1.04}
-                  showMobileWarning={false}
-                  showTooltip={false}
-                  displayOverlayContent
                 />
               </button>
             </div>
           </motion.section>
 
-          {/* Footer */}
           <motion.div variants={fadeUp} className="flex justify-center pt-4">
             <button
               onClick={() => navigate("/")}

@@ -71,6 +71,28 @@ function FieldRow({ label, children }) {
   );
 }
 
+function dedupeTags(tracks, field) {
+  return Object.values(
+    tracks
+      .flatMap((t) => t[field] || [])
+      .reduce((acc, tag) => {
+        const key = tag.name.toLowerCase();
+        if (!acc[key] || tag.count > acc[key].count) {
+          acc[key] = { name: tag.name.toLowerCase(), count: tag.count };
+        }
+        return acc;
+      }, {})
+  ).sort((a, b) => b.count - a.count);
+}
+
+function applyFilterGroups(tracks, groups) {
+  const hasFilters =
+    groups &&
+    groups.length > 0 &&
+    groups.some((g) => g.conditions && g.conditions.length > 0);
+  return hasFilters ? applyFilters(tracks, groups) : tracks;
+}
+
 export default function PlaylistDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -166,14 +188,7 @@ export default function PlaylistDetail() {
       } else {
         const enriched = data.tracks || [];
         setRawTracks(enriched);
-        const groups = automation.filterGroups;
-        const hasFilters = groups && groups.length > 0 &&
-          groups.some(g => g.conditions && g.conditions.length > 0);
-        if (hasFilters) {
-          setPreviewTracks(applyFilters(enriched, groups));
-        } else {
-          setPreviewTracks(enriched);
-        }
+        setPreviewTracks(applyFilterGroups(enriched, automation.filterGroups));
       }
     } catch (err) {
       setPreviewError(err.message || "Failed to load preview");
@@ -184,14 +199,7 @@ export default function PlaylistDetail() {
 
   useEffect(() => {
     if (!rawTracks) return;
-    const groups = automation?.filterGroups;
-    const hasFilters = groups && groups.length > 0 &&
-      groups.some(g => g.conditions && g.conditions.length > 0);
-    if (hasFilters) {
-      setPreviewTracks(applyFilters(rawTracks, groups));
-    } else {
-      setPreviewTracks(rawTracks);
-    }
+    setPreviewTracks(applyFilterGroups(rawTracks, automation?.filterGroups));
   }, [automation?.filterGroups, rawTracks]);
 
   if (notFound) {
@@ -227,30 +235,7 @@ export default function PlaylistDetail() {
     automation.source?.period;
 
   const availableTags = rawTracks
-    ? {
-        artist: Object.values(
-          rawTracks
-            .flatMap((t) => t.artist_tags || [])
-            .reduce((acc, tag) => {
-              const key = tag.name.toLowerCase();
-              if (!acc[key] || tag.count > acc[key].count) {
-                acc[key] = { name: tag.name.toLowerCase(), count: tag.count };
-              }
-              return acc;
-            }, {})
-        ).sort((a, b) => b.count - a.count),
-        album: Object.values(
-          rawTracks
-            .flatMap((t) => t.album_tags || [])
-            .reduce((acc, tag) => {
-              const key = tag.name.toLowerCase();
-              if (!acc[key] || tag.count > acc[key].count) {
-                acc[key] = { name: tag.name.toLowerCase(), count: tag.count };
-              }
-              return acc;
-            }, {})
-        ).sort((a, b) => b.count - a.count),
-      }
+    ? { artist: dedupeTags(rawTracks, "artist_tags"), album: dedupeTags(rawTracks, "album_tags") }
     : { artist: [], album: [] };
 
   return (
@@ -313,7 +298,6 @@ export default function PlaylistDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start">
           {/* Left: Settings */}
           <div className="space-y-6 pb-16">
-            {/* Identity */}
             <SectionCard title="Identity" icon={IconSettings} delay={0.1}>
               <FieldRow label="Playlist name">
                 <input
@@ -334,7 +318,6 @@ export default function PlaylistDetail() {
               </FieldRow>
             </SectionCard>
 
-            {/* Source */}
             <SectionCard title="Source" icon={IconMusic} delay={0.2}>
               <div className="grid grid-cols-2 gap-3">
                 {SOURCE_OPTIONS.map((opt) => {
@@ -382,12 +365,10 @@ export default function PlaylistDetail() {
               </FieldRow>
             </SectionCard>
 
-            {/* Schedule */}
             <SectionCard title="Schedule" icon={IconCalendarRepeat} delay={0.3}>
               <CronEditor value={automation.cron || ""} onChange={updateCron} />
             </SectionCard>
 
-            {/* Filters */}
             <SectionCard title="Filters" icon={IconFilter} delay={0.4}>
               <FilterBuilder
                 value={automation.filterGroups || []}

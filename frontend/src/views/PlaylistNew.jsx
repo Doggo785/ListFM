@@ -5,26 +5,18 @@ import {
   IconArrowRight,
   IconCheck,
   IconMusic,
-  IconHeart,
-  IconClock,
-  IconUsers,
   IconCalendarRepeat,
-  IconBolt,
-  IconSparkles,
   IconFilter,
+  IconSparkles,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import FilterBuilder from "@/components/builder/FilterBuilder";
 import CronEditor from "@/components/builder/CronEditor";
-import {
-  SOURCE_TYPES,
-  SOURCE_TYPE_LABELS,
-  PERIOD_OPTIONS,
-  createDefaultAutomation,
-  describeCron,
-  isValidCron,
-} from "@/lib/automation-rules";
-import { countActiveConditions } from "@/lib/filter-engine";
+import { createDefaultAutomation } from "@/lib/automation-rules";
+import { StepIndicator } from "@/components/builder/playlist-steps/StepIndicator";
+import { StepIdentity } from "@/components/builder/playlist-steps/StepIdentity";
+import { StepSource } from "@/components/builder/playlist-steps/StepSource";
+import { StepFilters } from "@/components/builder/playlist-steps/StepFilters";
+import { StepSummary } from "@/components/builder/playlist-steps/StepSummary";
 
 const STEPS = [
   { id: 1, label: "Identity", icon: IconSparkles },
@@ -33,303 +25,6 @@ const STEPS = [
   { id: 4, label: "Filters", icon: IconFilter },
   { id: 5, label: "Summary", icon: IconCheck },
 ];
-
-const SOURCE_OPTIONS = [
-  {
-    type: SOURCE_TYPES.TOP_TRACKS,
-    icon: IconBolt,
-    description: "Your most played tracks over the selected period",
-  },
-  {
-    type: SOURCE_TYPES.RECENT_TRACKS,
-    icon: IconClock,
-    description: "Your most recent listens",
-  },
-  {
-    type: SOURCE_TYPES.LOVED_TRACKS,
-    icon: IconHeart,
-    description: "Your Last.fm loved tracks",
-  },
-  {
-    type: SOURCE_TYPES.TOP_ARTISTS,
-    icon: IconUsers,
-    description: "Tracks from your favorite artists",
-  },
-];
-
-function StepIndicator({ currentStep }) {
-  return (
-    <div className="flex items-center justify-center gap-2 mb-10">
-      {STEPS.map((step, idx) => {
-        const Icon = step.icon;
-        const isActive = step.id === currentStep;
-        const isDone = step.id < currentStep;
-        return (
-          <div key={step.id} className="flex items-center gap-2">
-            {idx > 0 && (
-              <div
-                className={`w-8 h-px transition-colors ${
-                  isDone ? "bg-[#ff530b]" : "bg-neutral-700"
-                }`}
-              />
-            )}
-            <div
-              className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
-                isActive
-                  ? "bg-[#ff530b] text-white"
-                  : isDone
-                    ? "bg-[#ff530b]/20 text-[#ff530b]"
-                    : "bg-neutral-800 text-neutral-500"
-              }`}
-            >
-              <Icon size={14} />
-              <span className="hidden sm:inline">{step.label}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function StepIdentity({ data, onChange }) {
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">
-          Give your automation a name
-        </h3>
-        <p className="text-neutral-400 text-sm">
-          Choose a clear name so you can easily find this playlist.
-        </p>
-      </div>
-
-      <div className="space-y-4 max-w-lg mx-auto">
-        <div>
-          <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-            Playlist name
-          </label>
-          <input
-            type="text"
-            value={data.name}
-            onChange={(e) => onChange({ ...data, name: e.target.value })}
-            placeholder="e.g. Monthly Discoveries"
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors"
-            autoFocus
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-            Description{" "}
-            <span className="text-neutral-500 font-normal">(optional)</span>
-          </label>
-          <textarea
-            value={data.description}
-            onChange={(e) =>
-              onChange({ ...data, description: e.target.value })
-            }
-            placeholder="e.g. Compiles my new musical discoveries every month"
-            rows={3}
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors resize-none"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepSource({ data, onChange }) {
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">
-          Where do the tracks come from?
-        </h3>
-        <p className="text-neutral-400 text-sm">
-          Choose the source and time period for your listening data.
-        </p>
-      </div>
-
-      <div className="max-w-lg mx-auto space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {SOURCE_OPTIONS.map((opt) => {
-            const Icon = opt.icon;
-            const isSelected = data.source.type === opt.type;
-            return (
-              <button
-                key={opt.type}
-                type="button"
-                onClick={() =>
-                  onChange({
-                    ...data,
-                    source: { ...data.source, type: opt.type },
-                  })
-                }
-                className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all ${
-                  isSelected
-                    ? "border-[#ff530b] bg-[#ff530b]/10"
-                    : "border-neutral-700 bg-[#1c1c1c] hover:border-neutral-500"
-                }`}
-              >
-                <div
-                  className={`mt-0.5 rounded-lg p-2 ${
-                    isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400"
-                  }`}
-                >
-                  <Icon size={18} />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-white">
-                    {SOURCE_TYPE_LABELS[opt.type]}
-                  </div>
-                  <div className="text-xs text-neutral-400 mt-0.5">
-                    {opt.description}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-            Time period
-          </label>
-          <select
-            value={data.source.period}
-            onChange={(e) =>
-              onChange({
-                ...data,
-                source: { ...data.source, period: e.target.value },
-              })
-            }
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors appearance-none"
-          >
-            {PERIOD_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StepFilters({ data, onChange }) {
-  const filterCount = countActiveConditions(data.filterGroups);
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">
-          Filter your tracks
-        </h3>
-        <p className="text-neutral-400 text-sm max-w-md mx-auto">
-          Add conditions to refine which tracks appear in your playlist.
-          You can skip this step for no filters.
-        </p>
-        {filterCount > 0 && (
-          <div className="inline-flex items-center gap-2 mt-3 rounded-full bg-[#ff530b]/10 border border-[#ff530b]/20 px-4 py-1.5">
-            <IconFilter size={13} className="text-[#ff530b]" />
-            <span className="text-xs font-medium text-[#ff530b]">
-              {filterCount} active condition{filterCount !== 1 ? "s" : ""}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="max-w-2xl mx-auto">
-        <FilterBuilder
-          value={data.filterGroups}
-          onChange={(filterGroups) => onChange({ ...data, filterGroups })}
-          disabledFields={data.source?.type !== "recent_tracks" ? ["timestamp"] : []}
-        />
-      </div>
-    </div>
-  );
-}
-
-function StepSummary({ data }) {
-  const sourceLabel =
-    SOURCE_TYPE_LABELS[data.source.type] || data.source.type;
-  const periodLabel =
-    PERIOD_OPTIONS.find((p) => p.value === data.source.period)?.label ||
-    data.source.period;
-  const filterCount = countActiveConditions(data.filterGroups);
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-white mb-2">
-          All set!
-        </h3>
-        <p className="text-neutral-400 text-sm">
-          Review your configuration before creating the automation.
-        </p>
-      </div>
-
-      <div className="max-w-lg mx-auto">
-        <div className="rounded-xl border border-neutral-700 bg-[#1c1c1c] overflow-hidden">
-          <div className="p-6 border-b border-neutral-700">
-            <div className="text-xs font-medium text-[#ff530b] uppercase tracking-wider mb-1">
-              Playlist
-            </div>
-            <div className="text-xl font-bold text-white">
-              {data.name || <span className="text-neutral-500 italic">Untitled</span>}
-            </div>
-            {data.description && (
-              <div className="text-sm text-neutral-400 mt-1">
-                {data.description}
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 divide-x divide-neutral-700">
-            <div className="p-5">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
-                Source
-              </div>
-              <div className="text-sm font-semibold text-white">
-                {sourceLabel}
-              </div>
-              <div className="text-xs text-neutral-400 mt-0.5">
-                {periodLabel}
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
-                Schedule
-              </div>
-              <div className="text-sm font-semibold text-white">
-                {isValidCron(data.cron)
-                  ? describeCron(data.cron)
-                  : "Static"}
-              </div>
-              <div className="text-xs text-neutral-400 mt-0.5">
-                {isValidCron(data.cron)
-                  ? "Auto-updated"
-                  : "No auto-update"}
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
-                Filters
-              </div>
-              <div className="text-sm font-semibold text-white">
-                {filterCount > 0 ? `${filterCount} condition${filterCount > 1 ? "s" : ""}` : "None"}
-              </div>
-              <div className="text-xs text-neutral-400 mt-0.5">
-                {filterCount > 0 ? "Active filters" : "All tracks pass"}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function PlaylistNew() {
   const navigate = useNavigate();
@@ -374,7 +69,6 @@ export default function PlaylistNew() {
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
       <div className="mx-auto flex h-full max-w-3xl flex-col">
-        {/* Header */}
         <header className="mb-6 shrink-0">
           <button
             type="button"
@@ -392,14 +86,11 @@ export default function PlaylistNew() {
           </p>
         </header>
 
-        {/* Step indicator */}
-        <StepIndicator currentStep={step} />
+        <StepIndicator currentStep={step} steps={STEPS} />
 
-        {/* Step content */}
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1">{renderStep()}</div>
 
-          {/* Navigation */}
           <div className="flex items-center justify-between pt-6 pb-4 border-t border-neutral-800 mt-6 shrink-0">
             <Button
               variant="outline"

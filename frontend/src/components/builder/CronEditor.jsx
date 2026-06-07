@@ -57,15 +57,10 @@ export default function CronEditor({ value, onChange }) {
     }
   };
 
-  const applyPreset = (cron) => {
-    onChange(cron);
-  };
-
   return (
     <div className="space-y-6">
 
       <div className="max-w-2xl mx-auto space-y-5">
-        {/* Toggle */}
         <button
           type="button"
           onClick={toggleEnabled}
@@ -99,14 +94,12 @@ export default function CronEditor({ value, onChange }) {
 
         {enabled && (
           <>
-            {/* Description */}
             {description && (
               <div className="rounded-xl border border-[#ff530b]/20 bg-[#ff530b]/5 px-4 py-3 text-center">
                 <span className="text-sm font-medium text-[#ff530b]">{description}</span>
               </div>
             )}
 
-            {/* Cron fields */}
             <div className="rounded-xl border border-neutral-700 bg-[#1c1c1c] p-5 space-y-4">
               <div className="flex items-center gap-2 mb-1">
                 <IconClock size={14} className="text-neutral-500" />
@@ -133,7 +126,6 @@ export default function CronEditor({ value, onChange }) {
               </div>
             </div>
 
-            {/* Presets */}
             <div className="rounded-xl border border-neutral-700 bg-[#1c1c1c] p-5 space-y-3">
               <div className="flex items-center gap-2 mb-1">
                 <IconCalendar size={14} className="text-neutral-500" />
@@ -146,7 +138,7 @@ export default function CronEditor({ value, onChange }) {
                   <button
                     key={preset.cron}
                     type="button"
-                    onClick={() => applyPreset(preset.cron)}
+                    onClick={() => onChange(preset.cron)}
                     className={`flex flex-col items-start rounded-lg border px-3.5 py-2.5 text-left transition-all ${
                       value === preset.cron
                         ? "border-[#ff530b]/40 bg-[#ff530b]/10 text-[#ff530b]"
@@ -162,7 +154,6 @@ export default function CronEditor({ value, onChange }) {
               </div>
             </div>
 
-            {/* Cheatsheet */}
             <div className="rounded-xl border border-neutral-700 bg-[#1c1c1c] overflow-hidden">
               <button
                 type="button"

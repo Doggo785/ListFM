@@ -40,8 +40,9 @@ function renderIcon(sourceType) {
 }
 
 export function getPlaylistImageSrc(name, sourceType) {
-  const [color1, color2] = GRADIENTS[hashName(name) % GRADIENTS.length];
-  const gradId = `g${hashName(name)}`;
+  const hash = hashName(name);
+  const [color1, color2] = GRADIENTS[hash % GRADIENTS.length];
+  const gradId = `g${hash}`;
   const iconMarkup = renderIcon(sourceType);
 
   const svg = `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
