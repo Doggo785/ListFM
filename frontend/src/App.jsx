@@ -10,6 +10,9 @@ import PlaylistDetail from "./views/PlaylistDetail";
 
 function getLastUsername() {
   try {
+    const currentUsername = sessionStorage.getItem("listfm_current_username");
+    if (currentUsername) return currentUsername;
+    
     const data = JSON.parse(localStorage.getItem("listfm_last_visit") || "{}");
     const usernames = Object.keys(data);
     return usernames.length > 0 ? usernames[usernames.length - 1] : null;
@@ -18,24 +21,25 @@ function getLastUsername() {
   }
 }
 
-function TopBar() {
-  return (
-    <header className="top-bar">
-      <h1>ListFM</h1>
-    </header>
-  );
+function getUsernameFromPath(pathname) {
+  const match = pathname.match(/^\/dashboard\/([^/]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 function App() {
   const location = useLocation();
   const showSidebar = location.pathname !== "/";
+  const usernameFromUrl = getUsernameFromPath(location.pathname);
+
   return (
     <div className="app-container">
       <ScrollToTop />
       <div
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >
-        {showSidebar && <AppSidebar username={getLastUsername()} />}
+        {showSidebar && (
+          <AppSidebar username={usernameFromUrl || getLastUsername()} />
+        )}
         <div className="min-w-0 flex-1">
           <AnimatePresence mode="wait">
             <motion.div

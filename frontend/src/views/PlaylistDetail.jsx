@@ -86,7 +86,10 @@ export default function PlaylistDetail() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
 
-  const [username, setUsername] = useState(() => localStorage.getItem("listfm_username") || "");
+  const [username, setUsername] = useState(() => {
+    const fromDashboard = sessionStorage.getItem("listfm_current_username");
+    return fromDashboard || localStorage.getItem("listfm_username") || "";
+  });
 
   useEffect(() => {
     const stored = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
