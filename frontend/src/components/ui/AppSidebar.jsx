@@ -15,12 +15,12 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   const links = [
     {
       label: "Home",
-      href: "/",
+      href: username ? `/dashboard/${username}` : "/",
       icon: <IconHome className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
     },
     {
       label: "Playlists",
-      href: "/playlists",
+      href: "#",
       icon: <IconPlaylist className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
     },
     {
