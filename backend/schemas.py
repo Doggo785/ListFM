@@ -6,6 +6,11 @@ class Track(BaseModel):
     artist: str
 
 
+class UserInfo(BaseModel):
+    username: str
+    image: str | None = None
+
+
 class RecentTracksResponse(BaseModel):
     tracks: list[Track]
 

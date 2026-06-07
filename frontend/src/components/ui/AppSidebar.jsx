@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   IconHome,
@@ -11,6 +11,16 @@ import { Sidebar, SidebarBody, SidebarLink } from "./Sidebar";
 function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const [avatar, setAvatar] = useState(null);
+
+  useEffect(() => {
+    if (!username) return;
+    setAvatar(null);
+    fetch(`http://localhost:8000/api/${username}/info`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setAvatar(data?.image || null))
+      .catch(() => setAvatar(null));
+  }, [username]);
 
   const links = [
     {
@@ -55,9 +65,17 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
         </div>
         <div className="px-4 py-4 border-t border-neutral-800">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-[#ff530b] flex items-center justify-center text-white font-bold text-xs">
-              {(username || userLabel).charAt(0).toUpperCase()}
-            </div>
+            {avatar ? (
+              <img
+                src={avatar}
+                alt={username || userLabel}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-8 w-8 rounded-full bg-[#ff530b] flex items-center justify-center text-white font-bold text-xs">
+                {(username || userLabel).charAt(0).toUpperCase()}
+              </div>
+            )}
             {open && (
               <span className="text-white text-sm font-medium truncate">
                 {username || userLabel}
