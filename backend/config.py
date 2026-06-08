@@ -8,6 +8,7 @@ _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 class Settings(BaseSettings):
     lastfm_api_key: str
     lastfm_api_secret: str
+    database_url: str = "postgresql+asyncpg://listfm:listfm@localhost:5432/listfm"
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://localhost:5174",
