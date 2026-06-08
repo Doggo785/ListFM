@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
 import CountUp from "../components/elements/CountUp";
 import TiltedCard from "../components/ui/PlaylistCard";
-import { loadAutomationsFromStorage } from "../lib/automation-rules";
+import { getAutomations } from "@/lib/api";
 import {
   SOURCE_TYPE_LABELS,
   PERIOD_OPTIONS,
@@ -83,7 +83,19 @@ function Dashboard() {
 
   const lastVisit = useMemo(() => getLastVisit(username), [username]);
   const isFirstVisit = lastVisit === null;
-  const automations = useMemo(() => loadAutomationsFromStorage(), []);
+  const [automations, setAutomations] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getAutomations(username);
+        setAutomations(data);
+      } catch (err) {
+        console.error("Failed to load automations:", err);
+      }
+    };
+    load();
+  }, [username]);
 
   useEffect(() => {
     document.title = `${username} - ListFM`;

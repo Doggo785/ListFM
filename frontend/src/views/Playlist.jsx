@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import TiltedCard from "../components/ui/PlaylistCard";
 import {
@@ -7,6 +7,7 @@ import {
   describeCron,
   isValidCron,
 } from "@/lib/automation-rules";
+import { getAutomations } from "@/lib/api";
 import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
 import { IconPlus } from "@tabler/icons-react";
 
@@ -23,21 +24,6 @@ function buildDescription(auto) {
   return `${source} · ${period}`;
 }
 
-function loadAutomations() {
-  const saved = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
-  return saved.map((auto) => {
-    const name = auto.name || "Untitled";
-    const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
-    return {
-      id: auto.id,
-      title: name,
-      image: getPlaylistImageSrc(name, auto.source?.type),
-      description: buildDescription(auto),
-      glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
-    };
-  });
-}
-
 const CARD_PROPS = {
   containerHeight: "420px",
   containerWidth: "300px",
@@ -51,8 +37,35 @@ const CARD_PROPS = {
 };
 
 export default function Playlist() {
-  const [automations] = useState(loadAutomations);
+  const [username] = useState(() => {
+    return sessionStorage.getItem("listfm_current_username") || localStorage.getItem("listfm_username") || "";
+  });
+  const [automations, setAutomations] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const load = async () => {
+      if (!username) return;
+      try {
+        const data = await getAutomations(username);
+        const cards = data.map((auto) => {
+          const name = auto.name || "Untitled";
+          const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
+          return {
+            id: auto.id,
+            title: name,
+            image: getPlaylistImageSrc(name, auto.source?.type),
+            description: buildDescription(auto),
+            glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
+          };
+        });
+        setAutomations(cards);
+      } catch (err) {
+        console.error("Failed to load automations:", err);
+      }
+    };
+    load();
+  }, [username]);
 
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
