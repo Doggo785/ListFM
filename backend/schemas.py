@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class Track(BaseModel):
@@ -65,6 +65,27 @@ class AutomationRead(BaseModel):
     last_run: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_orm(cls, values):
+        """Auto-restructure flat DB columns (source_type/source_period/output_max_size) into nested schema."""
+        if hasattr(values, "source_type"):
+            return {
+                "id": values.id,
+                "username": values.username,
+                "name": values.name,
+                "description": values.description,
+                "source": {"type": values.source_type, "period": values.source_period},
+                "cron": values.cron,
+                "filter_groups": values.filter_groups or [],
+                "output": {"maxSize": values.output_max_size},
+                "enabled": values.enabled,
+                "created_at": values.created_at,
+                "updated_at": values.updated_at,
+                "last_run": values.last_run,
+            }
+        return values
 
 
 class GeneratedPlaylistCreate(BaseModel):
