@@ -139,7 +139,7 @@ export function computeListeningPulse(tracks) {
 
   const totalTracks = tracks.length;
   const uniqueArtists = sorted.length;
-  const diversity = totalTracks > 0 ? Math.round((uniqueArtists / totalTracks) * 100) : 0;
+  const diversity = Math.round((uniqueArtists / totalTracks) * 100);
 
   const mid = Math.floor(totalTracks / 2);
   const firstHalf = {};

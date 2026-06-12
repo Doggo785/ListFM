@@ -1,67 +1,6 @@
 import { useRef, useCallback, useState, useEffect } from "react";
-
-function parseHSL(hslStr) {
-  const match = hslStr.match(/([\d.]+)\s*([\d.]+)%?\s*([\d.]+)%?/);
-  if (!match) return { h: 40, s: 80, l: 80 };
-  return {
-    h: parseFloat(match[1]),
-    s: parseFloat(match[2]),
-    l: parseFloat(match[3]),
-  };
-}
-
-function buildBoxShadow(glowColor, intensity) {
-  const { h, s, l } = parseHSL(glowColor);
-  const base = `${h}deg ${s}% ${l}%`;
-  const layers = [
-    [0, 0, 0, 1, 100, true],
-    [0, 0, 1, 0, 60, true],
-    [0, 0, 3, 0, 50, true],
-    [0, 0, 6, 0, 40, true],
-    [0, 0, 15, 0, 30, true],
-    [0, 0, 25, 2, 20, true],
-    [0, 0, 50, 2, 10, true],
-    [0, 0, 1, 0, 60, false],
-    [0, 0, 3, 0, 50, false],
-    [0, 0, 6, 0, 40, false],
-    [0, 0, 15, 0, 30, false],
-    [0, 0, 25, 2, 20, false],
-    [0, 0, 50, 2, 10, false],
-  ];
-  return layers
-    .map(([x, y, blur, spread, alpha, inset]) => {
-      const a = Math.min(alpha * intensity, 100);
-      return `${inset ? "inset " : ""}${x}px ${y}px ${blur}px ${spread}px hsl(${base} / ${a}%)`;
-    })
-    .join(", ");
-}
-
-function easeOutCubic(x) {
-  return 1 - Math.pow(1 - x, 3);
-}
-function easeInCubic(x) {
-  return x * x * x;
-}
-
-function animateValue({
-  start = 0,
-  end = 100,
-  duration = 1000,
-  delay = 0,
-  ease = easeOutCubic,
-  onUpdate,
-  onEnd,
-}) {
-  const t0 = performance.now() + delay;
-  function tick() {
-    const elapsed = performance.now() - t0;
-    const t = Math.min(elapsed / duration, 1);
-    onUpdate(start + (end - start) * ease(t));
-    if (t < 1) requestAnimationFrame(tick);
-    else if (onEnd) onEnd();
-  }
-  setTimeout(() => requestAnimationFrame(tick), delay);
-}
+import { easeOutCubic, easeInCubic, animateValue } from "../../lib/animation";
+import { buildBoxShadow } from "../../lib/boxShadow";
 
 const GRADIENT_POSITIONS = [
   "80% 55%",
@@ -85,6 +24,15 @@ function buildMeshGradients(colors) {
   gradients.push(`linear-gradient(${colors[0]} 0 100%)`);
   return gradients;
 }
+
+const FILL_MASK_LAYERS = [
+  "linear-gradient(to bottom, black, black)",
+  "radial-gradient(ellipse at 50% 50%, black 40%, transparent 65%)",
+  "radial-gradient(ellipse at 66% 66%, black 5%, transparent 40%)",
+  "radial-gradient(ellipse at 33% 33%, black 5%, transparent 40%)",
+  "radial-gradient(ellipse at 66% 33%, black 5%, transparent 40%)",
+  "radial-gradient(ellipse at 33% 66%, black 5%, transparent 40%)",
+];
 
 const BorderGlow = ({
   children,
@@ -213,6 +161,13 @@ const BorderGlow = ({
   const borderBg = meshGradients.map((g) => `${g} border-box`);
   const fillBg = meshGradients.map((g) => `${g} padding-box`);
   const angleDeg = `${cursorAngle.toFixed(3)}deg`;
+  const fadeTransition = isVisible
+    ? "opacity 0.25s ease-out"
+    : "opacity 0.75s ease-in-out";
+  const fillMaskImage = [
+    ...FILL_MASK_LAYERS,
+    `conic-gradient(from ${angleDeg} at center, transparent 5%, black 15%, black 85%, transparent 95%)`,
+  ].join(", ");
 
   return (
     <div
@@ -241,9 +196,7 @@ const BorderGlow = ({
           opacity: borderOpacity,
           maskImage: `conic-gradient(from ${angleDeg} at center, black ${coneSpread}%, transparent ${coneSpread + 15}%, transparent ${100 - coneSpread - 15}%, black ${100 - coneSpread}%)`,
           WebkitMaskImage: `conic-gradient(from ${angleDeg} at center, black ${coneSpread}%, transparent ${coneSpread + 15}%, transparent ${100 - coneSpread - 15}%, black ${100 - coneSpread}%)`,
-          transition: isVisible
-            ? "opacity 0.25s ease-out"
-            : "opacity 0.75s ease-in-out",
+          transition: fadeTransition,
         }}
       />
 
@@ -252,32 +205,14 @@ const BorderGlow = ({
         style={{
           border: "1px solid transparent",
           background: fillBg.join(", "),
-          maskImage: [
-            "linear-gradient(to bottom, black, black)",
-            "radial-gradient(ellipse at 50% 50%, black 40%, transparent 65%)",
-            "radial-gradient(ellipse at 66% 66%, black 5%, transparent 40%)",
-            "radial-gradient(ellipse at 33% 33%, black 5%, transparent 40%)",
-            "radial-gradient(ellipse at 66% 33%, black 5%, transparent 40%)",
-            "radial-gradient(ellipse at 33% 66%, black 5%, transparent 40%)",
-            `conic-gradient(from ${angleDeg} at center, transparent 5%, black 15%, black 85%, transparent 95%)`,
-          ].join(", "),
-          WebkitMaskImage: [
-            "linear-gradient(to bottom, black, black)",
-            "radial-gradient(ellipse at 50% 50%, black 40%, transparent 65%)",
-            "radial-gradient(ellipse at 66% 66%, black 5%, transparent 40%)",
-            "radial-gradient(ellipse at 33% 33%, black 5%, transparent 40%)",
-            "radial-gradient(ellipse at 66% 33%, black 5%, transparent 40%)",
-            "radial-gradient(ellipse at 33% 66%, black 5%, transparent 40%)",
-            `conic-gradient(from ${angleDeg} at center, transparent 5%, black 15%, black 85%, transparent 95%)`,
-          ].join(", "),
+          maskImage: fillMaskImage,
+          WebkitMaskImage: fillMaskImage,
           maskComposite: "subtract, add, add, add, add, add",
           WebkitMaskComposite:
             "source-out, source-over, source-over, source-over, source-over, source-over",
           opacity: borderOpacity * fillOpacity,
           mixBlendMode: "soft-light",
-          transition: isVisible
-            ? "opacity 0.25s ease-out"
-            : "opacity 0.75s ease-in-out",
+          transition: fadeTransition,
         }}
       />
 
@@ -289,9 +224,7 @@ const BorderGlow = ({
           WebkitMaskImage: `conic-gradient(from ${angleDeg} at center, black 2.5%, transparent 10%, transparent 90%, black 97.5%)`,
           opacity: glowOpacity,
           mixBlendMode: "plus-lighter",
-          transition: isVisible
-            ? "opacity 0.25s ease-out"
-            : "opacity 0.75s ease-in-out",
+          transition: fadeTransition,
         }}
       >
         <span

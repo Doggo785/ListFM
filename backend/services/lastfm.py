@@ -75,11 +75,12 @@ def get_top_artists_tracks(username: str, period: str = "3m", limit: int = 50) -
     user = network.get_user(username)
     pylast_period = PERIOD_MAP.get(period, pylast.PERIOD_OVERALL)
     top_artists = user.get_top_artists(period=pylast_period, limit=10)
+    per_artist_limit = max(limit // max(len(top_artists), 1), 5)
     tracks = []
     for artist_item in top_artists:
         try:
             artist = network.get_artist(artist_item.item.name)
-            top_tracks = artist.get_top_tracks(limit=max(limit // max(len(top_artists), 1), 5))
+            top_tracks = artist.get_top_tracks(limit=per_artist_limit)
             for t in top_tracks:
                 tracks.append({
                     "title": t.item.title,

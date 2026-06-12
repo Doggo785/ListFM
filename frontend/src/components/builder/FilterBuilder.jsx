@@ -10,7 +10,6 @@ import {
   IconList,
   IconTag,
   IconClock,
-  IconChevronDown,
   IconFilter,
   IconGitBranch,
   IconListCheck,
@@ -23,6 +22,10 @@ import {
   createGroup,
   createCondition,
 } from "@/lib/automation-rules";
+import CustomSelect from "@/components/ui/CustomSelect";
+
+const INPUT_CLASSES =
+  "rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums";
 
 const FIELD_ICONS = {
   userplaycount: IconBolt,
@@ -36,55 +39,6 @@ const FIELD_ICONS = {
 };
 
 const FIELD_ENTRIES = Object.entries(FILTER_FIELDS);
-
-function CustomSelect({ value, onChange, options, placeholder, className = "" }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const selected = options.find((o) => o.value === value);
-
-  return (
-    <div ref={ref} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full rounded-xl border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white hover:border-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all"
-      >
-        <span className="truncate flex-1 text-left">{selected?.label || placeholder}</span>
-        <IconChevronDown size={14} className={`text-neutral-500 transition-transform shrink-0 ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
-          <div className="max-h-56 overflow-y-auto p-1">
-            {options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-lg transition-colors text-left ${
-                  opt.value === value
-                    ? "bg-[#ff530b]/15 text-[#ff530b]"
-                    : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                }`}
-              >
-                {opt.icon && <opt.icon size={14} className="shrink-0" />}
-                <span className="truncate">{opt.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function LogicToggle({ value, onChange }) {
   return (
@@ -161,7 +115,6 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
   }));
 
   const renderValueInput = () => {
-    // Boolean field: Yes / No toggle
     if (isBoolean) {
       return (
         <div className="flex items-center gap-2">
@@ -191,7 +144,6 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       );
     }
 
-    // Tags field: searchable dropdown with artist/album source toggle
     if (condition.field === "tags") {
       const tagSourceLabel = tagSource === "artist" ? "Artist" : "Album";
       return (
@@ -307,7 +259,6 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       );
     }
 
-    // Last Listened: days ago input with unit label
     if (isDate) {
       return (
         <div className="flex items-center gap-2">
@@ -318,7 +269,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
               onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
               placeholder="e.g. 30"
               min="0"
-              className="w-full rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+              className={`w-full ${INPUT_CLASSES}`}
             />
           </div>
           <span className="text-neutral-500 text-sm font-medium shrink-0">days ago</span>
@@ -326,7 +277,6 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       );
     }
 
-    // Rank: number with # prefix
     if (condition.field === "rank") {
       return (
         <div className="flex items-center gap-2">
@@ -337,7 +287,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
             onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
             placeholder="e.g. 10"
             min="1"
-            className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+            className={`flex-1 ${INPUT_CLASSES}`}
           />
           {needsMax && (
             <>
@@ -349,7 +299,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
                 onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
                 placeholder="e.g. 50"
                 min="1"
-                className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+                className={`flex-1 ${INPUT_CLASSES}`}
               />
             </>
           )}
@@ -357,7 +307,6 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       );
     }
 
-    // Default: number or text input
     return (
       <div className="flex items-center gap-2">
         <input
@@ -365,7 +314,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
           value={condition.value ?? ""}
           onChange={(e) => onChange({ ...condition, value: isText ? e.target.value : (e.target.value === "" ? "" : Number(e.target.value)) })}
           placeholder={isText ? "Enter value..." : "Min"}
-          className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+          className={`flex-1 ${INPUT_CLASSES}`}
         />
         {needsMax && (
           <>
@@ -375,7 +324,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
               value={condition.valueMax ?? ""}
               onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
               placeholder="Max"
-              className="flex-1 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+              className={`flex-1 ${INPUT_CLASSES}`}
             />
           </>
         )}

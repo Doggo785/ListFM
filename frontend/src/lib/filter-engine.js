@@ -41,9 +41,6 @@ function evaluateCondition(track, condition) {
   if (Number.isNaN(target)) return false;
   if (Number.isNaN(num)) return field === "timestamp";
 
-  const lowerFieldValue = String(fieldValue).toLowerCase();
-  const lowerValue = String(value).toLowerCase();
-
   switch (operator) {
     case "eq": return num === target;
     case "neq": return num !== target;
@@ -58,8 +55,8 @@ function evaluateCondition(track, condition) {
     }
     case "within_days": return num <= target * 86400;
     case "before": return num >= target * 86400;
-    case "contains": return lowerFieldValue.includes(lowerValue);
-    case "not_contains": return !lowerFieldValue.includes(lowerValue);
+    case "contains": return String(fieldValue).toLowerCase().includes(String(value).toLowerCase());
+    case "not_contains": return !String(fieldValue).toLowerCase().includes(String(value).toLowerCase());
     default: return false;
   }
 }

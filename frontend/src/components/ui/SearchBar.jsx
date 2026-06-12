@@ -26,7 +26,6 @@ const SearchInput = ({value, onChange, onSearch}) => {
               onChange={(e) => onChange(e.target.value)} 
               onKeyDown={handleKeyDown}
             />
-            <div id="input-mask" />
             <div id="pink-mask" />
             <div id="search-icon">
               <svg xmlns="http://www.w3.org/2000/svg" width={24} viewBox="0 0 24 24" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" height={24} fill="none" className="feather feather-search">
@@ -115,10 +114,6 @@ const StyledWrapper = styled.div`
     -webkit-text-fill-color: #ffffff;
     caret-color: #ffffff;
     transition: background-color 5000s ease-in-out 0s;
-  }
-
-  #main:focus-within > #input-mask {
-    display: none;
   }
 
   #pink-mask {

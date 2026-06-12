@@ -88,19 +88,12 @@ export default function Playlist() {
             <div className="flex flex-wrap items-start gap-6 pb-8 pt-2">
               {automations.map((auto) => {
                 const isUserAutomation = !auto.id.startsWith("auto-");
+                const navigateToPlaylist = () => navigate(`/playlists/${auto.id}`);
                 return (
                   <div
                     key={auto.id}
-                    className={`group relative shrink-0 py-2 ${
-                      isUserAutomation
-                        ? "cursor-pointer"
-                        : ""
-                    }`}
-                    onClick={
-                      isUserAutomation
-                        ? () => navigate(`/playlists/${auto.id}`)
-                        : undefined
-                    }
+                    className={`group relative shrink-0 py-2${isUserAutomation ? " cursor-pointer" : ""}`}
+                    onClick={isUserAutomation ? navigateToPlaylist : undefined}
                     role={isUserAutomation ? "button" : undefined}
                     tabIndex={isUserAutomation ? 0 : undefined}
                     onKeyDown={
@@ -108,7 +101,7 @@ export default function Playlist() {
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              navigate(`/playlists/${auto.id}`);
+                              navigateToPlaylist();
                             }
                           }
                         : undefined

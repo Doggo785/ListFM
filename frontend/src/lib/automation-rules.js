@@ -1,4 +1,3 @@
-// ── Source types ─────────────────────────────────────────────────
 export const SOURCE_TYPES = {
   TOP_TRACKS: "top_tracks",
   RECENT_TRACKS: "recent_tracks",
@@ -13,14 +12,6 @@ export const SOURCE_TYPE_LABELS = {
   top_artists: "Top Artists",
 };
 
-export const SOURCE_OPTIONS = [
-  { type: SOURCE_TYPES.TOP_TRACKS, description: "Your most played tracks over the selected period" },
-  { type: SOURCE_TYPES.RECENT_TRACKS, description: "Your most recent listens" },
-  { type: SOURCE_TYPES.LOVED_TRACKS, description: "Your Last.fm loved tracks" },
-  { type: SOURCE_TYPES.TOP_ARTISTS, description: "Tracks from your favorite artists" },
-];
-
-// ── Period options ────────────────────────────────────────────────
 export const PERIOD_OPTIONS = [
   { value: "7d", label: "Last 7 days" },
   { value: "1m", label: "Last month" },
@@ -30,7 +21,6 @@ export const PERIOD_OPTIONS = [
   { value: "overall", label: "All time" },
 ];
 
-// ── Cron presets (simplified interface) ────────────────────────────
 export const DEFAULT_CRON = "0 0 1 * *";
 
 export const CRON_PRESETS = [
@@ -41,8 +31,6 @@ export const CRON_PRESETS = [
   { label: "Every 3 months", cron: "0 0 1 */3 *", description: "Every 3 months on the 1st at midnight" },
   { label: "Every year (Jan 1st)", cron: "0 0 1 1 *", description: "Yearly on January 1st at midnight" },
 ];
-
-export const CRON_PLACEHOLDER = "min hour day month weekday";
 
 export function isValidCron(expr) {
   if (!expr || typeof expr !== "string") return false;
@@ -85,7 +73,6 @@ function nthSuffix(n) {
   return SUFFIXES[(v - 20) % 10] || SUFFIXES[v] || SUFFIXES[0];
 }
 
-// ── Filter fields ────────────────────────────────────────────────
 export const FILTER_FIELDS = {
   userplaycount: { label: "Your plays (all time)", type: "number", description: "Total times you played this track across all time" },
   userloved: { label: "Loved", type: "boolean", description: "Whether you've loved this track on Last.fm" },
@@ -121,7 +108,6 @@ export const FILTER_OPERATORS = {
   ],
 };
 
-// ── Default form ─────────────────────────────────────────────────
 export function createGroup(overrides = {}) {
   return {
     id: crypto.randomUUID(),
@@ -166,7 +152,6 @@ export function createDefaultAutomation() {
   };
 }
 
-// ── Validation helpers ───────────────────────────────────────────
 export function sanitizeAutomation(raw) {
   if (!raw || typeof raw !== "object") return null;
   if (!raw.id || !raw.source) return null;
@@ -197,16 +182,3 @@ export function sanitizeAutomation(raw) {
   };
 }
 
-export function loadAutomationsFromStorage() {
-  try {
-    const raw = JSON.parse(localStorage.getItem("listfm_automations") || "[]");
-    if (!Array.isArray(raw)) return [];
-    return raw.map(sanitizeAutomation).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-export function saveAutomationsToStorage(automations) {
-  localStorage.setItem("listfm_automations", JSON.stringify(automations));
-}

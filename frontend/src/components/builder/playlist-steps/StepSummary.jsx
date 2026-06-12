@@ -13,6 +13,8 @@ export function StepSummary({ data }) {
     PERIOD_OPTIONS.find((p) => p.value === data.source.period)?.label ||
     data.source.period;
   const filterCount = countActiveConditions(data.filterGroups);
+  const isCronValid = isValidCron(data.cron);
+  const filterLabel = filterCount > 0 ? `${filterCount} condition${filterCount > 1 ? "s" : ""}` : "None";
 
   return (
     <div className="space-y-6">
@@ -58,14 +60,10 @@ export function StepSummary({ data }) {
                 Schedule
               </div>
               <div className="text-sm font-semibold text-white">
-                {isValidCron(data.cron)
-                  ? describeCron(data.cron)
-                  : "Static"}
+                {isCronValid ? describeCron(data.cron) : "Static"}
               </div>
               <div className="text-xs text-neutral-400 mt-0.5">
-                {isValidCron(data.cron)
-                  ? "Auto-updated"
-                  : "No auto-update"}
+                {isCronValid ? "Auto-updated" : "No auto-update"}
               </div>
             </div>
             <div className="p-5">
@@ -73,7 +71,7 @@ export function StepSummary({ data }) {
                 Filters
               </div>
               <div className="text-sm font-semibold text-white">
-                {filterCount > 0 ? `${filterCount} condition${filterCount > 1 ? "s" : ""}` : "None"}
+                {filterLabel}
               </div>
               <div className="text-xs text-neutral-400 mt-0.5">
                 {filterCount > 0 ? "Active filters" : "All tracks pass"}

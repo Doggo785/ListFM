@@ -147,10 +147,6 @@ export default function TiltedCard({
                 src={imageSrc}
                 alt={altText}
                 className="absolute inset-0 h-full w-full object-cover will-change-transform [transform:translateZ(0)]"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                }}
               />
             )}
 

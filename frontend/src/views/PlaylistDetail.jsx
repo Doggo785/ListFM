@@ -225,15 +225,16 @@ export default function PlaylistDetail() {
       } else {
         const enriched = data.tracks || [];
         setRawTracks(enriched);
-        setPreviewTracks(applyFilterGroups(enriched, automation.filterGroups));
+        const filtered = applyFilterGroups(enriched, automation.filterGroups);
+        setPreviewTracks(filtered);
 
         // Auto-save to library (fire-and-forget)
         saveGeneratedPlaylist(username.trim(), {
           automation_id: automation.id,
           source_type: automation.source?.type,
           source_period: automation.source?.period,
-          tracks: applyFilterGroups(enriched, automation.filterGroups),
-          track_count: applyFilterGroups(enriched, automation.filterGroups).length,
+          tracks: filtered,
+          track_count: filtered.length,
           filter_groups: automation.filterGroups || [],
         }).catch(() => {}); // Silently fail — don't block UI
       }
@@ -288,7 +289,6 @@ export default function PlaylistDetail() {
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
       <div className="mx-auto max-w-[1400px]">
-        {/* Header */}
         <motion.header
           className="mb-8"
           initial={{ opacity: 0, y: -20 }}
@@ -341,7 +341,6 @@ export default function PlaylistDetail() {
           </div>
         </motion.header>
 
-        {/* Content: two columns on large screens */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start">
           {/* Left: Settings */}
           <div className="space-y-6 pb-16">
@@ -426,7 +425,6 @@ export default function PlaylistDetail() {
             </SectionCard>
           </div>
 
-          {/* Right: Preview (sticky) */}
           <div className="lg:sticky lg:top-8">
             <motion.div
               className="flex flex-col"
@@ -491,7 +489,6 @@ export default function PlaylistDetail() {
                     </p>
                   </div>
 
-                  {/* Track list */}
                   <div className="flex-1 overflow-y-auto p-5 min-h-0">
                     {previewLoading && (
                       <div className="flex items-center justify-center py-12">
@@ -569,7 +566,6 @@ export default function PlaylistDetail() {
                     )}
                   </div>
 
-                  {/* Save to Library */}
                   {previewTracks && previewTracks.length > 0 && (
                     <div className="px-5 py-4 border-t border-white/5 shrink-0">
                       {saveSuccess ? (
@@ -593,7 +589,6 @@ export default function PlaylistDetail() {
           </div>
         </div>
 
-        {/* Delete confirmation modal */}
         {showDeleteConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div
@@ -637,7 +632,6 @@ export default function PlaylistDetail() {
           </div>
         )}
 
-        {/* Save to Library modal */}
         {showSaveModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div

@@ -9,6 +9,8 @@ import {
 import { Sidebar, SidebarBody, SidebarLink } from "./Sidebar";
 import { getUserInfo } from "@/lib/api";
 
+const iconClass = "text-neutral-200 h-5 w-5 flex-shrink-0";
+
 function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -26,23 +28,23 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
     {
       label: "Home",
       href: username ? `/dashboard/${username}` : "/",
-      icon: <IconHome className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      icon: <IconHome className={iconClass} />,
     },
     {
       label: "Playlists",
       href: "#",
-      icon: <IconPlaylist className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      icon: <IconPlaylist className={iconClass} />,
     },
     {
       label: "Stats",
       href:
         activePage === "dashboard" && username ? `/dashboard/${username}` : "#",
-      icon: <IconChartBar className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      icon: <IconChartBar className={iconClass} />,
     },
     {
       label: "Profile",
       href: "#",
-      icon: <IconUser className="text-neutral-200 h-5 w-5 flex-shrink-0" />,
+      icon: <IconUser className={iconClass} />,
     },
   ];
 
