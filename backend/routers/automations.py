@@ -79,7 +79,9 @@ async def get_single_automation(username: str, automation_id: str, db: AsyncSess
 @router.post("/{username}/automations", response_model=AutomationRead, status_code=201)
 async def create_new_automation(username: str, data: AutomationCreate, db: AsyncSession = Depends(get_db)):
     user_id = await _resolve_user_id(db, username)
-    return await create_automation(db, user_id, username, data)
+    automation = await create_automation(db, user_id, username, data)
+    await db.commit()
+    return automation
 
 
 @router.patch("/{username}/automations/{automation_id}", response_model=AutomationRead)
@@ -90,6 +92,7 @@ async def update_existing_automation(
     automation = await update_automation(db, automation_id, user_id, data)
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
+    await db.commit()
     return automation
 
 
@@ -99,3 +102,4 @@ async def delete_existing_automation(username: str, automation_id: str, db: Asyn
     deleted = await delete_automation(db, automation_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Automation not found")
+    await db.commit()

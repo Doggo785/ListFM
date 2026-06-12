@@ -17,8 +17,10 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from database import Base
-from models.automation import Automation
-from models.generated_playlist import GeneratedPlaylist
+
+# Import all models so Base.metadata knows about every table.
+# This is required for `alembic revision --autogenerate` to detect all tables.
+import models  # noqa: F401
 
 target_metadata = Base.metadata
 

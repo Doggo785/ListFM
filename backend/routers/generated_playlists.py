@@ -43,7 +43,9 @@ async def save_generated_playlist(
     username: str, data: GeneratedPlaylistCreate, db: AsyncSession = Depends(get_db)
 ):
     user_id = await _resolve_user_id(db, username)
-    return await create_generated_playlist(db, user_id, username, data)
+    playlist = await create_generated_playlist(db, user_id, username, data)
+    await db.commit()
+    return playlist
 
 
 @router.post("/{username}/generated-playlists/auto-save", response_model=GeneratedPlaylistRead, status_code=201)
@@ -51,7 +53,9 @@ async def auto_save_generated_playlist(
     username: str, data: GeneratedPlaylistCreate, db: AsyncSession = Depends(get_db)
 ):
     user_id = await _resolve_user_id(db, username)
-    return await create_generated_playlist(db, user_id, username, data)
+    playlist = await create_generated_playlist(db, user_id, username, data)
+    await db.commit()
+    return playlist
 
 
 @router.delete("/{username}/generated-playlists/{playlist_id}", status_code=204)
@@ -62,3 +66,4 @@ async def delete_single_generated_playlist(
     deleted = await delete_generated_playlist(db, playlist_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Generated playlist not found")
+    await db.commit()
