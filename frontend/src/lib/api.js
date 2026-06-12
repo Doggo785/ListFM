@@ -85,26 +85,13 @@ export async function deleteAutomation(username, id) {
 }
 
 /**
- * Save a generated playlist to library (manual).
+ * Save a generated playlist to library.
  * @param {string} username
- * @param {object} playlist — { automation_id, name, tracks, track_count, filter_groups }
+ * @param {object} playlist — { automation_id, name, source_type, source_period, tracks, track_count, filter_groups }
  * @returns {Promise<object>} saved playlist
  */
 export async function saveGeneratedPlaylist(username, playlist) {
   return request(`/api/${username}/generated-playlists`, {
-    method: "POST",
-    body: JSON.stringify(playlist),
-  });
-}
-
-/**
- * Auto-save a generated playlist (fire-and-forget after preview).
- * @param {string} username
- * @param {object} playlist — { automation_id, tracks, track_count, filter_groups }
- * @returns {Promise<object>} saved playlist
- */
-export async function autoSaveGeneratedPlaylist(username, playlist) {
-  return request(`/api/${username}/generated-playlists/auto-save`, {
     method: "POST",
     body: JSON.stringify(playlist),
   });

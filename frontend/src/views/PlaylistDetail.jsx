@@ -24,7 +24,6 @@ import FilterBuilder from "@/components/builder/FilterBuilder";
 import CronEditor from "@/components/builder/CronEditor";
 import {
   previewAutomation,
-  autoSaveGeneratedPlaylist,
   saveGeneratedPlaylist,
   getAutomation,
   updateAutomation,
@@ -198,6 +197,8 @@ export default function PlaylistDetail() {
       await saveGeneratedPlaylist(username.trim(), {
         automation_id: automation.id,
         name: saveName.trim(),
+        source_type: automation.source?.type,
+        source_period: automation.source?.period,
         tracks: previewTracks,
         track_count: previewTracks.length,
         filter_groups: automation.filterGroups || [],
@@ -227,8 +228,10 @@ export default function PlaylistDetail() {
         setPreviewTracks(applyFilterGroups(enriched, automation.filterGroups));
 
         // Auto-save to library (fire-and-forget)
-        autoSaveGeneratedPlaylist(username.trim(), {
+        saveGeneratedPlaylist(username.trim(), {
           automation_id: automation.id,
+          source_type: automation.source?.type,
+          source_period: automation.source?.period,
           tracks: applyFilterGroups(enriched, automation.filterGroups),
           track_count: applyFilterGroups(enriched, automation.filterGroups).length,
           filter_groups: automation.filterGroups || [],
