@@ -208,7 +208,9 @@ class GeneratedPlaylistCreate(BaseModel):
     automation_id: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
-    tracks: list[Track]
+    source_type: Literal["top_tracks", "recent_tracks", "loved_tracks", "top_artists"]
+    source_period: Literal["7d", "1m", "3m", "6m", "12m", "overall"]
+    tracks: list[Track]  # Track objects from Last.fm (title, artist)
     track_count: int
     filter_groups: Optional[list[dict]] = None
 
