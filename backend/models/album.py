@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, DateTime, func
+from sqlalchemy import String, DateTime, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -9,6 +9,7 @@ from database import Base
 
 class Album(Base):
     __tablename__ = "albums"
+    __table_args__ = (UniqueConstraint("title", "artist", name="uq_albums_title_artist"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     title: Mapped[str] = mapped_column(String(500))
