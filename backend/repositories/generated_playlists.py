@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from schemas import GeneratedPlaylistCreate
+from repositories.tracks import get_or_create_track
 
 
 async def get_generated_playlists(db: AsyncSession, user_id: str) -> list[GeneratedPlaylist]:
@@ -50,10 +51,14 @@ async def create_generated_playlist(
         generated_at=now,
     )
     db.add(playlist)
-    for i, track_id in enumerate(data.tracks):
+    
+    for i, track_data in enumerate(data.tracks):
+        track = await get_or_create_track(
+            db, title=track_data.title, artist=track_data.artist
+        )
         playlist_track = PlaylistTrack(
             playlist_id=playlist.id,
-            track_id=track_id,
+            track_id=track.id,
             position=i,
         )
         db.add(playlist_track)

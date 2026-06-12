@@ -210,7 +210,7 @@ class GeneratedPlaylistCreate(BaseModel):
     description: Optional[str] = None
     source_type: str
     source_period: str
-    tracks: list[str]  # List of track IDs
+    tracks: list[Track]  # Track objects from Last.fm (title, artist)
     track_count: int
     filter_groups: Optional[list[dict]] = None
 
