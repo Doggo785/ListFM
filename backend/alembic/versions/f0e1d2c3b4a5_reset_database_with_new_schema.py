@@ -1,7 +1,7 @@
-"""reset database with new schema
+"""create full schema
 
 Revision ID: f0e1d2c3b4a5
-Revises: a1b2c3d4e5f6
+Revises: 
 Create Date: 2026-06-10 12:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 # revision identifiers, used by Alembic.
 revision: str = 'f0e1d2c3b4a5'
-down_revision: Union[str, Sequence[str], None] = 'a1b2c3d4e5f6'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -23,19 +23,20 @@ def upgrade() -> None:
     """Reset database with new schema."""
     
     # Drop existing tables in reverse dependency order (IF EXISTS for safety)
-    op.execute("DROP TABLE IF EXISTS playlist_tracks CASCADE")
-    op.execute("DROP TABLE IF EXISTS automation_history CASCADE")
-    op.execute("DROP TABLE IF EXISTS user_tracks CASCADE")
-    op.execute("DROP TABLE IF EXISTS album_tags CASCADE")
-    op.execute("DROP TABLE IF EXISTS track_tags CASCADE")
+    # Children first, then parents
+    op.execute("DROP TABLE IF EXISTS playlist_tracks CASCADE")       # FK → generated_playlists, tracks
+    op.execute("DROP TABLE IF EXISTS automation_history CASCADE")    # FK → automations
+    op.execute("DROP TABLE IF EXISTS generated_playlists CASCADE")  # FK → users, automations
+    op.execute("DROP TABLE IF EXISTS user_tracks CASCADE")          # FK → users, tracks
+    op.execute("DROP TABLE IF EXISTS album_tags CASCADE")           # FK → albums, tags
+    op.execute("DROP TABLE IF EXISTS track_tags CASCADE")           # FK → tracks, tags
+    op.execute("DROP TABLE IF EXISTS automations CASCADE")          # FK → users
     op.execute("DROP TABLE IF EXISTS tags CASCADE")
     op.execute("DROP TABLE IF EXISTS tracks CASCADE")
     op.execute("DROP TABLE IF EXISTS albums CASCADE")
-    op.execute("DROP TABLE IF EXISTS refresh_tokens CASCADE")
-    op.execute("DROP TABLE IF EXISTS auth_providers CASCADE")
+    op.execute("DROP TABLE IF EXISTS refresh_tokens CASCADE")       # FK → users
+    op.execute("DROP TABLE IF EXISTS auth_providers CASCADE")       # FK → users
     op.execute("DROP TABLE IF EXISTS users CASCADE")
-    op.execute("DROP TABLE IF EXISTS generated_playlists CASCADE")
-    op.execute("DROP TABLE IF EXISTS automations CASCADE")
     
     # Create users table
     op.create_table(
