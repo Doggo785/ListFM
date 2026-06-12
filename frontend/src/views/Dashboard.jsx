@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
 import CountUp from "../components/elements/CountUp";
 import TiltedCard from "../components/ui/PlaylistCard";
-import { getAutomations } from "@/lib/api";
+import { getAutomations, getUserInfo, getRecentTracks } from "@/lib/api";
 import {
   SOURCE_TYPE_LABELS,
   PERIOD_OPTIONS,
@@ -107,8 +107,7 @@ function Dashboard() {
   }, [username]);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/${username}/info`)
-      .then((res) => (res.ok ? res.json() : null))
+    getUserInfo(username)
       .then(async (data) => {
         const img = data?.image || null;
         setAvatar(img);
@@ -124,9 +123,7 @@ function Dashboard() {
     const fetchRecentTracks = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`http://localhost:8000/api/recent-tracks/${username}?limit=50`);
-        if (!res.ok) throw new Error("Unable to fetch tracks");
-        const data = await res.json();
+        const data = await getRecentTracks(username, 50);
         setPlaylist(data.tracks);
       } catch (err) {
         setError("Failed to fetch data.");

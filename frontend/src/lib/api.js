@@ -14,6 +14,25 @@ async function request(path, options = {}) {
 }
 
 /**
+ * Get user info (avatar, profile) from Last.fm.
+ * @param {string} username
+ * @returns {Promise<object>} user info with image
+ */
+export async function getUserInfo(username) {
+  return request(`/api/${username}/info`);
+}
+
+/**
+ * Get recently played tracks for a user.
+ * @param {string} username
+ * @param {number} limit — max tracks to return
+ * @returns {Promise<{ tracks: Array }>}
+ */
+export async function getRecentTracks(username, limit = 50) {
+  return request(`/api/${username}/recent-tracks?limit=${limit}`);
+}
+
+/**
  * Generate a preview playlist from an automation rule.
  * @param {string} username
  * @param {object} automation — full automation object

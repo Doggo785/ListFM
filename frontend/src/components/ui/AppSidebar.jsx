@@ -7,6 +7,7 @@ import {
   IconPlaylist,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./Sidebar";
+import { getUserInfo } from "@/lib/api";
 
 function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   const [open, setOpen] = useState(false);
@@ -16,8 +17,7 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   useEffect(() => {
     if (!username) return;
     setAvatar(null);
-    fetch(`http://localhost:8000/api/${username}/info`)
-      .then((res) => (res.ok ? res.json() : null))
+    getUserInfo(username)
       .then((data) => setAvatar(data?.image || null))
       .catch(() => setAvatar(null));
   }, [username]);
