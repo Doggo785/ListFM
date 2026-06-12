@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +38,12 @@ async def get_generated_playlist(db: AsyncSession, playlist_id: str, user_id: st
 async def create_generated_playlist(
     db: AsyncSession, user_id: str, lastfm_username: str, data: GeneratedPlaylistCreate
 ) -> GeneratedPlaylist:
-    """Create a new generated playlist record."""
+    """Create a new generated playlist record.
+
+    Caller is responsible for committing the session. All track lookups
+    and playlist_track inserts happen within the same uncommitted transaction,
+    ensuring atomicity.
+    """
     now = datetime.now(timezone.utc)
     playlist = GeneratedPlaylist(
         id=str(uuid.uuid4()),
@@ -51,7 +57,8 @@ async def create_generated_playlist(
         generated_at=now,
     )
     db.add(playlist)
-    
+    await db.flush()  # get playlist.id before referencing it in PlaylistTrack
+
     for i, track_data in enumerate(data.tracks):
         track = await get_or_create_track(
             db, title=track_data.title, artist=track_data.artist
@@ -62,17 +69,20 @@ async def create_generated_playlist(
             position=i,
         )
         db.add(playlist_track)
-    
-    await db.commit()
+
+    await db.flush()
     await db.refresh(playlist)
     return playlist
 
 
 async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id: str) -> bool:
-    """Soft delete a generated playlist. Returns True if deleted, False if not found."""
+    """Soft delete a generated playlist. Returns True if deleted, False if not found.
+
+    Caller is responsible for committing the session.
+    """
     playlist = await get_generated_playlist(db, playlist_id, user_id)
     if playlist is None:
         return False
     playlist.deleted_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
     return True

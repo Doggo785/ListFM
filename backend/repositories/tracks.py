@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,20 +30,31 @@ async def get_or_create_track(
     global_playcount: int = 0,
     image_url: str | None = None,
 ) -> Track:
-    existing = await get_track_by_artist_title(db, artist, title)
+    """Get an existing track or create a new one.
+
+    Uses SELECT FOR UPDATE to prevent race conditions on concurrent inserts.
+    Caller is responsible for committing the session.
+    """
+    now = datetime.now(timezone.utc)
+
+    # Lock the row if it exists to prevent concurrent duplicate inserts
+    result = await db.execute(
+        select(Track)
+        .where(Track.artist == artist, Track.title == title)
+        .with_for_update()
+    )
+    existing = result.scalar_one_or_none()
+
     if existing:
-        now = datetime.now(timezone.utc)
+        # Update only if stale
         if existing.last_fetched_at is None or existing.last_fetched_at < (now - CACHE_TTL):
             existing.listeners = listeners
             existing.global_playcount = global_playcount
             existing.image_url = image_url or existing.image_url
             existing.album_id = album_id or existing.album_id
             existing.last_fetched_at = now
-            await db.commit()
-            await db.refresh(existing)
         return existing
-    
-    now = datetime.now(timezone.utc)
+
     track = Track(
         id=str(uuid.uuid4()),
         title=title,
@@ -55,7 +67,7 @@ async def get_or_create_track(
         created_at=now,
     )
     db.add(track)
-    await db.commit()
+    await db.flush()
     await db.refresh(track)
     return track
 

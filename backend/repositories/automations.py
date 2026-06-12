@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +32,10 @@ async def get_automation(db: AsyncSession, automation_id: str, user_id: str) -> 
 
 
 async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str, data: AutomationCreate) -> Automation:
-    """Create a new automation for a user."""
+    """Create a new automation for a user.
+
+    Caller is responsible for committing the session.
+    """
     now = datetime.now(timezone.utc)
     automation = Automation(
         id=str(uuid.uuid4()),
@@ -49,7 +53,7 @@ async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str
         updated_at=now,
     )
     db.add(automation)
-    await db.commit()
+    await db.flush()
     await db.refresh(automation)
     return automation
 
@@ -57,7 +61,10 @@ async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str
 async def update_automation(
     db: AsyncSession, automation_id: str, user_id: str, data: AutomationUpdate
 ) -> Automation | None:
-    """Update an automation. Returns None if not found."""
+    """Update an automation. Returns None if not found.
+
+    Caller is responsible for committing the session.
+    """
     automation = await get_automation(db, automation_id, user_id)
     if automation is None:
         return None
@@ -75,16 +82,19 @@ async def update_automation(
         setattr(automation, field, value)
 
     automation.updated_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
     await db.refresh(automation)
     return automation
 
 
 async def delete_automation(db: AsyncSession, automation_id: str, user_id: str) -> bool:
-    """Soft delete an automation. Returns True if deleted, False if not found."""
+    """Soft delete an automation. Returns True if deleted, False if not found.
+
+    Caller is responsible for committing the session.
+    """
     automation = await get_automation(db, automation_id, user_id)
     if automation is None:
         return False
     automation.deleted_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
     return True

@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.tag import Tag
@@ -14,19 +16,22 @@ async def get_tag_by_name(db: AsyncSession, name: str) -> Tag | None:
 
 
 async def get_or_create_tag(db: AsyncSession, name: str) -> Tag:
-    existing = await get_tag_by_name(db, name)
-    if existing:
-        return existing
-    
-    tag = Tag(
-        id=str(uuid.uuid4()),
-        name=name,
-        created_at=datetime.now(timezone.utc),
+    """Get or create a tag atomically using INSERT ON CONFLICT.
+
+    Caller is responsible for committing the session.
+    """
+    stmt = (
+        insert(Tag)
+        .values(id=str(uuid.uuid4()), name=name, created_at=datetime.now(timezone.utc))
+        .on_conflict_do_update(
+            index_elements=["name"],
+            set_={"name": name},  # no-op update to return existing row
+        )
+        .returning(Tag)
     )
-    db.add(tag)
-    await db.commit()
-    await db.refresh(tag)
-    return tag
+    result = await db.execute(stmt)
+    await db.flush()
+    return result.scalar_one()
 
 
 async def upsert_track_tag(
@@ -35,30 +40,32 @@ async def upsert_track_tag(
     tag_name: str,
     weight: int,
 ) -> TrackTag:
+    """Upsert a track-tag association.
+
+    Caller is responsible for committing the session.
+    """
     tag = await get_or_create_tag(db, tag_name)
-    
-    result = await db.execute(
-        select(TrackTag).where(TrackTag.track_id == track_id, TrackTag.tag_id == tag.id)
+
+    stmt = (
+        insert(TrackTag)
+        .values(
+            track_id=track_id,
+            tag_id=tag.id,
+            weight=weight,
+            fetched_at=datetime.now(timezone.utc),
+        )
+        .on_conflict_do_update(
+            index_elements=["track_id", "tag_id"],
+            set_={
+                "weight": weight,
+                "fetched_at": datetime.now(timezone.utc),
+            },
+        )
+        .returning(TrackTag)
     )
-    existing = result.scalar_one_or_none()
-    
-    if existing:
-        existing.weight = weight
-        existing.fetched_at = datetime.now(timezone.utc)
-        await db.commit()
-        await db.refresh(existing)
-        return existing
-    
-    track_tag = TrackTag(
-        track_id=track_id,
-        tag_id=tag.id,
-        weight=weight,
-        fetched_at=datetime.now(timezone.utc),
-    )
-    db.add(track_tag)
-    await db.commit()
-    await db.refresh(track_tag)
-    return track_tag
+    result = await db.execute(stmt)
+    await db.flush()
+    return result.scalar_one()
 
 
 async def upsert_album_tag(
@@ -67,30 +74,32 @@ async def upsert_album_tag(
     tag_name: str,
     weight: int,
 ) -> AlbumTag:
+    """Upsert an album-tag association.
+
+    Caller is responsible for committing the session.
+    """
     tag = await get_or_create_tag(db, tag_name)
-    
-    result = await db.execute(
-        select(AlbumTag).where(AlbumTag.album_id == album_id, AlbumTag.tag_id == tag.id)
+
+    stmt = (
+        insert(AlbumTag)
+        .values(
+            album_id=album_id,
+            tag_id=tag.id,
+            weight=weight,
+            fetched_at=datetime.now(timezone.utc),
+        )
+        .on_conflict_do_update(
+            index_elements=["album_id", "tag_id"],
+            set_={
+                "weight": weight,
+                "fetched_at": datetime.now(timezone.utc),
+            },
+        )
+        .returning(AlbumTag)
     )
-    existing = result.scalar_one_or_none()
-    
-    if existing:
-        existing.weight = weight
-        existing.fetched_at = datetime.now(timezone.utc)
-        await db.commit()
-        await db.refresh(existing)
-        return existing
-    
-    album_tag = AlbumTag(
-        album_id=album_id,
-        tag_id=tag.id,
-        weight=weight,
-        fetched_at=datetime.now(timezone.utc),
-    )
-    db.add(album_tag)
-    await db.commit()
-    await db.refresh(album_tag)
-    return album_tag
+    result = await db.execute(stmt)
+    await db.flush()
+    return result.scalar_one()
 
 
 async def get_track_tags(db: AsyncSession, track_id: str) -> list[dict]:

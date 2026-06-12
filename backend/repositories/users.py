@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +38,10 @@ async def get_user_by_lastfm_username(db: AsyncSession, lastfm_username: str) ->
 
 
 async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) -> User:
-    """Create a new user with email/password."""
+    """Create a new user with email/password.
+
+    Caller is responsible for committing the session.
+    """
     now = datetime.now(timezone.utc)
     user = User(
         id=str(uuid.uuid4()),
@@ -60,13 +64,16 @@ async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) ->
         linked_at=now,
     )
     db.add(auth_provider)
-    await db.commit()
+    await db.flush()
     await db.refresh(user)
     return user
 
 
 async def create_user_from_lastfm(db: AsyncSession, lastfm_username: str, access_token: str | None = None) -> User:
-    """Create a new user from Last.fm OAuth."""
+    """Create a new user from Last.fm OAuth.
+
+    Caller is responsible for committing the session.
+    """
     now = datetime.now(timezone.utc)
     user = User(
         id=str(uuid.uuid4()),
@@ -88,13 +95,16 @@ async def create_user_from_lastfm(db: AsyncSession, lastfm_username: str, access
         linked_at=now,
     )
     db.add(auth_provider)
-    await db.commit()
+    await db.flush()
     await db.refresh(user)
     return user
 
 
 async def update_user(db: AsyncSession, user_id: str, data: UserUpdate) -> User | None:
-    """Update a user. Returns None if not found."""
+    """Update a user. Returns None if not found.
+
+    Caller is responsible for committing the session.
+    """
     user = await get_user_by_id(db, user_id)
     if user is None:
         return None
@@ -104,16 +114,19 @@ async def update_user(db: AsyncSession, user_id: str, data: UserUpdate) -> User 
         setattr(user, field, value)
 
     user.updated_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
     await db.refresh(user)
     return user
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
-    """Soft delete a user. Returns True if deleted, False if not found."""
+    """Soft delete a user. Returns True if deleted, False if not found.
+
+    Caller is responsible for committing the session.
+    """
     user = await get_user_by_id(db, user_id)
     if user is None:
         return False
     user.deleted_at = datetime.now(timezone.utc)
-    await db.commit()
+    await db.flush()
     return True
