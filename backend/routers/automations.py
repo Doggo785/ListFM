@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from schemas import AutomationCreate, AutomationUpdate, AutomationRead
-from repositories.users import get_user_by_lastfm_username
+from routers.deps import resolve_user_id
 from repositories.automations import (
     get_automations,
     get_automation,
@@ -20,13 +20,6 @@ from services.lastfm import (
 )
 
 router = APIRouter(prefix="/api", tags=["automations"])
-
-
-async def _resolve_user_id(db: AsyncSession, username: str) -> str:
-    user = await get_user_by_lastfm_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
-    return user.id
 
 
 @router.post("/preview")
@@ -63,13 +56,13 @@ def preview_automation(body: dict):
 
 @router.get("/{username}/automations", response_model=list[AutomationRead])
 async def list_automations(username: str, db: AsyncSession = Depends(get_db)):
-    user_id = await _resolve_user_id(db, username)
+    user_id = await resolve_user_id(db, username)
     return await get_automations(db, user_id)
 
 
 @router.get("/{username}/automations/{automation_id}", response_model=AutomationRead)
 async def get_single_automation(username: str, automation_id: str, db: AsyncSession = Depends(get_db)):
-    user_id = await _resolve_user_id(db, username)
+    user_id = await resolve_user_id(db, username)
     automation = await get_automation(db, automation_id, user_id)
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
@@ -78,7 +71,7 @@ async def get_single_automation(username: str, automation_id: str, db: AsyncSess
 
 @router.post("/{username}/automations", response_model=AutomationRead, status_code=201)
 async def create_new_automation(username: str, data: AutomationCreate, db: AsyncSession = Depends(get_db)):
-    user_id = await _resolve_user_id(db, username)
+    user_id = await resolve_user_id(db, username)
     automation = await create_automation(db, user_id, username, data)
     await db.commit()
     return automation
@@ -88,7 +81,7 @@ async def create_new_automation(username: str, data: AutomationCreate, db: Async
 async def update_existing_automation(
     username: str, automation_id: str, data: AutomationUpdate, db: AsyncSession = Depends(get_db)
 ):
-    user_id = await _resolve_user_id(db, username)
+    user_id = await resolve_user_id(db, username)
     automation = await update_automation(db, automation_id, user_id, data)
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
@@ -98,7 +91,7 @@ async def update_existing_automation(
 
 @router.delete("/{username}/automations/{automation_id}", status_code=204)
 async def delete_existing_automation(username: str, automation_id: str, db: AsyncSession = Depends(get_db)):
-    user_id = await _resolve_user_id(db, username)
+    user_id = await resolve_user_id(db, username)
     deleted = await delete_automation(db, automation_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Automation not found")
