@@ -73,7 +73,11 @@ async def get_single_automation(username: str, automation_id: str, db: AsyncSess
 async def create_new_automation(username: str, data: AutomationCreate, db: AsyncSession = Depends(get_db)):
     user_id = await resolve_user_id(db, username)
     automation = await create_automation(db, user_id, username, data)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save automation")
     return automation
 
 
@@ -85,7 +89,11 @@ async def update_existing_automation(
     automation = await update_automation(db, automation_id, user_id, data)
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save automation")
     return automation
 
 
@@ -95,4 +103,8 @@ async def delete_existing_automation(username: str, automation_id: str, db: Asyn
     deleted = await delete_automation(db, automation_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Automation not found")
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete automation")

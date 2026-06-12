@@ -37,7 +37,11 @@ async def save_generated_playlist(
 ):
     user_id = await resolve_user_id(db, username)
     playlist = await create_generated_playlist(db, user_id, username, data)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save playlist")
     return playlist
 
 
@@ -49,4 +53,8 @@ async def delete_single_generated_playlist(
     deleted = await delete_generated_playlist(db, playlist_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Generated playlist not found")
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete playlist")
