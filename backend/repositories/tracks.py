@@ -1,9 +1,11 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.track import Track
+
+CACHE_TTL = timedelta(hours=24)
 
 
 async def get_track_by_id(db: AsyncSession, track_id: str) -> Track | None:
@@ -30,7 +32,7 @@ async def get_or_create_track(
     existing = await get_track_by_artist_title(db, artist, title)
     if existing:
         now = datetime.now(timezone.utc)
-        if existing.last_fetched_at is None or existing.last_fetched_at < now:
+        if existing.last_fetched_at is None or existing.last_fetched_at < (now - CACHE_TTL):
             existing.listeners = listeners
             existing.global_playcount = global_playcount
             existing.image_url = image_url or existing.image_url

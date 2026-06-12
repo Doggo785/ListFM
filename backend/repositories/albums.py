@@ -1,9 +1,11 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.album import Album
+
+CACHE_TTL = timedelta(hours=24)
 
 
 async def get_album_by_id(db: AsyncSession, album_id: str) -> Album | None:
@@ -27,7 +29,7 @@ async def get_or_create_album(
     existing = await get_album_by_title_artist(db, title, artist)
     if existing:
         now = datetime.now(timezone.utc)
-        if existing.last_fetched_at is None or existing.last_fetched_at < now:
+        if existing.last_fetched_at is None or existing.last_fetched_at < (now - CACHE_TTL):
             existing.last_fetched_at = now
             await db.commit()
             await db.refresh(existing)
