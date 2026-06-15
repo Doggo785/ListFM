@@ -1,7 +1,10 @@
+import re
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 
 class UserCreate(BaseModel):
@@ -9,10 +12,26 @@ class UserCreate(BaseModel):
     password: str
     display_name: Optional[str] = None
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        normalized = v.strip().lower()
+        if not EMAIL_REGEX.match(normalized):
+            raise ValueError("Invalid email format")
+        return normalized
+
 
 class UserLogin(BaseModel):
     email: str
     password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        normalized = v.strip().lower()
+        if not EMAIL_REGEX.match(normalized):
+            raise ValueError("Invalid email format")
+        return normalized
 
 
 class UserRead(BaseModel):
