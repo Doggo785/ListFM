@@ -4,6 +4,8 @@ import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
 import ScrollToTop from "./components/elements/ScrollToTop";
 import SearchHome from "./views/SearchHome";
+import Login from "./views/Login";
+import Register from "./views/Register";
 import Dashboard from "./views/Dashboard";
 import PlaylistNew from "./views/PlaylistNew";
 import PlaylistDetail from "./views/PlaylistDetail";
@@ -53,7 +55,14 @@ function App() {
             >
               <Routes location={location}>
                 <Route path="/" element={<SearchHome />} />
-                <Route path="/dashboard/:username" element={<Dashboard />} />
+                <Route
+                  path="/dashboard/:username"
+                  element={
+                    <AuthGuard>
+                      <Dashboard />
+                    </AuthGuard>
+                  }
+                />
                 <Route
                   path="/playlists"
                   element={
@@ -63,8 +72,24 @@ function App() {
                     />
                   }
                 />
-                <Route path="/playlists/new" element={<PlaylistNew />} />
-                <Route path="/playlists/:id" element={<PlaylistDetail />} />
+                <Route
+                  path="/playlists/new"
+                  element={
+                    <AuthGuard>
+                      <PlaylistNew />
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/playlists/:id"
+                  element={
+                    <AuthGuard>
+                      <PlaylistDetail />
+                    </AuthGuard>
+                  }
+                />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
               </Routes>
             </motion.div>
           </AnimatePresence>

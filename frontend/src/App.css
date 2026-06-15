@@ -175,3 +175,226 @@ html, body, #root {
     padding: 1.5rem;
   }
 }
+
+/* ========================================
+   LOGIN PAGE
+   ======================================== */
+
+.login-page {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #0a0a0a;
+  overflow: hidden;
+}
+
+.login-page__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.45;
+}
+
+.login-page__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem;
+}
+
+.login-page__hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.login-page__brand {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  margin: 0;
+  line-height: 1;
+}
+
+.login-page__tagline {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 400;
+  color: #a3a3a3;
+  margin: 0;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.login-page__form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-page__label {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #d4d4d4;
+}
+
+.login-page__input {
+  width: 100%;
+  height: 48px;
+  padding: 0 1rem;
+  background-color: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  color: #ffffff;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  box-sizing: border-box;
+}
+
+.login-page__input::placeholder {
+  color: #737373;
+}
+
+.login-page__input:focus {
+  outline: none;
+  border-color: rgba(255, 104, 23, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 104, 23, 0.1);
+}
+
+.login-page__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-page__input:-webkit-autofill,
+.login-page__input:-webkit-autofill:hover,
+.login-page__input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #141414 inset;
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.login-page__button {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #FF6817;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  margin-top: 0.5rem;
+}
+
+.login-page__button:hover:not(:disabled) {
+  background-color: #ff530b;
+  transform: translateY(-1px);
+}
+
+.login-page__button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-page__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-page__button-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.login-page__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.login-page__error {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #fca5a5;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.login-page__footer {
+  width: 100%;
+  text-align: center;
+}
+
+.login-page__hint {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.875rem;
+  color: #737373;
+  margin: 0;
+}
+
+.login-page__link {
+  color: #17AEFF;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.login-page__link:hover {
+  color: #3dbdff;
+}
+
+@media (max-width: 640px) {
+  .login-page__brand {
+    font-size: 2.5rem;
+  }
+
+  .login-page__tagline {
+    font-size: 0.9rem;
+  }
+
+  .login-page__content {
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+}
