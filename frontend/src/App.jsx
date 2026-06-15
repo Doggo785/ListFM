@@ -9,6 +9,7 @@ import Register from "./views/Register";
 import Dashboard from "./views/Dashboard";
 import PlaylistNew from "./views/PlaylistNew";
 import PlaylistDetail from "./views/PlaylistDetail";
+import AuthGuard from "./components/AuthGuard";
 
 function getLastUsername() {
   try {

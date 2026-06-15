@@ -10,7 +10,7 @@ export function AuthProvider({ children }) {
   const checkSession = useCallback(async () => {
     try {
       const data = await request("/api/auth/me");
-      setUser(data.user);
+      setUser(data);
     } catch {
       setUser(null);
     } finally {
