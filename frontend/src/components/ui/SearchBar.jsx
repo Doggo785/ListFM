@@ -28,7 +28,7 @@ const SearchInput = ({value, onChange, onSearch}) => {
             />
             <div id="pink-mask" />
             <div id="search-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width={24} viewBox="0 0 24 24" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" height={24} fill="none" className="feather feather-search">
+              <svg xmlns="http://www.w3.org/2000/svg" width={24} viewBox="0 0 24 24" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" height={24} fill="none">
                 <circle stroke="url(#search)" r={8} cy={11} cx={11} />
                 <line stroke="url(#searchl)" y2="16.65" y1={22} x2="16.65" x1={22} />
                 <defs>
@@ -217,19 +217,6 @@ const StyledWrapper = styled.div`
     );
     transition: all 2s;
   }
-  #poda:hover > .darkBorderBg::before {
-    transform: translate(-50%, -50%) rotate(262deg);
-  }
-  #poda:hover > .glow::before {
-    transform: translate(-50%, -50%) rotate(240deg);
-  }
-  #poda:hover > .white::before {
-    transform: translate(-50%, -50%) rotate(263deg);
-  }
-  #poda:hover > .border::before {
-    transform: translate(-50%, -50%) rotate(250deg);
-  }
-
   #poda:hover > .darkBorderBg::before {
     transform: translate(-50%, -50%) rotate(-98deg);
   }

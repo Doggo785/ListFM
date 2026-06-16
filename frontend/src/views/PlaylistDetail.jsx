@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import {
@@ -133,7 +133,7 @@ export default function PlaylistDetail() {
       try {
         const found = await getAutomation(username, id);
         setAutomation(found);
-      } catch (err) {
+      } catch {
         setNotFound(true);
       }
     };
@@ -250,6 +250,14 @@ export default function PlaylistDetail() {
     setPreviewTracks(applyFilterGroups(rawTracks, automation?.filterGroups));
   }, [automation?.filterGroups, rawTracks]);
 
+  const availableTags = useMemo(
+    () =>
+      rawTracks
+        ? { artist: dedupeTags(rawTracks, "artist_tags"), album: dedupeTags(rawTracks, "album_tags") }
+        : { artist: [], album: [] },
+    [rawTracks]
+  );
+
   if (notFound) {
     return (
       <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
@@ -281,10 +289,6 @@ export default function PlaylistDetail() {
   const periodLabel =
     PERIOD_OPTIONS.find((p) => p.value === automation.source?.period)?.label ||
     automation.source?.period;
-
-  const availableTags = rawTracks
-    ? { artist: dedupeTags(rawTracks, "artist_tags"), album: dedupeTags(rawTracks, "album_tags") }
-    : { artist: [], album: [] };
 
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
@@ -382,7 +386,7 @@ export default function PlaylistDetail() {
                     >
                       <div
                         className={`rounded-lg p-1.5 transition-colors ${
-                          isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400 group-hover:text-neutral-300"
+                          isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400"
                         }`}
                       >
                         <Icon size={16} />

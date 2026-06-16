@@ -149,30 +149,22 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       return (
         <div className="space-y-2.5">
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => { setTagSource("artist"); onChange({ ...condition, tagSource: "artist" }); }}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                tagSource === "artist"
-                  ? "bg-[#ff530b]/15 text-[#ff530b] border border-[#ff530b]/30"
-                  : "text-neutral-500 border border-transparent hover:text-neutral-300"
-              }`}
-            >
-              <IconBolt size={11} />
-              Artist
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTagSource("album"); onChange({ ...condition, tagSource: "album" }); }}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                tagSource === "album"
-                  ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
-                  : "text-neutral-500 border border-transparent hover:text-neutral-300"
-              }`}
-            >
-              <IconTag size={11} />
-              Album
-            </button>
+            {[
+              { value: "artist", label: "Artist", Icon: IconBolt, active: "bg-[#ff530b]/15 text-[#ff530b] border border-[#ff530b]/30" },
+              { value: "album", label: "Album", Icon: IconTag, active: "bg-purple-500/15 text-purple-400 border border-purple-500/30" },
+            ].map(({ value, label, Icon, active }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => { setTagSource(value); onChange({ ...condition, tagSource: value }); }}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  tagSource === value ? active : "text-neutral-500 border border-transparent hover:text-neutral-300"
+                }`}
+              >
+                <Icon size={11} />
+                {label}
+              </button>
+            ))}
           </div>
           <div className="relative" ref={tagInputRef}>
             <div className="flex items-center gap-2 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5">
@@ -367,19 +359,15 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       </div>
 
       <div className="px-4 pb-3.5 pt-0">
-        {disabledFields.includes(condition.field) ? (
-          <p className="text-[11px] text-amber-500/80 mb-2.5 leading-relaxed">
-            This filter is not available with the current source. Change the source to "Recent Tracks" to use it.
-          </p>
-        ) : (
-          <p className="text-[11px] text-neutral-600 mb-2.5 leading-relaxed">
-            {condition.field === "tags"
-              ? tagSource === "artist"
-                ? "Genre or mood tag associated with the artist of the track"
-                : "Genre or mood tag associated with the album of the track"
+        <p className={`text-[11px] mb-2.5 leading-relaxed ${
+          disabledFields.includes(condition.field) ? "text-amber-500/80" : "text-neutral-600"
+        }`}>
+          {disabledFields.includes(condition.field)
+            ? "This filter is not available with the current source. Change the source to \"Recent Tracks\" to use it."
+            : condition.field === "tags"
+              ? `${tagSource === "artist" ? "Genre or mood tag associated with the artist" : "Genre or mood tag associated with the album"} of the track`
               : fieldDef.description}
-          </p>
-        )}
+        </p>
         {renderValueInput()}
       </div>
     </div>

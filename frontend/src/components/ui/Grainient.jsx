@@ -265,15 +265,9 @@ const Grainient = ({
     co[0] = centerX;
     co[1] = centerY;
     u.uZoom.value           = zoom;
-    const rgb1 = hexToRgb(color1);
-    const c1 = u.uColor1.value;
-    c1[0] = rgb1[0]; c1[1] = rgb1[1]; c1[2] = rgb1[2];
-    const rgb2 = hexToRgb(color2);
-    const c2 = u.uColor2.value;
-    c2[0] = rgb2[0]; c2[1] = rgb2[1]; c2[2] = rgb2[2];
-    const rgb3 = hexToRgb(color3);
-    const c3 = u.uColor3.value;
-    c3[0] = rgb3[0]; c3[1] = rgb3[1]; c3[2] = rgb3[2];
+    u.uColor1.value.set(hexToRgb(color1));
+    u.uColor2.value.set(hexToRgb(color2));
+    u.uColor3.value.set(hexToRgb(color3));
   }, [
     timeSpeed, colorBalance, warpStrength, warpFrequency, warpSpeed,
     warpAmplitude, blendAngle, blendSoftness, rotationAmount, noiseScale,

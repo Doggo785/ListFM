@@ -32,18 +32,14 @@ export function hashName(name) {
   return Math.abs(hash);
 }
 
-function renderIcon(sourceType) {
-  const Icon = ICONS[sourceType] || IconBolt;
-  return renderToStaticMarkup(
-    <Icon size={60} stroke={1.5} color="white" opacity="0.9" />
-  );
-}
-
 export function getPlaylistImageSrc(name, sourceType) {
   const hash = hashName(name);
   const [color1, color2] = GRADIENTS[hash % GRADIENTS.length];
   const gradId = `g${hash}`;
-  const iconMarkup = renderIcon(sourceType);
+  const Icon = ICONS[sourceType] || IconBolt;
+  const iconMarkup = renderToStaticMarkup(
+    <Icon size={60} stroke={1.5} color="white" opacity="0.9" />
+  );
 
   const svg = `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
   <defs>
