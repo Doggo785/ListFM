@@ -23,22 +23,20 @@ export function AuthProvider({ children }) {
   }, [checkSession]);
 
   const login = useCallback(async (email, password) => {
-    const data = await request("/api/auth/login", {
+    await request("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
-    setUser(data.user);
-    return data;
-  }, []);
+    await checkSession();
+  }, [checkSession]);
 
-  const register = useCallback(async (email, password) => {
-    const data = await request("/api/auth/register", {
+  const register = useCallback(async (email, password, displayName) => {
+    await request("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, display_name: displayName || undefined }),
     });
-    setUser(data.user);
-    return data;
-  }, []);
+    await checkSession();
+  }, [checkSession]);
 
   const logout = useCallback(async () => {
     await request("/api/auth/logout", { method: "POST" });

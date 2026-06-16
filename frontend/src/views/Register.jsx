@@ -47,7 +47,7 @@ const stagger = {
 };
 
 function validateEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(value);
 }
 
 function Register() {
@@ -57,6 +57,7 @@ function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -88,7 +89,7 @@ function Register() {
 
     setLoading(true);
     try {
-      await register(email, password);
+      await register(email, password, displayName);
       navigate("/");
     } catch (err) {
       const msg = err?.message || "";
@@ -166,6 +167,30 @@ function Register() {
                 }}
                 placeholder="you@example.com"
                 autoComplete="email"
+                className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
+              />
+            </div>
+          </motion.div>
+
+          <motion.div variants={fadeUp} className="space-y-1.5">
+            <label
+              htmlFor="register-display-name"
+              className="block text-xs font-medium text-neutral-400 uppercase tracking-wider"
+            >
+              Display name
+            </label>
+            <div className="relative">
+              <IconMail
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600"
+              />
+              <input
+                id="register-display-name"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Optional"
+                autoComplete="name"
                 className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
               />
             </div>

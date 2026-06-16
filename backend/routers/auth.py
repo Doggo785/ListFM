@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from jose import JWTError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
@@ -25,6 +25,7 @@ from routers.deps import (
     get_current_active_user,
     set_auth_cookies,
 )
+from services.rate_limit import rate_limit, login_limiter, register_limiter, refresh_limiter
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -76,6 +77,7 @@ async def register(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit(request, register_limiter)
     email = body.email.strip().lower()
 
     if len(body.password) < 8:
@@ -114,6 +116,7 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit(request, login_limiter)
     email = body.email.strip().lower()
 
     user = await get_user_by_email(db, email)
@@ -147,6 +150,7 @@ async def refresh(
     refresh_token: str | None = Cookie(None),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit(request, refresh_limiter)
     if refresh_token is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -165,7 +169,17 @@ async def refresh(
     )
     stored_token = result.scalar_one_or_none()
 
-    if stored_token is None or stored_token.revoked:
+    if stored_token is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if stored_token.revoked:
+        # Token reuse detected — revoke entire family to prevent stolen token usage
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.family == stored_token.family, RefreshToken.revoked == False)
+            .values(revoked=True)
+        )
+        await db.flush()
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if stored_token.expires_at < datetime.now(timezone.utc):
