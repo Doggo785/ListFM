@@ -31,7 +31,7 @@ function getUsernameFromPath(pathname) {
 
 function App() {
   const location = useLocation();
-  const showSidebar = location.pathname !== "/";
+  const showSidebar = location.pathname !== "/" && location.pathname !== "/login" && location.pathname !== "/register";
   const usernameFromUrl = getUsernameFromPath(location.pathname);
   const lastUsername = getLastUsername();
 

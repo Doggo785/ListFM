@@ -1,13 +1,36 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import {
   IconMail,
   IconLock,
   IconLoader2,
   IconAlertCircle,
+  IconEye,
+  IconEyeOff,
 } from "@tabler/icons-react";
+
+const getPasswordStrength = (password) => {
+  if (!password) return { score: 0, label: "", color: "" };
+  
+  let score = 0;
+  
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  
+  if (/[a-z]/.test(password)) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[^a-zA-Z0-9]/.test(password)) score += 1;
+  
+  const normalizedScore = Math.min(Math.round((score / 6) * 100), 100);
+  
+  if (normalizedScore < 25) return { score: normalizedScore, label: "Weak", color: "#ef4444" };
+  if (normalizedScore < 50) return { score: normalizedScore, label: "Fair", color: "#f97316" };
+  if (normalizedScore < 75) return { score: normalizedScore, label: "Good", color: "#eab308" };
+  return { score: normalizedScore, label: "Strong", color: "#22c55e" };
+};
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -36,6 +59,9 @@ function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   useEffect(() => {
     document.title = "Register - ListFM";
@@ -87,6 +113,12 @@ function Register() {
         className="w-full max-w-sm space-y-8"
       >
         <motion.header variants={fadeUp} className="text-center">
+          <Link
+            to="/"
+            className="inline-block mb-4 text-3xl font-black text-[#ff530b] hover:opacity-80 transition-opacity"
+          >
+            ListFM
+          </Link>
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Create your account
           </h1>
@@ -153,7 +185,7 @@ function Register() {
               />
               <input
                 id="register-password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -161,9 +193,52 @@ function Register() {
                 }}
                 placeholder="At least 8 characters"
                 autoComplete="new-password"
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
+                className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-10 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-neutral-600 hover:text-neutral-400 transition-colors"
+              >
+                {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </button>
             </div>
+            
+            <AnimatePresence>
+              {password.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs text-neutral-500">Password strength</span>
+                      <motion.span
+                        key={passwordStrength.label}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-xs font-medium"
+                        style={{ color: passwordStrength.color }}
+                      >
+                        {passwordStrength.label}
+                      </motion.span>
+                    </div>
+                    <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${passwordStrength.score}%` }}
+                        transition={{ duration: 0.4, ease: "easeOut" }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: passwordStrength.color }}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           <motion.div variants={fadeUp} className="space-y-1.5">

@@ -3,12 +3,14 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import Grainient from "../components/ui/Grainient";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -78,7 +80,12 @@ function Login() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         >
-          <h1 className="login-page__brand">ListFM</h1>
+          <Link
+            to="/"
+            className="login-page__brand hover:opacity-80 transition-opacity inline-block"
+          >
+            ListFM
+          </Link>
           <p className="login-page__tagline">Welcome back</p>
         </motion.div>
 
@@ -120,16 +127,25 @@ function Login() {
             <label htmlFor="password" className="login-page__label">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="login-page__input"
-              autoComplete="current-password"
-              disabled={loading}
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="login-page__input pr-10"
+                autoComplete="current-password"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-neutral-600 hover:text-neutral-400 transition-colors"
+              >
+                {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </button>
+            </div>
           </div>
 
           <button
