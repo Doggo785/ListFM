@@ -38,7 +38,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://listfm:listfm@localhost:5432/listfm
           LASTFM_API_KEY: test_key
           LASTFM_API_SECRET: test_secret
-          JWT_SECRET: test_jwt_secret_for_ci_only
+          JWT_SECRET: test_jwt_secret_for_ci_only_padded
         run: |
           source .venv/bin/activate
           cd backend && alembic upgrade head
@@ -47,7 +47,7 @@ jobs:
           DATABASE_URL: postgresql+asyncpg://listfm:listfm@localhost:5432/listfm
           LASTFM_API_KEY: test_key
           LASTFM_API_SECRET: test_secret
-          JWT_SECRET: test_jwt_secret_for_ci_only
+          JWT_SECRET: test_jwt_secret_for_ci_only_padded
         run: |
           source .venv/bin/activate
           python -m pytest backend/tests/ -v
