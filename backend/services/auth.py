@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
 
-from backend.config import get_settings
+from config import get_settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -36,10 +36,6 @@ def create_refresh_token(user_id: str) -> str:
 
 def decode_token(token: str) -> dict:
     settings = get_settings()
-    try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
-        return payload
-    except JWTError as e:
-        raise e
+    return jwt.decode(
+        token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+    )

@@ -30,7 +30,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def _hash_token(token: str) -> str:
-    """SHA-256 hash of a token for storage in the refresh_tokens table."""
     return hashlib.sha256(token.encode()).hexdigest()
 
 
@@ -41,7 +40,6 @@ async def _store_refresh_token(
     family: str,
     request: Request,
 ) -> RefreshToken:
-    """Persist a refresh token record in the database."""
     settings = get_settings()
     now = datetime.now(timezone.utc)
     rt = RefreshToken(
@@ -62,7 +60,6 @@ def _build_token_response(
     access_token: str,
     refresh_token: str,
 ) -> TokenResponse:
-    """Build the TokenResponse payload."""
     settings = get_settings()
     return TokenResponse(
         access_token=access_token,
@@ -79,14 +76,11 @@ async def register(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    # Normalize email
     email = body.email.strip().lower()
 
-    # Password validation
     if len(body.password) < 8:
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
 
-    # Duplicate email check
     existing = await get_user_by_email(db, email)
     if existing is not None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -96,11 +90,9 @@ async def register(
     password_hash = hash_password(body.password)
     user = await create_user(db, user_data, password_hash)
 
-    # Generate tokens
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
 
-    # Store refresh token in DB
     family = str(uuid.uuid4())
     await _store_refresh_token(db, user.id, refresh_token, family, request)
 
@@ -110,7 +102,6 @@ async def register(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create account")
 
-    # Set httpOnly cookies
     set_auth_cookies(response, access_token, refresh_token)
 
     return _build_token_response(access_token, refresh_token)
@@ -123,23 +114,18 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    # Normalize email
     email = body.email.strip().lower()
 
-    # Find user
     user = await get_user_by_email(db, email)
     if user is None or user.password_hash is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Verify password
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Generate tokens
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
 
-    # Store refresh token in DB
     family = str(uuid.uuid4())
     await _store_refresh_token(db, user.id, refresh_token, family, request)
 
@@ -149,7 +135,6 @@ async def login(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to log in")
 
-    # Set httpOnly cookies
     set_auth_cookies(response, access_token, refresh_token)
 
     return _build_token_response(access_token, refresh_token)
@@ -165,7 +150,6 @@ async def refresh(
     if refresh_token is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    # Decode the refresh token
     try:
         payload = decode_token(refresh_token)
         user_id: str | None = payload.get("sub")
@@ -175,7 +159,6 @@ async def refresh(
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Look up the stored token record
     token_hash = _hash_token(refresh_token)
     result = await db.execute(
         select(RefreshToken).where(RefreshToken.token_hash == token_hash)
@@ -185,20 +168,16 @@ async def refresh(
     if stored_token is None or stored_token.revoked:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    # Check expiry
     if stored_token.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     family = stored_token.family
 
-    # Generate new tokens
     new_access_token = create_access_token(user_id)
     new_refresh_token = create_refresh_token(user_id)
 
-    # Store new refresh token
     new_rt = await _store_refresh_token(db, user_id, new_refresh_token, family, request)
 
-    # Revoke the old token (set replaced_by)
     stored_token.revoked = True
     stored_token.replaced_by = new_rt.id
     await db.flush()
@@ -209,7 +188,6 @@ async def refresh(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to refresh token")
 
-    # Set httpOnly cookies
     set_auth_cookies(response, new_access_token, new_refresh_token)
 
     return _build_token_response(new_access_token, new_refresh_token)
@@ -221,7 +199,6 @@ async def logout(
     refresh_token: str | None = Cookie(None),
     db: AsyncSession = Depends(get_db),
 ):
-    # Revoke refresh token if present
     if refresh_token is not None:
         token_hash = _hash_token(refresh_token)
         result = await db.execute(
@@ -238,7 +215,6 @@ async def logout(
             await db.rollback()
             raise HTTPException(status_code=500, detail="Failed to log out")
 
-    # Clear cookies
     clear_auth_cookies(response)
 
     return {"detail": "Logged out"}
