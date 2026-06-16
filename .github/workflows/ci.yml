@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: listfm
+          POSTGRES_PASSWORD: listfm
+          POSTGRES_DB: listfm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U listfm"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r backend/requirements.txt pytest pytest-asyncio
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://listfm:listfm@localhost:5432/listfm
+          LASTFM_API_KEY: test_key
+          LASTFM_API_SECRET: test_secret
+          JWT_SECRET: test_jwt_secret_for_ci_only_padded
+        run: |
+          source .venv/bin/activate
+          cd backend && alembic upgrade head
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://listfm:listfm@localhost:5432/listfm
+          LASTFM_API_KEY: test_key
+          LASTFM_API_SECRET: test_secret
+          JWT_SECRET: test_jwt_secret_for_ci_only_padded
+        run: |
+          source .venv/bin/activate
+          python -m pytest backend/tests/ -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build
+        working-directory: frontend
+        run: npm run build

@@ -8,7 +8,6 @@ Create Date: 2026-06-12 10:00:00.000000
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
@@ -37,14 +36,12 @@ def upgrade() -> None:
           AND a1.created_at > a2.created_at
     """)
 
-    # Add unique constraint on tracks(artist, title)
     op.create_unique_constraint(
         'uq_tracks_artist_title',
         'tracks',
         ['artist', 'title'],
     )
 
-    # Add unique constraint on albums(title, artist)
     op.create_unique_constraint(
         'uq_albums_title_artist',
         'albums',

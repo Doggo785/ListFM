@@ -5,6 +5,7 @@ from config import get_settings
 from database import engine
 from routers.users import router as users_router
 from routers.automations import router as automations_router
+from routers.auth import router as auth_router
 from routers.generated_playlists import router as generated_playlists_router
 
 settings = get_settings()
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(automations_router)
 app.include_router(generated_playlists_router)

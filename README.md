@@ -23,6 +23,7 @@ Powered by Last.fm -- built with React & FastAPI.
 | 🎧 | **Last.fm Integration** — Import your listening history, top tracks, loved tracks, and genre tags |
 | 📊 | **Smart Dashboard** — Visualize your stats: tracks played, unique artists, albums, and top artist |
 | 🔄 | **Automated Playlists** — Create playlists from top tracks, recent plays, loved tracks, or top artists |
+| 🔐 | **Authentication** — JWT-based auth with httpOnly cookies, refresh token rotation, and protected routes |
 | 🎨 | **Beautiful UI** — Animated gradients, tilted cards, smooth page transitions, and WebGL effects |
 | ⏱️ | **Flexible Periods** — Filter by 7 days, 1 month, 3 months, 6 months, 12 months, or overall |
 
@@ -106,6 +107,8 @@ npm run dev
 
 ## 📡 API Reference
 
+### Public
+
 | Method | Endpoint | Description |
 |:---:|---|---|
 | `GET` | `/api/health` | Health check |
@@ -116,6 +119,28 @@ npm run dev
 | `GET` | `/api/{username}/loved-tracks` | Loved / favorited tracks |
 | `GET` | `/api/{username}/source-tracks` | Flexible source endpoint |
 | `POST` | `/api/automations/preview` | Preview automation results |
+
+### Authentication
+
+| Method | Endpoint | Description |
+|:---:|---|---|
+| `POST` | `/api/auth/register` | Create a new account |
+| `POST` | `/api/auth/login` | Sign in |
+| `POST` | `/api/auth/refresh` | Refresh access token |
+| `POST` | `/api/auth/logout` | Sign out |
+| `GET` | `/api/auth/me` | Get current user info |
+
+### Protected (requires auth)
+
+| Method | Endpoint | Description |
+|:---:|---|---|
+| `GET` | `/api/{username}/automations` | List automations |
+| `POST` | `/api/{username}/automations` | Create automation |
+| `PATCH` | `/api/{username}/automations/{id}` | Update automation |
+| `DELETE` | `/api/{username}/automations/{id}` | Delete automation |
+| `GET` | `/api/{username}/generated-playlists` | List generated playlists |
+| `POST` | `/api/{username}/generated-playlists` | Save generated playlist |
+| `DELETE` | `/api/{username}/generated-playlists/{id}` | Delete generated playlist |
 
 ---
 
@@ -128,16 +153,22 @@ ListFM/
 │   ├── config.py            # Settings and API keys
 │   ├── schemas.py           # Pydantic models
 │   ├── routers/
+│   │   ├── auth.py          # Authentication endpoints
 │   │   ├── users.py         # User endpoints
-│   │   └── automations.py   # Automation endpoints
-│   └── services/
-│       └── lastfm.py        # Last.fm API wrapper
+│   │   ├── automations.py   # Automation endpoints
+│   │   └── generated_playlists.py
+│   ├── services/
+│   │   ├── auth.py          # JWT and password hashing
+│   │   ├── lastfm.py        # Last.fm API wrapper
+│   │   └── rate_limit.py    # Rate limiting
+│   └── tests/               # Backend test suite
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx          # Routes and layout
-│   │   ├── views/           # Search, Dashboard, Playlist pages
+│   │   ├── views/           # Search, Dashboard, Auth pages
 │   │   ├── components/      # UI components
+│   │   ├── contexts/        # React contexts (Auth)
 │   │   └── lib/             # Utilities
 │   └── package.json
 │
@@ -153,8 +184,11 @@ ListFM/
 |---|---|:---:|
 | `LASTFM_API_KEY` | Last.fm API key | ✅ |
 | `LASTFM_API_SECRET` | Last.fm API secret | ✅ |
+| `DATABASE_URL` | PostgreSQL connection string | ✅ |
+| `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | ✅ |
+| `COOKIE_SECURE` | Set to `true` for HTTPS deployments | |
 
-Get your keys at **[last.fm/api/account/create](https://www.last.fm/api/account/create)**
+Get your Last.fm keys at **[last.fm/api/account/create](https://www.last.fm/api/account/create)**
 
 ---
 

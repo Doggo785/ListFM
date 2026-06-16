@@ -104,20 +104,21 @@ const BorderGlow = ({
     if (!animated) return;
     const angleStart = 110;
     const angleEnd = 465;
+    const updateAngle = (v) =>
+      setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
+    const updateProximity = (v) => setEdgeProximity(v / 100);
 
     const rafId = requestAnimationFrame(() => {
       setSweepActive(true);
       setCursorAngle(angleStart);
     });
 
-    animateValue({ duration: 500, onUpdate: (v) => setEdgeProximity(v / 100) });
+    animateValue({ duration: 500, onUpdate: updateProximity });
     animateValue({
       ease: easeInCubic,
       duration: 1500,
       end: 50,
-      onUpdate: (v) => {
-        setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
-      },
+      onUpdate: updateAngle,
     });
     animateValue({
       ease: easeOutCubic,
@@ -125,9 +126,7 @@ const BorderGlow = ({
       duration: 2250,
       start: 50,
       end: 100,
-      onUpdate: (v) => {
-        setCursorAngle((angleEnd - angleStart) * (v / 100) + angleStart);
-      },
+      onUpdate: updateAngle,
     });
     animateValue({
       ease: easeInCubic,
@@ -135,7 +134,7 @@ const BorderGlow = ({
       duration: 1500,
       start: 100,
       end: 0,
-      onUpdate: (v) => setEdgeProximity(v / 100),
+      onUpdate: updateProximity,
       onEnd: () => setSweepActive(false),
     });
 

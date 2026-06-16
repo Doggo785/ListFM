@@ -1,15 +1,33 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-async function request(path, options = {}) {
+let isRefreshing = false;
+let refreshPromise = null;
+
+export async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
+  if (res.status === 401 && path !== "/api/auth/refresh" && !options._retried) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = fetch(`${API_BASE}/api/auth/refresh`, {
+        method: "POST",
+        credentials: "include",
+      }).finally(() => { isRefreshing = false; });
+    }
+    const refreshRes = await refreshPromise;
+    if (refreshRes.ok) {
+      return request(path, { ...options, _retried: true });
+    }
+  }
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`API ${res.status}: ${body}`);
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 

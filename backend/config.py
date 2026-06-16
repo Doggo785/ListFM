@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -13,6 +14,18 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://localhost:5174",
     ]
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    cookie_secure: bool = False
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def validate_jwt_secret(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError("jwt_secret must be at least 32 characters")
+        return v
 
     model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8"}
 

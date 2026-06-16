@@ -5,9 +5,11 @@ import {
   IconChartBar,
   IconUser,
   IconPlaylist,
+  IconLogout,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./Sidebar";
 import { getUserInfo } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 const iconClass = "text-neutral-200 h-5 w-5 flex-shrink-0";
 
@@ -15,6 +17,7 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const [avatar, setAvatar] = useState(null);
+  const { logout } = useAuth();
 
   useEffect(() => {
     if (!username) return;
@@ -84,6 +87,14 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
               </span>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => { logout(); navigate("/"); }}
+            className="mt-3 flex items-center gap-2 text-neutral-400 hover:text-red-400 transition-colors text-sm"
+          >
+            <IconLogout size={16} />
+            {open && <span>Log out</span>}
+          </button>
         </div>
       </SidebarBody>
     </Sidebar>
