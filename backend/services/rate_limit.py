@@ -25,7 +25,7 @@ class RateLimiter:
 
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
-register_limiter = RateLimiter(max_requests=5, window_seconds=300)
+register_limiter = RateLimiter(max_requests=3, window_seconds=21600)
 refresh_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
 
