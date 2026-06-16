@@ -11,6 +11,7 @@ from sqlalchemy.pool import NullPool
 from config import get_settings
 from database import get_db
 from backend.main import app
+from services.rate_limit import login_limiter, register_limiter, refresh_limiter
 from models.auth_provider import AuthProvider
 from models.refresh_token import RefreshToken
 from models.user import User
@@ -33,7 +34,10 @@ async def _override_get_db():
 
 @pytest_asyncio.fixture(autouse=True)
 async def _cleanup_db():
-    """Clean all test data before and after each test."""
+    """Clean all test data and rate limiter state before and after each test."""
+    login_limiter.reset()
+    register_limiter.reset()
+    refresh_limiter.reset()
     async with _TestSessionLocal() as db:
         await db.execute(delete(RefreshToken))
         await db.execute(delete(AuthProvider))

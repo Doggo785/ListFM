@@ -13,6 +13,9 @@ class RateLimiter:
         cutoff = now - self.window_seconds
         self._requests[key] = [t for t in self._requests[key] if t > cutoff]
 
+    def reset(self) -> None:
+        self._requests.clear()
+
     def check(self, key: str) -> None:
         now = time.monotonic()
         self._clean(key, now)
