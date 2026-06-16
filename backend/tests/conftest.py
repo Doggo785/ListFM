@@ -31,6 +31,22 @@ async def _override_get_db():
     app.dependency_overrides.clear()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _cleanup_db():
+    """Clean all test data before and after each test."""
+    async with _TestSessionLocal() as db:
+        await db.execute(delete(RefreshToken))
+        await db.execute(delete(AuthProvider))
+        await db.execute(delete(User))
+        await db.commit()
+    yield
+    async with _TestSessionLocal() as db:
+        await db.execute(delete(RefreshToken))
+        await db.execute(delete(AuthProvider))
+        await db.execute(delete(User))
+        await db.commit()
+
+
 @pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from jose import jwt
@@ -21,7 +22,7 @@ def create_access_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
-    payload = {"sub": user_id, "exp": expire}
+    payload = {"sub": user_id, "exp": expire, "jti": str(uuid.uuid4())}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -30,7 +31,7 @@ def create_refresh_token(user_id: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.refresh_token_expire_days
     )
-    payload = {"sub": user_id, "exp": expire}
+    payload = {"sub": user_id, "exp": expire, "jti": str(uuid.uuid4())}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
