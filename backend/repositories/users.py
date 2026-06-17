@@ -119,6 +119,140 @@ async def update_user(db: AsyncSession, user_id: str, data: UserUpdate) -> User 
     return user
 
 
+async def get_or_create_user_from_google(
+    db: AsyncSession,
+    provider_user_id: str,
+    email: str | None = None,
+    display_name: str | None = None,
+) -> User:
+    """Look up user by Google provider_user_id, or create a new one.
+
+    Caller is responsible for committing the session.
+    """
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(User)
+        .join(AuthProvider)
+        .where(
+            AuthProvider.provider == "google",
+            AuthProvider.provider_user_id == provider_user_id,
+            User.deleted_at.is_(None),
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    if email:
+        result = await db.execute(
+            select(User).where(User.email == email, User.deleted_at.is_(None))
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            auth_provider = AuthProvider(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                provider="google",
+                provider_user_id=provider_user_id,
+                linked_at=now,
+            )
+            db.add(auth_provider)
+            await db.flush()
+            return user
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=email,
+        role="user",
+        email_verified=False,
+        display_name=display_name,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(user)
+    await db.flush()
+
+    auth_provider = AuthProvider(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        provider="google",
+        provider_user_id=provider_user_id,
+        linked_at=now,
+    )
+    db.add(auth_provider)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+async def get_or_create_user_from_discord(
+    db: AsyncSession,
+    provider_user_id: str,
+    email: str | None = None,
+    display_name: str | None = None,
+) -> User:
+    """Look up user by Discord provider_user_id, or create a new one.
+
+    Caller is responsible for committing the session.
+    """
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        select(User)
+        .join(AuthProvider)
+        .where(
+            AuthProvider.provider == "discord",
+            AuthProvider.provider_user_id == provider_user_id,
+            User.deleted_at.is_(None),
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    if email:
+        result = await db.execute(
+            select(User).where(User.email == email, User.deleted_at.is_(None))
+        )
+        user = result.scalar_one_or_none()
+        if user is not None:
+            auth_provider = AuthProvider(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                provider="discord",
+                provider_user_id=provider_user_id,
+                linked_at=now,
+            )
+            db.add(auth_provider)
+            await db.flush()
+            return user
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=email,
+        role="user",
+        email_verified=False,
+        display_name=display_name,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(user)
+    await db.flush()
+
+    auth_provider = AuthProvider(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        provider="discord",
+        provider_user_id=provider_user_id,
+        linked_at=now,
+    )
+    db.add(auth_provider)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
     """Soft delete a user. Returns True if deleted, False if not found.
 
