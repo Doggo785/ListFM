@@ -14,25 +14,24 @@ def _validate_email(v: str) -> str:
     return normalized
 
 
-class UserCreate(BaseModel):
+class EmailValidatorMixin:
+    """Shared email validator for Pydantic models."""
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        return _validate_email(v)
+
+
+class UserCreate(EmailValidatorMixin, BaseModel):
     email: str
     password: str
     display_name: Optional[str] = None
 
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
 
-
-class UserLogin(BaseModel):
+class UserLogin(EmailValidatorMixin, BaseModel):
     email: str
     password: str
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
 
 
 class UserRead(BaseModel):
