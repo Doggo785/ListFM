@@ -54,10 +54,19 @@ class UserUpdate(BaseModel):
 
 
 class AuthProviderCreate(BaseModel):
-    provider: Literal["email", "lastfm"]
+    provider: Literal["email", "lastfm", "google", "discord"]
     provider_user_id: str
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
+
+
+class LinkLastfmRequest(BaseModel):
+    username: str
+
+
+class LinkLastfmResponse(BaseModel):
+    username: str
+    image: str | None = None
 
 
 class AuthProviderRead(BaseModel):

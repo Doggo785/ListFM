@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     cookie_secure: bool = False
 
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    discord_oauth_client_id: str = ""
+    discord_oauth_client_secret: str = ""
+    oauth_redirect_base: str = "http://localhost:8000"
+
     @field_validator("jwt_secret")
     @classmethod
     def validate_jwt_secret(cls, v: str) -> str:
