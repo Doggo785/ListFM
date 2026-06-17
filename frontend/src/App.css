@@ -337,6 +337,57 @@ html, body, #root {
   }
 }
 
+.login-page__oauth-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.login-page__button--google {
+  background-color: #ffffff;
+  color: #1f1f1f;
+  font-weight: 500;
+  gap: 0.75rem;
+}
+
+.login-page__button--google:hover:not(:disabled) {
+  background-color: #f3f3f3;
+}
+
+.login-page__button--discord {
+  background-color: #5865F2;
+  color: #ffffff;
+  font-weight: 500;
+  gap: 0.75rem;
+}
+
+.login-page__button--discord:hover:not(:disabled) {
+  background-color: #4752c4;
+}
+
+.login-page__divider {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.login-page__divider::before,
+.login-page__divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.login-page__divider span {
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.8125rem;
+  color: #737373;
+  text-transform: lowercase;
+}
+
 .login-page__error {
   width: 100%;
   padding: 0.75rem 1rem;

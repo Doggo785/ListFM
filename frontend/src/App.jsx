@@ -7,6 +7,8 @@ import SearchHome from "./views/SearchHome";
 import Login from "./views/Login";
 import Register from "./views/Register";
 import Dashboard from "./views/Dashboard";
+import AuthCallback from "./views/AuthCallback";
+import LinkLastfm from "./views/LinkLastfm";
 import PlaylistNew from "./views/PlaylistNew";
 import PlaylistDetail from "./views/PlaylistDetail";
 import AuthGuard from "./components/AuthGuard";
@@ -31,7 +33,12 @@ function getUsernameFromPath(pathname) {
 
 function App() {
   const location = useLocation();
-  const showSidebar = location.pathname !== "/" && location.pathname !== "/login" && location.pathname !== "/register";
+  const showSidebar =
+    location.pathname !== "/" &&
+    location.pathname !== "/login" &&
+    location.pathname !== "/register" &&
+    location.pathname !== "/auth/callback" &&
+    location.pathname !== "/link-lastfm";
   const usernameFromUrl = getUsernameFromPath(location.pathname);
   const lastUsername = getLastUsername();
 
@@ -91,6 +98,15 @@ function App() {
                 />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route
+                  path="/link-lastfm"
+                  element={
+                    <AuthGuard>
+                      <LinkLastfm />
+                    </AuthGuard>
+                  }
+                />
               </Routes>
             </motion.div>
           </AnimatePresence>
