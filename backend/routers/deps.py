@@ -7,19 +7,8 @@ from config import get_settings
 from database import get_db
 from models.auth_provider import AuthProvider
 from models.user import User
-from repositories.users import get_user_by_id, get_user_by_lastfm_username
+from repositories.users import get_user_by_id
 from services.auth import decode_token
-
-
-async def resolve_user_id(db: AsyncSession, username: str) -> str:
-    """Resolve a Last.fm username to a user ID.
-
-    Raises HTTPException(404) if the user is not found.
-    """
-    user = await get_user_by_lastfm_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
-    return user.id
 
 
 async def get_current_user(
