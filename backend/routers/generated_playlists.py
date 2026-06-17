@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -47,7 +48,7 @@ async def save_generated_playlist(
     playlist = await create_generated_playlist(db, current_user.id, username, data)
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save playlist")
     return playlist
@@ -65,6 +66,6 @@ async def delete_single_generated_playlist(
         raise HTTPException(status_code=404, detail="Generated playlist not found")
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete playlist")
