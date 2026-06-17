@@ -10,7 +10,7 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import get_settings
+from config import Settings, get_settings
 from database import get_db
 from models.auth_provider import AuthProvider
 from models.user import User
@@ -47,7 +47,7 @@ def _discord_client() -> DiscordOAuth2:
     )
 
 
-def _redirect_uri(provider: str, settings: "object") -> str:
+def _redirect_uri(provider: str, settings: Settings) -> str:
     base = settings.oauth_redirect_base.rstrip("/")
     return f"{base}/api/auth/{provider}/callback"
 
