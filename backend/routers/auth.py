@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
+from models.auth_provider import AuthProvider
 from models.refresh_token import RefreshToken
 from models.user import User
 from repositories.users import create_user, get_user_by_email
@@ -235,10 +236,24 @@ async def logout(
 
 
 @router.get("/me")
-async def me(current_user: User = Depends(get_current_active_user)):
+async def me(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(AuthProvider).where(
+            AuthProvider.user_id == current_user.id,
+            AuthProvider.provider == "lastfm",
+        )
+    )
+    lastfm_provider = result.scalar_one_or_none()
+    lastfm_username = lastfm_provider.provider_user_id if lastfm_provider else None
+
     return {
         "id": current_user.id,
         "email": current_user.email,
         "display_name": current_user.display_name,
         "role": current_user.role,
+        "lastfm_username": lastfm_username,
+        "is_lastfm_linked": lastfm_username is not None,
     }

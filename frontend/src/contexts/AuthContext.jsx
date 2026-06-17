@@ -43,14 +43,26 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const linkLastfm = useCallback(async (username) => {
+    await request("/api/auth/link-lastfm", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+    await checkSession();
+  }, [checkSession]);
+
+  const isLastfmLinked = !!user?.lastfm_username;
+
   const value = useMemo(() => ({
     user,
     isAuthenticated: !!user,
+    isLastfmLinked,
     login,
     register,
     logout,
+    linkLastfm,
     loading,
-  }), [user, loading, login, register, logout]);
+  }), [user, loading, isLastfmLinked, login, register, logout, linkLastfm]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -47,6 +47,15 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    display_name: Optional[str] = None
+    role: str
+    lastfm_username: Optional[str] = None
+    is_lastfm_linked: bool = False
+
+
 class UserUpdate(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
