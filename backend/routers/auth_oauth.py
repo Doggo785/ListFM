@@ -1,21 +1,29 @@
+import asyncio
 import secrets
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
+from models.auth_provider import AuthProvider
+from models.user import User
 from repositories.users import (
     get_or_create_user_from_discord,
     get_or_create_user_from_google,
+    get_user_by_lastfm_username,
 )
 from routers.auth import _store_refresh_token
-from routers.deps import set_auth_cookies
+from routers.deps import get_current_active_user, set_auth_cookies
+from schemas import LinkLastfmRequest, LinkLastfmResponse
 from services.auth import create_access_token, create_refresh_token
+from services.lastfm import get_user_info
 
 router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 
@@ -198,3 +206,49 @@ async def discord_callback(
 
     frontend_base = settings.cors_origins[0] if settings.cors_origins else "http://localhost:5173"
     return RedirectResponse(url=f"{frontend_base}/dashboard", status_code=302)
+
+
+@router.post("/link-lastfm", response_model=LinkLastfmResponse)
+async def link_lastfm(
+    body: LinkLastfmRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate a Last.fm username and link it to the authenticated user."""
+    username = body.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username is required")
+
+    # Validate username exists on Last.fm (sync call in thread)
+    try:
+        info = await asyncio.to_thread(get_user_info, username)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Last.fm username")
+
+    existing_user = await get_user_by_lastfm_username(db, username)
+    if existing_user is not None and existing_user.id != current_user.id:
+        raise HTTPException(status_code=409, detail="Last.fm username is already linked to another account")
+
+    result = await db.execute(
+        select(AuthProvider).where(
+            AuthProvider.user_id == current_user.id,
+            AuthProvider.provider == "lastfm",
+        )
+    )
+    existing_provider = result.scalar_one_or_none()
+    if existing_provider is not None:
+        await db.delete(existing_provider)
+        await db.flush()
+
+    now = datetime.now(timezone.utc)
+    auth_provider = AuthProvider(
+        id=str(uuid.uuid4()),
+        user_id=current_user.id,
+        provider="lastfm",
+        provider_user_id=username,
+        linked_at=now,
+    )
+    db.add(auth_provider)
+    await db.flush()
+
+    return LinkLastfmResponse(username=username, image=info.get("image"))
