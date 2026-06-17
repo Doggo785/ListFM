@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
 import CountUp from "../components/elements/CountUp";
@@ -15,11 +16,10 @@ import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/Playli
 import {
   getGreeting,
   getLastVisit,
-  setLastVisit,
   formatRelativeTime,
 } from "../lib/dashboard-helpers";
 import {
-  IconSearch,
+  IconHome,
   IconHeadphones,
   IconPlus,
 } from "@tabler/icons-react";
@@ -73,7 +73,8 @@ function buildDescription(auto) {
 }
 
 function Dashboard() {
-  const { username } = useParams();
+  const { user } = useAuth();
+  const username = user?.lastfm_username;
   const navigate = useNavigate();
   const [playlist, setPlaylist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,6 +85,23 @@ function Dashboard() {
   const lastVisit = useMemo(() => getLastVisit(username), [username]);
   const isFirstVisit = lastVisit === null;
   const [automations, setAutomations] = useState([]);
+
+  if (!username) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
+        <div className="text-center">
+          <p className="text-white font-medium mb-2">No Last.fm account linked</p>
+          <p className="text-neutral-500 text-sm">Link your Last.fm account to view your dashboard.</p>
+          <button
+            onClick={() => navigate("/link-lastfm")}
+            className="mt-4 px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
+          >
+            Link Last.fm
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -101,10 +119,7 @@ function Dashboard() {
     document.title = `${username} - ListFM`;
   }, [username]);
 
-  useEffect(() => {
-    setLastVisit(username);
-    sessionStorage.setItem("listfm_current_username", username);
-  }, [username]);
+
 
   useEffect(() => {
     getUserInfo()
@@ -181,7 +196,7 @@ function Dashboard() {
             onClick={() => navigate("/")}
             className="mt-4 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[#ff530b] transition-colors"
           >
-            Back to Search
+            Back to Home
           </button>
         </div>
       </div>
@@ -328,8 +343,8 @@ function Dashboard() {
               onClick={() => navigate("/")}
               className="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 hover:text-white transition-colors"
             >
-              <IconSearch size={16} strokeWidth={1.5} />
-              Search
+              <IconHome size={16} strokeWidth={1.5} />
+              Home
             </button>
           </motion.div>
         </motion.div>

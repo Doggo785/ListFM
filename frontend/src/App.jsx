@@ -44,7 +44,7 @@ function App() {
               <Routes location={location}>
                 <Route path="/" element={<Landing />} />
                 <Route
-                  path="/dashboard/:username"
+                  path="/dashboard"
                   element={
                     <AuthGuard>
                       <Dashboard />
