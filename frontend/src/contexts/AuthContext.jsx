@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { request } from "../lib/api.js";
+import { request, setCurrentUsername } from "../lib/api.js";
 
 const AuthContext = createContext(null);
 
@@ -11,8 +11,10 @@ export function AuthProvider({ children }) {
     try {
       const data = await request("/api/auth/me");
       setUser(data);
+      setCurrentUsername(data.lastfm_username || null);
     } catch {
       setUser(null);
+      setCurrentUsername(null);
     } finally {
       setLoading(false);
     }
@@ -41,6 +43,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     await request("/api/auth/logout", { method: "POST" });
     setUser(null);
+    setCurrentUsername(null);
   }, []);
 
   const linkLastfm = useCallback(async (username) => {

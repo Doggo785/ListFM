@@ -35,6 +35,7 @@ import {
   PERIOD_OPTIONS,
 } from "@/lib/automation-rules";
 import { applyFilters } from "@/lib/filter-engine";
+import { useAuth } from "../contexts/AuthContext";
 
 const SOURCE_OPTIONS = [
   { type: SOURCE_TYPES.TOP_TRACKS, icon: IconBolt, description: "Most played tracks" },
@@ -102,6 +103,8 @@ function applyFilterGroups(tracks, groups) {
 export default function PlaylistDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const username = user?.lastfm_username;
 
   const [automation, setAutomation] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -118,11 +121,6 @@ export default function PlaylistDetail() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
 
-  const [username, setUsername] = useState(() => {
-    const fromDashboard = sessionStorage.getItem("listfm_current_username");
-    return fromDashboard || localStorage.getItem("listfm_username") || "";
-  });
-
   useEffect(() => {
     document.title = automation?.name ? `${automation.name} - ListFM` : "Playlist - ListFM";
   }, [automation?.name]);
@@ -131,7 +129,7 @@ export default function PlaylistDetail() {
     const loadAutomation = async () => {
       if (!username || !id) return;
       try {
-        const found = await getAutomation(username, id);
+        const found = await getAutomation(id);
         setAutomation(found);
       } catch {
         setNotFound(true);
@@ -174,7 +172,7 @@ export default function PlaylistDetail() {
 
   const handleSave = async () => {
     try {
-      await updateAutomation(username, automation.id, automation);
+      await updateAutomation(automation.id, automation);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
@@ -184,7 +182,7 @@ export default function PlaylistDetail() {
 
   const confirmDelete = async () => {
     try {
-      await deleteAutomation(username, automation.id);
+      await deleteAutomation(automation.id);
       navigate("/playlists");
     } catch (err) {
       console.error("Failed to delete automation:", err);
@@ -194,7 +192,7 @@ export default function PlaylistDetail() {
   const handleSaveToLibrary = async () => {
     if (!saveName.trim() || !previewTracks) return;
     try {
-      await saveGeneratedPlaylist(username.trim(), {
+      await saveGeneratedPlaylist({
         automation_id: automation.id,
         name: saveName.trim(),
         source_type: automation.source?.type,
@@ -213,13 +211,13 @@ export default function PlaylistDetail() {
   };
 
   const loadPreview = async () => {
-    if (!username.trim()) return;
+    if (!username?.trim()) return;
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewTracks(null);
     setRawTracks(null);
     try {
-      const data = await previewAutomation(username.trim(), automation);
+      const data = await previewAutomation(automation);
       if (data.error) {
         setPreviewError(data.error);
       } else {
@@ -229,7 +227,7 @@ export default function PlaylistDetail() {
         setPreviewTracks(filtered);
 
         // Auto-save to library (fire-and-forget)
-        saveGeneratedPlaylist(username.trim(), {
+        saveGeneratedPlaylist({
           automation_id: automation.id,
           source_type: automation.source?.type,
           source_period: automation.source?.period,
@@ -461,17 +459,13 @@ export default function PlaylistDetail() {
                   <div className="p-5 space-y-3 shrink-0 border-b border-white/5">
                     <FieldRow label="Last.fm username">
                       <div className="flex gap-2.5">
-                        <input
-                          type="text"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          placeholder="e.g. john_doe"
-                          className="flex-1 h-12 rounded-xl border border-neutral-700 bg-[#141414] px-4 text-base text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all shadow-inner"
-                        />
+                        <div className="flex-1 h-12 rounded-xl border border-neutral-700 bg-[#141414] px-4 flex items-center text-base text-white/70 shadow-inner">
+                          {username || "Not linked"}
+                        </div>
                         <Button
                           size="default"
                           onClick={loadPreview}
-                          disabled={previewLoading || !username.trim()}
+                          disabled={previewLoading || !username?.trim()}
                           className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
                         >
                           {previewLoading ? (

@@ -9,6 +9,7 @@ import {
 } from "@/lib/automation-rules";
 import { getAutomations } from "@/lib/api";
 import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
+import { useAuth } from "../contexts/AuthContext";
 import { IconPlus } from "@tabler/icons-react";
 
 function buildDescription(auto) {
@@ -37,9 +38,8 @@ const CARD_PROPS = {
 };
 
 export default function Playlist() {
-  const [username] = useState(() => {
-    return sessionStorage.getItem("listfm_current_username") || localStorage.getItem("listfm_username") || "";
-  });
+  const { user } = useAuth();
+  const username = user?.lastfm_username;
   const [automations, setAutomations] = useState([]);
   const navigate = useNavigate();
 
@@ -47,7 +47,7 @@ export default function Playlist() {
     const load = async () => {
       if (!username) return;
       try {
-        const data = await getAutomations(username);
+        const data = await getAutomations();
         const cards = data.map((auto) => {
           const name = auto.name || "Untitled";
           const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];

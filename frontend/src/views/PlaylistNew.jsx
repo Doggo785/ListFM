@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import CronEditor from "@/components/builder/CronEditor";
 import { createDefaultAutomation } from "@/lib/automation-rules";
 import { createAutomation } from "@/lib/api";
+import { useAuth } from "../contexts/AuthContext";
 import { StepIndicator } from "@/components/builder/playlist-steps/StepIndicator";
 import { StepIdentity } from "@/components/builder/playlist-steps/StepIdentity";
 import { StepSource } from "@/components/builder/playlist-steps/StepSource";
@@ -29,11 +30,10 @@ const STEPS = [
 
 export default function PlaylistNew() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const username = user?.lastfm_username;
   const [step, setStep] = useState(1);
   const [data, setData] = useState(createDefaultAutomation());
-  const [username] = useState(() => {
-    return sessionStorage.getItem("listfm_current_username") || localStorage.getItem("listfm_username") || "";
-  });
 
   useEffect(() => {
     document.title = "New Playlist - ListFM";
@@ -49,7 +49,7 @@ export default function PlaylistNew() {
   const handleCreate = async () => {
     if (!username) return;
     try {
-      await createAutomation(username, data);
+      await createAutomation(data);
       navigate("/playlists");
     } catch (err) {
       console.error("Failed to create automation:", err);

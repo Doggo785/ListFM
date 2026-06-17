@@ -1,22 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import SearchInput from "../components/ui/SearchBar";
 import Grainient from "../components/ui/Grainient";
 
-function SearchHome() {
-  const [username, setUsername] = useState("");
+function Landing() {
   const navigate = useNavigate();
 
   useEffect(() => {
     document.title = "ListFM";
   }, []);
-
-  const handleSearch = () => {
-    if (username.trim()) {
-      navigate(`/dashboard/${username}`);
-    }
-  };
 
   return (
     <main className="homepage">
@@ -43,7 +35,8 @@ function SearchHome() {
         >
           <h1 className="homepage__brand">ListFM</h1>
           <p className="homepage__tagline">
-            Create automated playlists that evolve with your listening habits
+            Your music, automated. Import your Last.fm listening history and
+            build smart playlists.
           </p>
         </motion.div>
 
@@ -51,13 +44,26 @@ function SearchHome() {
           className="homepage__search"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+          transition={{
+            duration: 0.7,
+            delay: 0.15,
+            ease: [0.22, 1, 0.36, 1],
+          }}
         >
-          <SearchInput
-            value={username}
-            onChange={setUsername}
-            onSearch={handleSearch}
-          />
+          <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+            <button
+              onClick={() => navigate("/login")}
+              className="w-full px-6 py-3 rounded-lg bg-[#FF6817] text-white font-semibold text-sm hover:bg-[#e55c14] transition-colors cursor-pointer"
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => navigate("/register")}
+              className="w-full px-6 py-3 rounded-lg border border-white/20 text-white font-semibold text-sm hover:bg-white/10 transition-colors cursor-pointer"
+            >
+              Create Account
+            </button>
+          </div>
         </motion.div>
 
         <motion.div
@@ -66,11 +72,13 @@ function SearchHome() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.7, delay: 0.4 }}
         >
-          <span>Start by entering your Last.fm username</span>
+          <span>
+            Connect your Last.fm account to get started
+          </span>
         </motion.div>
       </div>
     </main>
   );
 }
 
-export default SearchHome;
+export default Landing;

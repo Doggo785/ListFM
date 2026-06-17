@@ -88,7 +88,7 @@ function Dashboard() {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await getAutomations(username);
+        const data = await getAutomations();
         setAutomations(data);
       } catch (err) {
         console.error("Failed to load automations:", err);
@@ -107,7 +107,7 @@ function Dashboard() {
   }, [username]);
 
   useEffect(() => {
-    getUserInfo(username)
+    getUserInfo()
       .then(async (data) => {
         const img = data?.image || null;
         setAvatar(img);
@@ -123,7 +123,7 @@ function Dashboard() {
     const fetchRecentTracks = async () => {
       setIsLoading(true);
       try {
-        const data = await getRecentTracks(username, 50);
+        const data = await getRecentTracks(50);
         setPlaylist(data.tracks);
       } catch (err) {
         setError("Failed to fetch data.");
