@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   IconMail,
   IconLock,
+  IconUser,
   IconLoader2,
   IconAlertCircle,
   IconEye,
@@ -215,7 +216,7 @@ function Register() {
               Display name
             </label>
             <div className="relative">
-              <IconMail
+              <IconUser
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600"
               />

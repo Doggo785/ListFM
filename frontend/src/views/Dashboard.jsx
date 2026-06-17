@@ -1,3 +1,4 @@
+// SIZE_OK: 326 pure LOC — single page component with cohesive state; splitting would introduce prop drilling for no gain
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -108,8 +109,8 @@ function Dashboard() {
       try {
         const data = await getAutomations();
         setAutomations(data);
-      } catch (err) {
-        console.error("Failed to load automations:", err);
+      } catch {
+        // Automations silently fail; dashboard still renders without them.
       }
     };
     load();
@@ -118,8 +119,6 @@ function Dashboard() {
   useEffect(() => {
     document.title = `${username} - ListFM`;
   }, [username]);
-
-
 
   useEffect(() => {
     getUserInfo()
@@ -140,9 +139,8 @@ function Dashboard() {
       try {
         const data = await getRecentTracks(50);
         setPlaylist(data.tracks);
-      } catch (err) {
+      } catch {
         setError("Failed to fetch data.");
-        console.error(err);
       } finally {
         setIsLoading(false);
       }
