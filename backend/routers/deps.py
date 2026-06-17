@@ -1,9 +1,11 @@
 from fastapi import Cookie, Depends, HTTPException, Response
 from jose import JWTError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
+from models.auth_provider import AuthProvider
 from models.user import User
 from repositories.users import get_user_by_id, get_user_by_lastfm_username
 from services.auth import decode_token
@@ -54,6 +56,26 @@ async def get_current_active_user(
     if current_user.deleted_at is not None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return current_user
+
+
+async def get_current_user_lastfm_username(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    """Get the Last.fm username for the current authenticated user."""
+    result = await db.execute(
+        select(AuthProvider).where(
+            AuthProvider.user_id == current_user.id,
+            AuthProvider.provider == "lastfm",
+        )
+    )
+    provider = result.scalar_one_or_none()
+    if provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Last.fm account linked. Please link your Last.fm account first.",
+        )
+    return provider.provider_user_id
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:

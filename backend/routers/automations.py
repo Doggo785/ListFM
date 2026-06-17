@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from schemas import AutomationCreate, AutomationUpdate, AutomationRead
 from models.user import User
-from routers.deps import resolve_user_id, get_current_active_user
+from routers.deps import get_current_user_lastfm_username, get_current_active_user
 from repositories.automations import (
     get_automations,
     get_automation,
@@ -24,16 +24,15 @@ router = APIRouter(prefix="/api", tags=["automations"])
 
 
 @router.post("/preview")
-def preview_automation(body: dict):
-    username = body.get("username")
+async def preview_automation(
+    body: dict,
+    username: str = Depends(get_current_user_lastfm_username),
+):
     automation = body.get("automation", {})
     source = automation.get("source", {})
     source_type = source.get("type", "top_tracks")
     period = source.get("period", "3m")
     limit = min(automation.get("output", {}).get("maxSize", 15), 15)
-
-    if not username:
-        return {"error": "username is required"}
 
     try:
         match source_type:
@@ -55,32 +54,36 @@ def preview_automation(body: dict):
         return {"error": str(e)}
 
 
-@router.get("/{username}/automations", response_model=list[AutomationRead])
-async def list_automations(username: str, db: AsyncSession = Depends(get_db)):
-    user_id = await resolve_user_id(db, username)
-    return await get_automations(db, user_id)
+@router.get("/automations", response_model=list[AutomationRead])
+async def list_automations(
+    username: str = Depends(get_current_user_lastfm_username),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_automations(db, current_user.id)
 
 
-@router.get("/{username}/automations/{automation_id}", response_model=AutomationRead)
-async def get_single_automation(username: str, automation_id: str, db: AsyncSession = Depends(get_db)):
-    user_id = await resolve_user_id(db, username)
-    automation = await get_automation(db, automation_id, user_id)
+@router.get("/automations/{automation_id}", response_model=AutomationRead)
+async def get_single_automation(
+    automation_id: str,
+    username: str = Depends(get_current_user_lastfm_username),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    automation = await get_automation(db, automation_id, current_user.id)
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     return automation
 
 
-@router.post("/{username}/automations", response_model=AutomationRead, status_code=201)
+@router.post("/automations", response_model=AutomationRead, status_code=201)
 async def create_new_automation(
-    username: str,
     data: AutomationCreate,
-    db: AsyncSession = Depends(get_db),
+    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    user_id = await resolve_user_id(db, username)
-    if user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    automation = await create_automation(db, user_id, username, data)
+    automation = await create_automation(db, current_user.id, username, data)
     try:
         await db.commit()
     except Exception:
@@ -89,18 +92,15 @@ async def create_new_automation(
     return automation
 
 
-@router.patch("/{username}/automations/{automation_id}", response_model=AutomationRead)
+@router.patch("/automations/{automation_id}", response_model=AutomationRead)
 async def update_existing_automation(
-    username: str,
     automation_id: str,
     data: AutomationUpdate,
-    db: AsyncSession = Depends(get_db),
+    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    user_id = await resolve_user_id(db, username)
-    if user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    automation = await update_automation(db, automation_id, user_id, data)
+    automation = await update_automation(db, automation_id, current_user.id, data)
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     try:
@@ -111,17 +111,14 @@ async def update_existing_automation(
     return automation
 
 
-@router.delete("/{username}/automations/{automation_id}", status_code=204)
+@router.delete("/automations/{automation_id}", status_code=204)
 async def delete_existing_automation(
-    username: str,
     automation_id: str,
-    db: AsyncSession = Depends(get_db),
+    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    user_id = await resolve_user_id(db, username)
-    if user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-    deleted = await delete_automation(db, automation_id, user_id)
+    deleted = await delete_automation(db, automation_id, current_user.id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Automation not found")
     try:

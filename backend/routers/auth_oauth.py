@@ -251,4 +251,10 @@ async def link_lastfm(
     db.add(auth_provider)
     await db.flush()
 
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to link Last.fm account")
+
     return LinkLastfmResponse(username=username, image=info.get("image"))

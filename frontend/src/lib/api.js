@@ -61,8 +61,8 @@ export async function request(path, options = {}) {
  * @returns {Promise<object>} user info with image
  */
 export async function getUserInfo() {
-  const username = requireUsername();
-  return request(`/api/${username}/info`);
+  requireUsername();
+  return request("/api/info");
 }
 
 /**
@@ -70,8 +70,8 @@ export async function getUserInfo() {
  * @returns {Promise<{ tracks: Array }>}
  */
 export async function getRecentTracks(limit = 50) {
-  const username = requireUsername();
-  return request(`/api/${username}/recent-tracks?limit=${limit}`);
+  requireUsername();
+  return request(`/api/recent-tracks?limit=${limit}`);
 }
 
 /**
@@ -79,10 +79,10 @@ export async function getRecentTracks(limit = 50) {
  * @returns {{ tracks: Array, totalMatched: number }}
  */
 export async function previewAutomation(automation) {
-  const username = requireUsername();
-  return request(`/api/automations/preview`, {
+  requireUsername();
+  return request("/api/automations/preview", {
     method: "POST",
-    body: JSON.stringify({ username, automation }),
+    body: JSON.stringify({ automation }),
   });
 }
 
@@ -90,8 +90,8 @@ export async function previewAutomation(automation) {
  * @returns {Promise<Array>} list of automations
  */
 export async function getAutomations() {
-  const username = requireUsername();
-  return request(`/api/${username}/automations`);
+  requireUsername();
+  return request("/api/automations");
 }
 
 /**
@@ -99,8 +99,8 @@ export async function getAutomations() {
  * @returns {Promise<object>} automation
  */
 export async function getAutomation(id) {
-  const username = requireUsername();
-  return request(`/api/${username}/automations/${id}`);
+  requireUsername();
+  return request(`/api/automations/${id}`);
 }
 
 /**
@@ -108,8 +108,8 @@ export async function getAutomation(id) {
  * @returns {Promise<object>} created automation with id
  */
 export async function createAutomation(automation) {
-  const username = requireUsername();
-  return request(`/api/${username}/automations`, {
+  requireUsername();
+  return request("/api/automations", {
     method: "POST",
     body: JSON.stringify(automation),
   });
@@ -121,8 +121,8 @@ export async function createAutomation(automation) {
  * @returns {Promise<object>} updated automation
  */
 export async function updateAutomation(id, automation) {
-  const username = requireUsername();
-  return request(`/api/${username}/automations/${id}`, {
+  requireUsername();
+  return request(`/api/automations/${id}`, {
     method: "PATCH",
     body: JSON.stringify(automation),
   });
@@ -133,8 +133,8 @@ export async function updateAutomation(id, automation) {
  * @returns {Promise<void>}
  */
 export async function deleteAutomation(id) {
-  const username = requireUsername();
-  return request(`/api/${username}/automations/${id}`, {
+  requireUsername();
+  return request(`/api/automations/${id}`, {
     method: "DELETE",
   });
 }
@@ -144,8 +144,8 @@ export async function deleteAutomation(id) {
  * @returns {Promise<object>} saved playlist
  */
 export async function saveGeneratedPlaylist(playlist) {
-  const username = requireUsername();
-  return request(`/api/${username}/generated-playlists`, {
+  requireUsername();
+  return request("/api/generated-playlists", {
     method: "POST",
     body: JSON.stringify(playlist),
   });
@@ -155,8 +155,8 @@ export async function saveGeneratedPlaylist(playlist) {
  * @returns {Promise<Array>} list of generated playlists
  */
 export async function getGeneratedPlaylists() {
-  const username = requireUsername();
-  return request(`/api/${username}/generated-playlists`);
+  requireUsername();
+  return request("/api/generated-playlists");
 }
 
 /**
@@ -164,8 +164,8 @@ export async function getGeneratedPlaylists() {
  * @returns {Promise<void>}
  */
 export async function deleteGeneratedPlaylist(id) {
-  const username = requireUsername();
-  return request(`/api/${username}/generated-playlists/${id}`, {
+  requireUsername();
+  return request(`/api/generated-playlists/${id}`, {
     method: "DELETE",
   });
 }

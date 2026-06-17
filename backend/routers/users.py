@@ -1,12 +1,13 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from services.lastfm import get_recent_tracks, get_top_tags, get_top_tracks, get_loved_tracks, get_user_info
 from schemas import RecentTracksResponse, Track, UserInfo
+from routers.deps import get_current_user_lastfm_username
 
 router = APIRouter(prefix="/api", tags=["users"])
 
 
-@router.get("/{username}/info", response_model=UserInfo)
-def user_info(username: str):
+@router.get("/info", response_model=UserInfo)
+async def user_info(username: str = Depends(get_current_user_lastfm_username)):
     try:
         info = get_user_info(username)
         return UserInfo(**info)
@@ -14,8 +15,8 @@ def user_info(username: str):
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
-@router.get("/{username}/recent-tracks", response_model=RecentTracksResponse)
-def user_recent_tracks(username: str, limit: int = 5):
+@router.get("/recent-tracks", response_model=RecentTracksResponse)
+async def user_recent_tracks(limit: int = 5, username: str = Depends(get_current_user_lastfm_username)):
     try:
         tracks = get_recent_tracks(username, limit=limit)
         return RecentTracksResponse(tracks=[Track(**t) for t in tracks])
@@ -23,32 +24,32 @@ def user_recent_tracks(username: str, limit: int = 5):
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
-@router.get("/{username}/top-tags")
-def user_top_tags(username: str, period: str = "3m"):
+@router.get("/top-tags")
+async def user_top_tags(period: str = "3m", username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tags": get_top_tags(username, period)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
-@router.get("/{username}/top-tracks")
-def user_top_tracks(username: str, period: str = "3m", limit: int = 50):
+@router.get("/top-tracks")
+async def user_top_tracks(period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tracks": get_top_tracks(username, period, limit)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
-@router.get("/{username}/loved-tracks")
-def user_loved_tracks(username: str, limit: int = 50):
+@router.get("/loved-tracks")
+async def user_loved_tracks(limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tracks": get_loved_tracks(username, limit)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
 
-@router.get("/{username}/source-tracks")
-def user_source_tracks(username: str, source: str = "top_tracks", period: str = "3m", limit: int = 50):
+@router.get("/source-tracks")
+async def user_source_tracks(source: str = "top_tracks", period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
     try:
         match source:
             case "top_tracks":
