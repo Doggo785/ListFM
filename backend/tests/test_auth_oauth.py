@@ -62,6 +62,15 @@ async def test_discord_login_no_keys(client: AsyncClient):
 # ===========================================================================
 
 
+class _MockGoogleResponse:
+    def __init__(self, status_code: int, json_data: dict):
+        self.status_code = status_code
+        self._json_data = json_data
+
+    def json(self):
+        return self._json_data
+
+
 @pytest.mark.asyncio
 async def test_google_callback_new_user(client: AsyncClient):
     """Google callback for a new user redirects to /link-lastfm."""
@@ -73,16 +82,14 @@ async def test_google_callback_new_user(client: AsyncClient):
                 "get_access_token",
                 return_value={"access_token": "fake_token"},
             ),
-            patch.object(
-                GoogleOAuth2,
-                "get_profile",
-                return_value={
-                    "resourceName": "google_12345",
-                    "emailAddresses": [{"value": email, "metadata": {"primary": True}}],
-                    "name": "Test User",
-                },
-            ),
+            patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
         ):
+            mock_resp = _MockGoogleResponse(200, {
+                "id": "google_12345",
+                "email": email,
+                "name": "Test User",
+            })
+            mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
             resp = await client.get(
                 "/api/auth/google/callback?code=fakecode&state=fakestate",
                 cookies={"oauth_state": "fakestate"},
@@ -106,16 +113,14 @@ async def test_google_callback_returning_user(client: AsyncClient):
                 "get_access_token",
                 return_value={"access_token": "fake_token"},
             ),
-            patch.object(
-                GoogleOAuth2,
-                "get_profile",
-                return_value={
-                    "resourceName": "google_12345",
-                    "emailAddresses": [{"value": email, "metadata": {"primary": True}}],
-                    "name": "Test User",
-                },
-            ),
+            patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
         ):
+            mock_resp = _MockGoogleResponse(200, {
+                "id": "google_12345",
+                "email": email,
+                "name": "Test User",
+            })
+            mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
             resp = await client.get(
                 "/api/auth/google/callback?code=fakecode&state=fakestate",
                 cookies={"oauth_state": "fakestate"},
@@ -426,6 +431,34 @@ async def test_link_lastfm_invalid_username(client: AsyncClient):
         assert resp.json()["detail"] == "Invalid Last.fm username"
     finally:
         await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_link_lastfm_conflict(client: AsyncClient):
+    """POST /api/auth/link-lastfm with a username already linked to another account returns 409."""
+    email1 = _unique_email()
+    email2 = _unique_email()
+    try:
+        await _register_and_login(client, email1)
+        mock_info = {"username": "shareduser", "image": None}
+        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
+            resp1 = await client.post(
+                "/api/auth/link-lastfm",
+                json={"username": "shareduser"},
+            )
+        assert resp1.status_code == 200
+
+        await _register_and_login(client, email2)
+        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
+            resp2 = await client.post(
+                "/api/auth/link-lastfm",
+                json={"username": "shareduser"},
+            )
+        assert resp2.status_code == 409
+        assert "already linked" in resp2.json()["detail"]
+    finally:
+        await _cleanup_user(email=email1)
+        await _cleanup_user(email=email2)
 
 
 @pytest.mark.asyncio
