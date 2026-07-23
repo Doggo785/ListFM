@@ -240,12 +240,12 @@ async def discord_callback(
     username = profile.get("username") or email
 
     if not email:
-        user, _ = await get_or_create_user_from_discord(
+        user, is_new = await get_or_create_user_from_discord(
             db, provider_user_id=provider_id, email=None, display_name=username
         )
         if user.email is not None:
             return await _finalize_oauth_login(db, request, response, user, is_new=False, settings=settings)
-        return await _finalize_oauth_login(db, request, response, user, is_new=True, settings=settings, needs_email=True)
+        return await _finalize_oauth_login(db, request, response, user, is_new=is_new, settings=settings, needs_email=True)
 
     user, is_new = await get_or_create_user_from_discord(
         db, provider_user_id=provider_id, email=email, display_name=username
@@ -324,7 +324,7 @@ async def complete_oauth_email(
         )
 
     current_user.email = body.email
-    current_user.email_verified = True
+    current_user.email_verified = False
     current_user.updated_at = datetime.now(timezone.utc)
     await db.flush()
 

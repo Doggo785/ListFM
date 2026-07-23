@@ -1,5 +1,7 @@
 """Tests for OAuth redirect endpoints and /api/auth/link-lastfm."""
 
+import uuid
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -9,6 +11,7 @@ from httpx_oauth.clients.google import GoogleOAuth2
 
 from sqlalchemy import select
 
+from models.auth_provider import AuthProvider
 from models.user import User
 
 from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
@@ -201,6 +204,52 @@ async def test_discord_callback_returning_user(client: AsyncClient):
                     "id": "discord_12345",
                     "username": "discord_user",
                     "email": email,
+                },
+            ),
+        ):
+            resp = await client.get(
+                "/api/auth/discord/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/dashboard" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_discord_callback_returning_user_no_email_from_discord(client: AsyncClient):
+    """Discord returning user with no email from Discord redirects to /dashboard (not needs_email)."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+        user_id = _get_user_id_from_cookies(client)
+
+        # Pre-link a Discord AuthProvider to simulate a returning user who already has an email in DB
+        async with _TestSessionLocal() as db:
+            provider = AuthProvider(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                provider="discord",
+                provider_user_id="discord_returning_123",
+                linked_at=datetime.now(timezone.utc),
+            )
+            db.add(provider)
+            await db.commit()
+
+        with (
+            patch.object(
+                DiscordOAuth2,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch.object(
+                DiscordOAuth2,
+                "get_profile",
+                return_value={
+                    "id": "discord_returning_123",
+                    "username": "returning_user",
+                    "email": None,
                 },
             ),
         ):
