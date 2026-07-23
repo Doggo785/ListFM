@@ -3,11 +3,12 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import Settings, get_settings
@@ -48,14 +49,20 @@ def _discord_client() -> DiscordOAuth2:
     )
 
 
+OAUTH_PROVIDER_CONFIGS = {
+    "google": ("google_oauth_client_id", "google_oauth_client_secret"),
+    "discord": ("discord_oauth_client_id", "discord_oauth_client_secret"),
+}
+
+
 def check_oauth_configured(provider: str) -> None:
     settings = get_settings()
-    if provider == "google":
-        if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
-            raise HTTPException(status_code=400, detail="google OAuth is not configured")
-    elif provider == "discord":
-        if not settings.discord_oauth_client_id or not settings.discord_oauth_client_secret:
-            raise HTTPException(status_code=400, detail="discord OAuth is not configured")
+    config = OAUTH_PROVIDER_CONFIGS.get(provider)
+    if config is None:
+        raise HTTPException(status_code=400, detail=f"Unknown OAuth provider: {provider}")
+    client_id_attr, client_secret_attr = config
+    if not getattr(settings, client_id_attr) or not getattr(settings, client_secret_attr):
+        raise HTTPException(status_code=400, detail=f"{provider} OAuth is not configured")
 
 
 def _redirect_uri(provider: str, settings: Settings) -> str:
@@ -75,7 +82,8 @@ async def _extract_oauth_profile(
     """
     profile = await client.get_profile(access_token)
     if provider == "google":
-        provider_id = profile.get("resourceName", "")
+        resource_name = profile.get("resourceName", "")
+        provider_id = resource_name.replace("people/", "", 1) if resource_name.startswith("people/") else resource_name
         emails = profile.get("emailAddresses", [])
         email = next(
             (e["value"] for e in emails if e.get("metadata", {}).get("primary")),
@@ -92,7 +100,6 @@ async def _extract_oauth_profile(
 async def _finalize_oauth_login(
     db: AsyncSession,
     request: Request,
-    response: Response,
     user: User,
     is_new: bool,
     settings: Settings,
@@ -107,33 +114,26 @@ async def _finalize_oauth_login(
 
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to complete OAuth login")
 
-    set_auth_cookies(response, jwt_access, jwt_refresh)
-
     if needs_email:
-        return RedirectResponse(url=f"{settings.frontend_url}/auth/callback?needs_email=1", status_code=302)
+        resp = RedirectResponse(url=f"{settings.frontend_url}/auth/callback?needs_email=1", status_code=302)
+    else:
+        redirect_path = "/link-lastfm" if is_new else "/dashboard"
+        resp = RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
 
-    redirect_path = "/link-lastfm" if is_new else "/dashboard"
-    return RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
+    resp.delete_cookie(key=OAUTH_STATE_COOKIE)
+    set_auth_cookies(resp, jwt_access, jwt_refresh)
+    return resp
 
 
 @router.get("/google/login")
-async def google_login(request: Request, response: Response):
+async def google_login(request: Request):
     check_oauth_configured("google")
     settings = get_settings()
     state = secrets.token_urlsafe(32)
-
-    response.set_cookie(
-        key=OAUTH_STATE_COOKIE,
-        value=state,
-        httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
-        max_age=OAUTH_STATE_MAX_AGE,
-    )
 
     client = _google_client()
     redirect_uri = _redirect_uri("google", settings)
@@ -142,13 +142,21 @@ async def google_login(request: Request, response: Response):
         state=state,
     )
 
-    return RedirectResponse(url=authorization_url, status_code=302)
+    resp = RedirectResponse(url=authorization_url, status_code=302)
+    resp.set_cookie(
+        key=OAUTH_STATE_COOKIE,
+        value=state,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        max_age=OAUTH_STATE_MAX_AGE,
+    )
+    return resp
 
 
 @router.get("/google/callback")
 async def google_callback(
     request: Request,
-    response: Response,
     code: str | None = None,
     state: str | None = None,
     oauth_state: str | None = Cookie(None),
@@ -159,8 +167,6 @@ async def google_callback(
 
     if not state or state != oauth_state:
         raise HTTPException(status_code=403, detail="Invalid or expired OAuth state")
-
-    response.delete_cookie(key=OAUTH_STATE_COOKIE)
 
     client = _google_client()
     settings = get_settings()
@@ -174,29 +180,20 @@ async def google_callback(
     access_token = token["access_token"]
     provider_id, email, profile = await _extract_oauth_profile(client, access_token, "google")
 
-    display_name = profile.get("name") or email
+    display_name = profile.get("names", [{}])[0].get("displayName") or email
 
     user, is_new = await get_or_create_user_from_google(
         db, provider_user_id=provider_id, email=email, display_name=display_name
     )
 
-    return await _finalize_oauth_login(db, request, response, user, is_new, settings)
+    return await _finalize_oauth_login(db, request, user, is_new, settings)
 
 
 @router.get("/discord/login")
-async def discord_login(request: Request, response: Response):
+async def discord_login(request: Request):
     check_oauth_configured("discord")
     settings = get_settings()
     state = secrets.token_urlsafe(32)
-
-    response.set_cookie(
-        key=OAUTH_STATE_COOKIE,
-        value=state,
-        httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
-        max_age=OAUTH_STATE_MAX_AGE,
-    )
 
     client = _discord_client()
     redirect_uri = _redirect_uri("discord", settings)
@@ -205,13 +202,21 @@ async def discord_login(request: Request, response: Response):
         state=state,
     )
 
-    return RedirectResponse(url=authorization_url, status_code=302)
+    resp = RedirectResponse(url=authorization_url, status_code=302)
+    resp.set_cookie(
+        key=OAUTH_STATE_COOKIE,
+        value=state,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        max_age=OAUTH_STATE_MAX_AGE,
+    )
+    return resp
 
 
 @router.get("/discord/callback")
 async def discord_callback(
     request: Request,
-    response: Response,
     code: str | None = None,
     state: str | None = None,
     oauth_state: str | None = Cookie(None),
@@ -222,8 +227,6 @@ async def discord_callback(
 
     if not state or state != oauth_state:
         raise HTTPException(status_code=403, detail="Invalid or expired OAuth state")
-
-    response.delete_cookie(key=OAUTH_STATE_COOKIE)
 
     client = _discord_client()
     settings = get_settings()
@@ -244,14 +247,14 @@ async def discord_callback(
             db, provider_user_id=provider_id, email=None, display_name=username
         )
         if user.email is not None:
-            return await _finalize_oauth_login(db, request, response, user, is_new=False, settings=settings)
-        return await _finalize_oauth_login(db, request, response, user, is_new=is_new, settings=settings, needs_email=True)
+            return await _finalize_oauth_login(db, request, user, is_new=False, settings=settings)
+        return await _finalize_oauth_login(db, request, user, is_new=is_new, settings=settings, needs_email=True)
 
     user, is_new = await get_or_create_user_from_discord(
         db, provider_user_id=provider_id, email=email, display_name=username
     )
 
-    return await _finalize_oauth_login(db, request, response, user, is_new, settings)
+    return await _finalize_oauth_login(db, request, user, is_new, settings)
 
 
 @router.post("/link-lastfm", response_model=LinkLastfmResponse)
@@ -299,7 +302,7 @@ async def link_lastfm(
 
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to link Last.fm account")
 
@@ -330,7 +333,7 @@ async def complete_oauth_email(
 
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update email")
 
