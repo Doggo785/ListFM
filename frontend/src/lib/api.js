@@ -27,11 +27,21 @@ function requireUsername() {
 
 export async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+  } catch (err) {
+    if (err instanceof TypeError && err.message === "Failed to fetch") {
+      throw new Error(
+        "Unable to reach the server. Make sure the backend is running on port 8000."
+      );
+    }
+    throw err;
+  }
   if (res.status === 401 && path !== "/api/auth/refresh" && !options._retried) {
     if (!isRefreshing) {
       isRefreshing = true;
@@ -40,9 +50,13 @@ export async function request(path, options = {}) {
         credentials: "include",
       }).finally(() => { isRefreshing = false; });
     }
-    const refreshRes = await refreshPromise;
-    if (refreshRes.ok) {
-      return request(path, { ...options, _retried: true });
+    try {
+      const refreshRes = await refreshPromise;
+      if (refreshRes.ok) {
+        return request(path, { ...options, _retried: true });
+      }
+    } catch {
+      // Refresh failed (network error, etc.) — fall through to original 401
     }
   }
   if (!res.ok) {

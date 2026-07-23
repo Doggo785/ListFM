@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from config import get_settings
 from database import engine
 from routers.users import router as users_router
@@ -27,6 +28,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(OSError)
+async def db_connection_error_handler(request: Request, exc: OSError):
+    """Return clean JSON instead of HTML 500 when PostgreSQL is unreachable."""
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Service temporarily unavailable. Database connection failed."},
+    )
+
 
 app.include_router(auth_router)
 app.include_router(auth_oauth_router)

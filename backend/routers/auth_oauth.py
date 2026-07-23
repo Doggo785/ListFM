@@ -3,6 +3,7 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
@@ -78,19 +79,25 @@ async def _extract_oauth_profile(
 ) -> tuple[str, str | None, dict]:
     """Fetch OAuth profile once and extract (provider_id, email, profile_dict).
 
-    Avoids double-fetching: get_id_email() internally calls get_profile(),
-    so we call get_profile() once and extract what we need.
+    For Google, uses the userinfo endpoint (no People API required).
+    For Discord, uses the httpx-oauth client's get_profile().
     """
-    profile = await client.get_profile(access_token)
     if provider == "google":
-        resource_name = profile.get("resourceName", "")
-        provider_id = resource_name.replace("people/", "", 1) if resource_name.startswith("people/") else resource_name
-        emails = profile.get("emailAddresses", [])
-        email = next(
-            (e["value"] for e in emails if e.get("metadata", {}).get("primary")),
-            emails[0]["value"] if emails else None,
-        )
+        async with httpx.AsyncClient() as http:
+            resp = await http.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if resp.status_code >= 400:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to fetch Google profile: {resp.status_code}",
+                )
+            profile = resp.json()
+        provider_id = profile.get("id", "")
+        email = profile.get("email")
     elif provider == "discord":
+        profile = await client.get_profile(access_token)
         provider_id = profile.get("id", "")
         email = profile.get("email")
     else:
@@ -180,7 +187,7 @@ async def google_callback(
     access_token = token["access_token"]
     provider_id, email, profile = await _extract_oauth_profile(client, access_token, "google")
 
-    display_name = profile.get("names", [{}])[0].get("displayName") or email
+    display_name = profile.get("name") or email
 
     user, is_new = await get_or_create_user_from_google(
         db, provider_user_id=provider_id, email=email, display_name=display_name
