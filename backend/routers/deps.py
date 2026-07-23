@@ -41,7 +41,6 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """Return the current user only if they are not soft-deleted."""
     if current_user.deleted_at is not None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return current_user
@@ -51,7 +50,6 @@ async def get_current_user_lastfm_username(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> str:
-    """Get the Last.fm username for the current authenticated user."""
     result = await db.execute(
         select(AuthProvider).where(
             AuthProvider.user_id == current_user.id,
@@ -68,7 +66,6 @@ async def get_current_user_lastfm_username(
 
 
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
-    """Set httpOnly cookies for access_token and refresh_token."""
     settings = get_settings()
 
     response.set_cookie(
@@ -90,6 +87,5 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str) 
 
 
 def clear_auth_cookies(response: Response) -> None:
-    """Clear the auth cookies."""
     response.delete_cookie(key="access_token", httponly=True, samesite="lax")
     response.delete_cookie(key="refresh_token", httponly=True, samesite="lax")

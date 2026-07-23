@@ -38,10 +38,7 @@ async def get_user_by_lastfm_username(db: AsyncSession, lastfm_username: str) ->
 
 
 async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) -> User:
-    """Create a new user with email/password.
-
-    Caller is responsible for committing the session.
-    """
+    """Caller is responsible for committing the session."""
     now = datetime.now(timezone.utc)
     user = User(
         id=str(uuid.uuid4()),
@@ -70,10 +67,7 @@ async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) ->
 
 
 async def create_user_from_lastfm(db: AsyncSession, lastfm_username: str, access_token: str | None = None) -> User:
-    """Create a new user from Last.fm OAuth.
-
-    Caller is responsible for committing the session.
-    """
+    """Caller is responsible for committing the session."""
     now = datetime.now(timezone.utc)
     user = User(
         id=str(uuid.uuid4()),
@@ -126,9 +120,8 @@ async def _get_or_create_user_from_provider(
     email: str | None = None,
     display_name: str | None = None,
 ) -> tuple[User, bool]:
-    """Shared logic for looking up/creating a user from an OAuth provider.
+    """Returns (User, is_new) where is_new=True when created.
 
-    Returns (User, is_new) where is_new=True when a new user is created.
     Caller is responsible for committing the session.
     """
     now = datetime.now(timezone.utc)
@@ -194,11 +187,7 @@ async def get_or_create_user_from_google(
     email: str | None = None,
     display_name: str | None = None,
 ) -> tuple[User, bool]:
-    """Look up user by Google provider_user_id, or create a new one.
-
-    Returns (User, is_new) where is_new=True when a new user is created.
-    Caller is responsible for committing the session.
-    """
+    """Caller is responsible for committing the session."""
     return await _get_or_create_user_from_provider(db, "google", provider_user_id, email, display_name)
 
 
@@ -208,16 +197,12 @@ async def get_or_create_user_from_discord(
     email: str | None = None,
     display_name: str | None = None,
 ) -> tuple[User, bool]:
-    """Look up user by Discord provider_user_id, or create a new one.
-
-    Returns (User, is_new) where is_new=True when a new user is created.
-    Caller is responsible for committing the session.
-    """
+    """Caller is responsible for committing the session."""
     return await _get_or_create_user_from_provider(db, "discord", provider_user_id, email, display_name)
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
-    """Soft delete a user. Returns True if deleted, False if not found.
+    """Returns True if deleted, False if not found.
 
     Caller is responsible for committing the session.
     """

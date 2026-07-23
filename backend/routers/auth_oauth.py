@@ -7,6 +7,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
+from httpx_oauth.oauth2 import GetAccessTokenError
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -105,7 +106,6 @@ async def _finalize_oauth_login(
     settings: Settings,
     needs_email: bool = False,
 ) -> RedirectResponse:
-    """Complete OAuth login: tokens, commit, cookies, and redirect."""
     jwt_access = create_access_token(user.id)
     jwt_refresh = create_refresh_token(user.id)
 
@@ -174,7 +174,7 @@ async def google_callback(
 
     try:
         token = await client.get_access_token(code, redirect_uri)
-    except Exception:
+    except GetAccessTokenError:
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
     access_token = token["access_token"]
@@ -234,7 +234,7 @@ async def discord_callback(
 
     try:
         token = await client.get_access_token(code, redirect_uri)
-    except Exception:
+    except GetAccessTokenError:
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
     access_token = token["access_token"]
@@ -263,7 +263,6 @@ async def link_lastfm(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Validate a Last.fm username and link it to the authenticated user."""
     username = body.username.strip()
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
@@ -315,7 +314,6 @@ async def complete_oauth_email(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Set email for users who signed up via Discord without an email."""
     if current_user.email is not None:
         raise HTTPException(status_code=400, detail="Email already set")
 
