@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api", tags=["users"])
 
 
 @router.get("/info", response_model=UserInfo)
-async def user_info(username: str = Depends(get_current_user_lastfm_username)):
+def user_info(username: str = Depends(get_current_user_lastfm_username)):
     try:
         info = get_user_info(username)
         return UserInfo(**info)
@@ -16,7 +16,7 @@ async def user_info(username: str = Depends(get_current_user_lastfm_username)):
 
 
 @router.get("/recent-tracks", response_model=RecentTracksResponse)
-async def user_recent_tracks(limit: int = 5, username: str = Depends(get_current_user_lastfm_username)):
+def user_recent_tracks(limit: int = 5, username: str = Depends(get_current_user_lastfm_username)):
     try:
         tracks = get_recent_tracks(username, limit=limit)
         return RecentTracksResponse(tracks=[Track(**t) for t in tracks])
@@ -25,7 +25,7 @@ async def user_recent_tracks(limit: int = 5, username: str = Depends(get_current
 
 
 @router.get("/top-tags")
-async def user_top_tags(period: str = "3m", username: str = Depends(get_current_user_lastfm_username)):
+def user_top_tags(period: str = "3m", username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tags": get_top_tags(username, period)}
     except Exception as e:
@@ -33,7 +33,7 @@ async def user_top_tags(period: str = "3m", username: str = Depends(get_current_
 
 
 @router.get("/top-tracks")
-async def user_top_tracks(period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
+def user_top_tracks(period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tracks": get_top_tracks(username, period, limit)}
     except Exception as e:
@@ -41,7 +41,7 @@ async def user_top_tracks(period: str = "3m", limit: int = 50, username: str = D
 
 
 @router.get("/loved-tracks")
-async def user_loved_tracks(limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
+def user_loved_tracks(limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tracks": get_loved_tracks(username, limit)}
     except Exception as e:
@@ -49,7 +49,7 @@ async def user_loved_tracks(limit: int = 50, username: str = Depends(get_current
 
 
 @router.get("/source-tracks")
-async def user_source_tracks(source: str = "top_tracks", period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
+def user_source_tracks(source: str = "top_tracks", period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
     try:
         match source:
             case "top_tracks":

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api", tags=["automations"])
 
 
 @router.post("/preview")
-async def preview_automation(
+def preview_automation(
     body: dict,
     username: str = Depends(get_current_user_lastfm_username),
 ):
