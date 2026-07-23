@@ -1,9 +1,11 @@
 """Tests for OAuth redirect endpoints and /api/auth/link-lastfm."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from httpx_oauth.clients.discord import DiscordOAuth2
+from httpx_oauth.clients.google import GoogleOAuth2
 
 from .conftest import _cleanup_user, _unique_email
 
@@ -60,17 +62,17 @@ async def test_google_callback_new_user(client: AsyncClient):
     try:
         with (
             patch.object(
-                AsyncMock,
+                GoogleOAuth2,
                 "get_access_token",
                 return_value={"access_token": "fake_token"},
             ),
             patch.object(
-                AsyncMock,
+                GoogleOAuth2,
                 "get_id_email",
                 return_value=("google_12345", email),
             ),
             patch.object(
-                AsyncMock,
+                GoogleOAuth2,
                 "get_profile",
                 return_value={"name": "Test User"},
             ),
@@ -94,17 +96,17 @@ async def test_google_callback_returning_user(client: AsyncClient):
 
         with (
             patch.object(
-                AsyncMock,
+                GoogleOAuth2,
                 "get_access_token",
                 return_value={"access_token": "fake_token"},
             ),
             patch.object(
-                AsyncMock,
+                GoogleOAuth2,
                 "get_id_email",
                 return_value=("google_12345", email),
             ),
             patch.object(
-                AsyncMock,
+                GoogleOAuth2,
                 "get_profile",
                 return_value={"name": "Test User"},
             ),
@@ -124,17 +126,17 @@ async def test_discord_callback_no_email(client: AsyncClient):
     """Discord callback without email redirects to needs_email=1."""
     with (
         patch.object(
-            AsyncMock,
+            DiscordOAuth2,
             "get_access_token",
             return_value={"access_token": "fake_token"},
         ),
         patch.object(
-            AsyncMock,
+            DiscordOAuth2,
             "get_id_email",
             return_value=("discord_12345", None),
         ),
         patch.object(
-            AsyncMock,
+            DiscordOAuth2,
             "get_profile",
             return_value={"username": "discord_user"},
         ),
@@ -154,17 +156,17 @@ async def test_discord_callback_new_user(client: AsyncClient):
     try:
         with (
             patch.object(
-                AsyncMock,
+                DiscordOAuth2,
                 "get_access_token",
                 return_value={"access_token": "fake_token"},
             ),
             patch.object(
-                AsyncMock,
+                DiscordOAuth2,
                 "get_id_email",
                 return_value=("discord_12345", email),
             ),
             patch.object(
-                AsyncMock,
+                DiscordOAuth2,
                 "get_profile",
                 return_value={"username": "discord_user"},
             ),
@@ -188,17 +190,17 @@ async def test_discord_callback_returning_user(client: AsyncClient):
 
         with (
             patch.object(
-                AsyncMock,
+                DiscordOAuth2,
                 "get_access_token",
                 return_value={"access_token": "fake_token"},
             ),
             patch.object(
-                AsyncMock,
+                DiscordOAuth2,
                 "get_id_email",
                 return_value=("discord_12345", email),
             ),
             patch.object(
-                AsyncMock,
+                DiscordOAuth2,
                 "get_profile",
                 return_value={"username": "discord_user"},
             ),
