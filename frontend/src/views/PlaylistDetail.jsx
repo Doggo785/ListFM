@@ -344,7 +344,6 @@ export default function PlaylistDetail() {
         </motion.header>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start">
-          {/* Left: Settings */}
           <div className="space-y-6 pb-16">
             <SectionCard title="Identity" icon={IconSettings} delay={0.1}>
               <FieldRow label="Playlist name">

@@ -3,7 +3,6 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 let isRefreshing = false;
 let refreshPromise = null;
 
-// ── Module-level username cache ──────────────────────────────────────────────
 let _username = null;
 
 /**
@@ -15,9 +14,6 @@ export function setCurrentUsername(username) {
   _username = username;
 }
 
-/**
- * @returns {string|null} the cached Last.fm username
- */
 export function getCurrentUsername() {
   return _username;
 }
@@ -86,9 +82,6 @@ export async function previewAutomation(automation) {
   });
 }
 
-/**
- * @returns {Promise<Array>} list of automations
- */
 export async function getAutomations() {
   requireUsername();
   return request("/api/automations");
