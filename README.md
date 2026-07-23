@@ -129,6 +129,12 @@ npm run dev
 | `POST` | `/api/auth/refresh` | Refresh access token |
 | `POST` | `/api/auth/logout` | Sign out |
 | `GET` | `/api/auth/me` | Get current user info |
+| `GET` | `/api/auth/google/login` | Login with Google OAuth |
+| `GET` | `/api/auth/google/callback` | Google OAuth callback |
+| `GET` | `/api/auth/discord/login` | Login with Discord OAuth |
+| `GET` | `/api/auth/discord/callback` | Discord OAuth callback |
+| `POST` | `/api/auth/link-lastfm` | Link Last.fm account after OAuth |
+| `POST` | `/api/auth/oauth/complete-email` | Set email for Discord users without one |
 
 ### Protected (requires auth)
 
