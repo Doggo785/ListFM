@@ -8,9 +8,6 @@ from httpx import AsyncClient
 from .conftest import _cleanup_user, _unique_email
 
 
-# ---------------------------------------------------------------------------
-# Helper
-# ---------------------------------------------------------------------------
 async def _register_and_login(client: AsyncClient, email: str, password: str = "StrongP@ss1!"):
     """Register a new user and log in. Returns the login response."""
     reg = await client.post(
@@ -81,7 +78,6 @@ async def test_duplicate_lastfm_username(client: AsyncClient):
             )
             assert resp1.status_code == 200
 
-            # Link again — should re-link, not fail
             resp2 = await client.post(
                 "/api/auth/link-lastfm",
                 json={"username": "dupe_user"},

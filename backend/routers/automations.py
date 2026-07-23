@@ -56,7 +56,6 @@ async def preview_automation(
 
 @router.get("/automations", response_model=list[AutomationRead])
 async def list_automations(
-    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -66,7 +65,6 @@ async def list_automations(
 @router.get("/automations/{automation_id}", response_model=AutomationRead)
 async def get_single_automation(
     automation_id: str,
-    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -96,7 +94,6 @@ async def create_new_automation(
 async def update_existing_automation(
     automation_id: str,
     data: AutomationUpdate,
-    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -114,7 +111,6 @@ async def update_existing_automation(
 @router.delete("/automations/{automation_id}", status_code=204)
 async def delete_existing_automation(
     automation_id: str,
-    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):

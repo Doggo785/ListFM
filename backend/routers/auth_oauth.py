@@ -274,7 +274,6 @@ async def link_lastfm(
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
 
-    # Validate username exists on Last.fm (sync call in thread)
     try:
         info = await asyncio.to_thread(get_user_info, username)
     except Exception:

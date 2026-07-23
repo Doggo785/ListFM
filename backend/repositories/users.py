@@ -24,7 +24,6 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 
 async def get_user_by_lastfm_username(db: AsyncSession, lastfm_username: str) -> User | None:
-    """Get a user by Last.fm username via auth_providers."""
     result = await db.execute(
         select(User)
         .join(AuthProvider)
