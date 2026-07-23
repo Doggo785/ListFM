@@ -47,6 +47,16 @@ def _discord_client() -> DiscordOAuth2:
     )
 
 
+def check_oauth_configured(provider: str) -> None:
+    settings = get_settings()
+    if provider == "google":
+        if not settings.google_oauth_client_id or not settings.google_oauth_client_secret:
+            raise HTTPException(status_code=400, detail="google OAuth is not configured")
+    elif provider == "discord":
+        if not settings.discord_oauth_client_id or not settings.discord_oauth_client_secret:
+            raise HTTPException(status_code=400, detail="discord OAuth is not configured")
+
+
 def _redirect_uri(provider: str, settings: Settings) -> str:
     base = settings.oauth_redirect_base.rstrip("/")
     return f"{base}/api/auth/{provider}/callback"

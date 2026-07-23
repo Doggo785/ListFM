@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     discord_oauth_client_id: str = ""
     discord_oauth_client_secret: str = ""
     oauth_redirect_base: str = "http://localhost:8000"
+    frontend_url: str = "http://localhost:5173"
 
     @field_validator("jwt_secret")
     @classmethod
