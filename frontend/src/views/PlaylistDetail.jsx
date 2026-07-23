@@ -234,7 +234,7 @@ export default function PlaylistDetail() {
           tracks: filtered,
           track_count: filtered.length,
           filter_groups: automation.filterGroups || [],
-        }).catch(() => {}); // Silently fail — don't block UI
+        }).catch(() => {});
       }
     } catch (err) {
       setPreviewError(err.message || "Failed to load preview");

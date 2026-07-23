@@ -14,10 +14,6 @@ export function setCurrentUsername(username) {
   _username = username;
 }
 
-export function getCurrentUsername() {
-  return _username;
-}
-
 function requireUsername() {
   if (!_username) {
     throw new Error("No username available — user may not be authenticated");
@@ -158,21 +154,4 @@ export async function saveGeneratedPlaylist(playlist) {
   });
 }
 
-/**
- * @returns {Promise<Array>} list of generated playlists
- */
-export async function getGeneratedPlaylists() {
-  requireUsername();
-  return request("/api/generated-playlists");
-}
 
-/**
- * @param {string} id — playlist UUID
- * @returns {Promise<void>}
- */
-export async function deleteGeneratedPlaylist(id) {
-  requireUsername();
-  return request(`/api/generated-playlists/${id}`, {
-    method: "DELETE",
-  });
-}
