@@ -16,8 +16,6 @@ function AuthCallback() {
   }, []);
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    const state = searchParams.get("state");
     const err = searchParams.get("error");
     const needsEmailParam = searchParams.get("needs_email");
 
@@ -29,13 +27,6 @@ function AuthCallback() {
     if (err) {
       setError(searchParams.get("error_description") || "Authentication failed. Please try again.");
       return;
-    }
-
-    if (code && state) {
-      const timer = setTimeout(() => {
-        navigate("/dashboard", { replace: true });
-      }, 500);
-      return () => clearTimeout(timer);
     }
 
     setError("Invalid authentication response. Please try again.");

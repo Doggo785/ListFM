@@ -7,7 +7,11 @@ from httpx import AsyncClient
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 
-from .conftest import _cleanup_user, _unique_email
+from sqlalchemy import select
+
+from models.user import User
+
+from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
 
 
 # ---------------------------------------------------------------------------
@@ -68,13 +72,12 @@ async def test_google_callback_new_user(client: AsyncClient):
             ),
             patch.object(
                 GoogleOAuth2,
-                "get_id_email",
-                return_value=("google_12345", email),
-            ),
-            patch.object(
-                GoogleOAuth2,
                 "get_profile",
-                return_value={"name": "Test User"},
+                return_value={
+                    "resourceName": "google_12345",
+                    "emailAddresses": [{"value": email, "metadata": {"primary": True}}],
+                    "name": "Test User",
+                },
             ),
         ):
             resp = await client.get(
@@ -102,13 +105,12 @@ async def test_google_callback_returning_user(client: AsyncClient):
             ),
             patch.object(
                 GoogleOAuth2,
-                "get_id_email",
-                return_value=("google_12345", email),
-            ),
-            patch.object(
-                GoogleOAuth2,
                 "get_profile",
-                return_value={"name": "Test User"},
+                return_value={
+                    "resourceName": "google_12345",
+                    "emailAddresses": [{"value": email, "metadata": {"primary": True}}],
+                    "name": "Test User",
+                },
             ),
         ):
             resp = await client.get(
@@ -132,13 +134,12 @@ async def test_discord_callback_no_email(client: AsyncClient):
         ),
         patch.object(
             DiscordOAuth2,
-            "get_id_email",
-            return_value=("discord_12345", None),
-        ),
-        patch.object(
-            DiscordOAuth2,
             "get_profile",
-            return_value={"username": "discord_user"},
+            return_value={
+                "id": "discord_12345",
+                "username": "discord_user",
+                "email": None,
+            },
         ),
     ):
         resp = await client.get(
@@ -162,13 +163,12 @@ async def test_discord_callback_new_user(client: AsyncClient):
             ),
             patch.object(
                 DiscordOAuth2,
-                "get_id_email",
-                return_value=("discord_12345", email),
-            ),
-            patch.object(
-                DiscordOAuth2,
                 "get_profile",
-                return_value={"username": "discord_user"},
+                return_value={
+                    "id": "discord_12345",
+                    "username": "discord_user",
+                    "email": email,
+                },
             ),
         ):
             resp = await client.get(
@@ -196,13 +196,12 @@ async def test_discord_callback_returning_user(client: AsyncClient):
             ),
             patch.object(
                 DiscordOAuth2,
-                "get_id_email",
-                return_value=("discord_12345", email),
-            ),
-            patch.object(
-                DiscordOAuth2,
                 "get_profile",
-                return_value={"username": "discord_user"},
+                return_value={
+                    "id": "discord_12345",
+                    "username": "discord_user",
+                    "email": email,
+                },
             ),
         ):
             resp = await client.get(
@@ -251,6 +250,13 @@ async def test_complete_email_success(client: AsyncClient):
     try:
         await _register_and_login(client, email)
 
+        user_id = _get_user_id_from_cookies(client)
+        async with _TestSessionLocal() as db:
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one()
+            user.email = None
+            await db.commit()
+
         new_email = _unique_email()
         resp = await client.post(
             "/api/auth/oauth/complete-email",
@@ -274,10 +280,18 @@ async def test_complete_email_duplicate(client: AsyncClient):
     email2 = _unique_email()
     try:
         await _register_and_login(client, email1)
-        # Create a second user
-        await _register_and_login(client, email2)
+        user1_id = _get_user_id_from_cookies(client)
 
-        # Try to set email2's email to email1's email
+        await _register_and_login(client, email2)
+        user2_id = _get_user_id_from_cookies(client)
+
+        # Clear user2's email in DB (simulate Discord user without email)
+        async with _TestSessionLocal() as db:
+            result = await db.execute(select(User).where(User.id == user2_id))
+            user2 = result.scalar_one()
+            user2.email = None
+            await db.commit()
+
         resp = await client.post(
             "/api/auth/oauth/complete-email",
             json={"email": email1},
@@ -286,7 +300,6 @@ async def test_complete_email_duplicate(client: AsyncClient):
         assert "already exists" in resp.json()["detail"]
     finally:
         await _cleanup_user(email=email1)
-        await _cleanup_user(email=email2)
 
 
 @pytest.mark.asyncio
@@ -305,6 +318,13 @@ async def test_complete_email_invalid_format(client: AsyncClient):
     email = _unique_email()
     try:
         await _register_and_login(client, email)
+
+        user_id = _get_user_id_from_cookies(client)
+        async with _TestSessionLocal() as db:
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one()
+            user.email = None
+            await db.commit()
 
         resp = await client.post(
             "/api/auth/oauth/complete-email",

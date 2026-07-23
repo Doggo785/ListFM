@@ -13,6 +13,10 @@ from database import get_db
 from backend.main import app
 from services.rate_limit import login_limiter, register_limiter, refresh_limiter
 from models.auth_provider import AuthProvider
+from models.automation import Automation
+from models.automation_history import AutomationHistory
+from models.generated_playlist import GeneratedPlaylist
+from models.playlist_track import PlaylistTrack
 from models.refresh_token import RefreshToken
 from models.user import User
 
@@ -39,12 +43,20 @@ async def _cleanup_db():
     register_limiter.reset()
     refresh_limiter.reset()
     async with _TestSessionLocal() as db:
+        await db.execute(delete(PlaylistTrack))
+        await db.execute(delete(AutomationHistory))
+        await db.execute(delete(GeneratedPlaylist))
+        await db.execute(delete(Automation))
         await db.execute(delete(RefreshToken))
         await db.execute(delete(AuthProvider))
         await db.execute(delete(User))
         await db.commit()
     yield
     async with _TestSessionLocal() as db:
+        await db.execute(delete(PlaylistTrack))
+        await db.execute(delete(AutomationHistory))
+        await db.execute(delete(GeneratedPlaylist))
+        await db.execute(delete(Automation))
         await db.execute(delete(RefreshToken))
         await db.execute(delete(AuthProvider))
         await db.execute(delete(User))

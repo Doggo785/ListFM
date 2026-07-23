@@ -63,6 +63,63 @@ def _redirect_uri(provider: str, settings: Settings) -> str:
     return f"{base}/api/auth/{provider}/callback"
 
 
+async def _extract_oauth_profile(
+    client: GoogleOAuth2 | DiscordOAuth2,
+    access_token: str,
+    provider: str,
+) -> tuple[str, str | None, dict]:
+    """Fetch OAuth profile once and extract (provider_id, email, profile_dict).
+
+    Avoids double-fetching: get_id_email() internally calls get_profile(),
+    so we call get_profile() once and extract what we need.
+    """
+    profile = await client.get_profile(access_token)
+    if provider == "google":
+        provider_id = profile.get("resourceName", "")
+        emails = profile.get("emailAddresses", [])
+        email = next(
+            (e["value"] for e in emails if e.get("metadata", {}).get("primary")),
+            emails[0]["value"] if emails else None,
+        )
+    elif provider == "discord":
+        provider_id = profile.get("id", "")
+        email = profile.get("email")
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+    return provider_id, email, profile
+
+
+async def _finalize_oauth_login(
+    db: AsyncSession,
+    request: Request,
+    response: Response,
+    user: User,
+    is_new: bool,
+    settings: Settings,
+    needs_email: bool = False,
+) -> RedirectResponse:
+    """Complete OAuth login: tokens, commit, cookies, and redirect."""
+    jwt_access = create_access_token(user.id)
+    jwt_refresh = create_refresh_token(user.id)
+
+    family = str(uuid.uuid4())
+    await _store_refresh_token(db, user.id, jwt_refresh, family, request)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to complete OAuth login")
+
+    set_auth_cookies(response, jwt_access, jwt_refresh)
+
+    if needs_email:
+        return RedirectResponse(url=f"{settings.frontend_url}/auth/callback?needs_email=1", status_code=302)
+
+    redirect_path = "/link-lastfm" if is_new else "/dashboard"
+    return RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
+
+
 @router.get("/google/login")
 async def google_login(request: Request, response: Response):
     check_oauth_configured("google")
@@ -115,8 +172,7 @@ async def google_callback(
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
     access_token = token["access_token"]
-    provider_id, email = await client.get_id_email(access_token)
-    profile = await client.get_profile(access_token)
+    provider_id, email, profile = await _extract_oauth_profile(client, access_token, "google")
 
     display_name = profile.get("name") or email
 
@@ -124,22 +180,7 @@ async def google_callback(
         db, provider_user_id=provider_id, email=email, display_name=display_name
     )
 
-    jwt_access = create_access_token(user.id)
-    jwt_refresh = create_refresh_token(user.id)
-
-    family = str(uuid.uuid4())
-    await _store_refresh_token(db, user.id, jwt_refresh, family, request)
-
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to complete OAuth login")
-
-    set_auth_cookies(response, jwt_access, jwt_refresh)
-
-    redirect_path = "/link-lastfm" if is_new else "/dashboard"
-    return RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
+    return await _finalize_oauth_login(db, request, response, user, is_new, settings)
 
 
 @router.get("/discord/login")
@@ -194,53 +235,23 @@ async def discord_callback(
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
     access_token = token["access_token"]
-    provider_id, email = await client.get_id_email(access_token)
-    profile = await client.get_profile(access_token)
+    provider_id, email, profile = await _extract_oauth_profile(client, access_token, "discord")
 
     username = profile.get("username") or email
 
-    # If Discord didn't provide an email, redirect to email prompt
     if not email:
         user, _ = await get_or_create_user_from_discord(
             db, provider_user_id=provider_id, email=None, display_name=username
         )
-
-        jwt_access = create_access_token(user.id)
-        jwt_refresh = create_refresh_token(user.id)
-
-        family = str(uuid.uuid4())
-        await _store_refresh_token(db, user.id, jwt_refresh, family, request)
-
-        try:
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to complete OAuth login")
-
-        set_auth_cookies(response, jwt_access, jwt_refresh)
-
-        return RedirectResponse(url=f"{settings.frontend_url}/auth/callback?needs_email=1", status_code=302)
+        if user.email is not None:
+            return await _finalize_oauth_login(db, request, response, user, is_new=False, settings=settings)
+        return await _finalize_oauth_login(db, request, response, user, is_new=True, settings=settings, needs_email=True)
 
     user, is_new = await get_or_create_user_from_discord(
         db, provider_user_id=provider_id, email=email, display_name=username
     )
 
-    jwt_access = create_access_token(user.id)
-    jwt_refresh = create_refresh_token(user.id)
-
-    family = str(uuid.uuid4())
-    await _store_refresh_token(db, user.id, jwt_refresh, family, request)
-
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to complete OAuth login")
-
-    set_auth_cookies(response, jwt_access, jwt_refresh)
-
-    redirect_path = "/link-lastfm" if is_new else "/dashboard"
-    return RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
+    return await _finalize_oauth_login(db, request, response, user, is_new, settings)
 
 
 @router.post("/link-lastfm", response_model=LinkLastfmResponse)
@@ -302,6 +313,9 @@ async def complete_oauth_email(
     db: AsyncSession = Depends(get_db),
 ):
     """Set email for users who signed up via Discord without an email."""
+    if current_user.email is not None:
+        raise HTTPException(status_code=400, detail="Email already set")
+
     existing = await get_user_by_email(db, body.email)
     if existing is not None and existing.id != current_user.id:
         raise HTTPException(
@@ -310,6 +324,7 @@ async def complete_oauth_email(
         )
 
     current_user.email = body.email
+    current_user.email_verified = True
     current_user.updated_at = datetime.now(timezone.utc)
     await db.flush()
 
