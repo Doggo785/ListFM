@@ -87,6 +87,10 @@ class AuthProviderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class OAuthCompleteEmailRequest(EmailValidatorMixin, BaseModel):
+    email: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

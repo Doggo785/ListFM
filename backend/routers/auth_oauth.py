@@ -17,11 +17,12 @@ from models.user import User
 from repositories.users import (
     get_or_create_user_from_discord,
     get_or_create_user_from_google,
+    get_user_by_email,
     get_user_by_lastfm_username,
 )
 from routers.auth import _store_refresh_token
 from routers.deps import get_current_active_user, set_auth_cookies
-from schemas import LinkLastfmRequest, LinkLastfmResponse
+from schemas import LinkLastfmRequest, LinkLastfmResponse, OAuthCompleteEmailRequest
 from services.auth import create_access_token, create_refresh_token
 from services.lastfm import get_user_info
 
@@ -64,6 +65,7 @@ def _redirect_uri(provider: str, settings: Settings) -> str:
 
 @router.get("/google/login")
 async def google_login(request: Request, response: Response):
+    check_oauth_configured("google")
     settings = get_settings()
     state = secrets.token_urlsafe(32)
 
@@ -118,7 +120,7 @@ async def google_callback(
 
     display_name = profile.get("name") or email
 
-    user = await get_or_create_user_from_google(
+    user, is_new = await get_or_create_user_from_google(
         db, provider_user_id=provider_id, email=email, display_name=display_name
     )
 
@@ -136,12 +138,13 @@ async def google_callback(
 
     set_auth_cookies(response, jwt_access, jwt_refresh)
 
-    frontend_base = settings.cors_origins[0] if settings.cors_origins else "http://localhost:5173"
-    return RedirectResponse(url=f"{frontend_base}/dashboard", status_code=302)
+    redirect_path = "/link-lastfm" if is_new else "/dashboard"
+    return RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
 
 
 @router.get("/discord/login")
 async def discord_login(request: Request, response: Response):
+    check_oauth_configured("discord")
     settings = get_settings()
     state = secrets.token_urlsafe(32)
 
@@ -196,7 +199,29 @@ async def discord_callback(
 
     username = profile.get("username") or email
 
-    user = await get_or_create_user_from_discord(
+    # If Discord didn't provide an email, redirect to email prompt
+    if not email:
+        user, _ = await get_or_create_user_from_discord(
+            db, provider_user_id=provider_id, email=None, display_name=username
+        )
+
+        jwt_access = create_access_token(user.id)
+        jwt_refresh = create_refresh_token(user.id)
+
+        family = str(uuid.uuid4())
+        await _store_refresh_token(db, user.id, jwt_refresh, family, request)
+
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to complete OAuth login")
+
+        set_auth_cookies(response, jwt_access, jwt_refresh)
+
+        return RedirectResponse(url=f"{settings.frontend_url}/auth/callback?needs_email=1", status_code=302)
+
+    user, is_new = await get_or_create_user_from_discord(
         db, provider_user_id=provider_id, email=email, display_name=username
     )
 
@@ -214,8 +239,8 @@ async def discord_callback(
 
     set_auth_cookies(response, jwt_access, jwt_refresh)
 
-    frontend_base = settings.cors_origins[0] if settings.cors_origins else "http://localhost:5173"
-    return RedirectResponse(url=f"{frontend_base}/dashboard", status_code=302)
+    redirect_path = "/link-lastfm" if is_new else "/dashboard"
+    return RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
 
 
 @router.post("/link-lastfm", response_model=LinkLastfmResponse)
@@ -268,3 +293,30 @@ async def link_lastfm(
         raise HTTPException(status_code=500, detail="Failed to link Last.fm account")
 
     return LinkLastfmResponse(username=username, image=info.get("image"))
+
+
+@router.post("/oauth/complete-email")
+async def complete_oauth_email(
+    body: OAuthCompleteEmailRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set email for users who signed up via Discord without an email."""
+    existing = await get_user_by_email(db, body.email)
+    if existing is not None and existing.id != current_user.id:
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists",
+        )
+
+    current_user.email = body.email
+    current_user.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update email")
+
+    return {"detail": "Email updated"}

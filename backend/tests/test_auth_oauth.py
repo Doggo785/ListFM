@@ -1,6 +1,6 @@
 """Tests for OAuth redirect endpoints and /api/auth/link-lastfm."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
@@ -28,25 +28,289 @@ async def _register_and_login(client: AsyncClient, email: str, password: str = "
 
 
 # ===========================================================================
-# OAuth redirect tests
+# OAuth key validation tests
 # ===========================================================================
 
 
 @pytest.mark.asyncio
-async def test_google_login_redirect(client: AsyncClient):
-    """GET /api/auth/google/login should redirect (302) or error — never 200."""
+async def test_google_login_no_keys(client: AsyncClient):
+    """GET /api/auth/google/login without configured keys returns 400."""
     resp = await client.get("/api/auth/google/login")
-    # In test env there are no real OAuth creds, so the endpoint may 500
-    # or successfully build a redirect URL. Both are acceptable — just
-    # confirm it does NOT silently succeed with 200.
-    assert resp.status_code != 200
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "google OAuth is not configured"
 
 
 @pytest.mark.asyncio
-async def test_discord_login_redirect(client: AsyncClient):
-    """GET /api/auth/discord/login should redirect (302) or error — never 200."""
+async def test_discord_login_no_keys(client: AsyncClient):
+    """GET /api/auth/discord/login without configured keys returns 400."""
     resp = await client.get("/api/auth/discord/login")
-    assert resp.status_code != 200
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "discord OAuth is not configured"
+
+
+# ===========================================================================
+# OAuth callback tests (mocked httpx-oauth)
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_google_callback_new_user(client: AsyncClient):
+    """Google callback for a new user redirects to /link-lastfm."""
+    email = _unique_email()
+    try:
+        with (
+            patch.object(
+                AsyncMock,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch.object(
+                AsyncMock,
+                "get_id_email",
+                return_value=("google_12345", email),
+            ),
+            patch.object(
+                AsyncMock,
+                "get_profile",
+                return_value={"name": "Test User"},
+            ),
+        ):
+            resp = await client.get(
+                "/api/auth/google/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/link-lastfm" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_google_callback_returning_user(client: AsyncClient):
+    """Google callback for an existing user redirects to /dashboard."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        with (
+            patch.object(
+                AsyncMock,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch.object(
+                AsyncMock,
+                "get_id_email",
+                return_value=("google_12345", email),
+            ),
+            patch.object(
+                AsyncMock,
+                "get_profile",
+                return_value={"name": "Test User"},
+            ),
+        ):
+            resp = await client.get(
+                "/api/auth/google/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/dashboard" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_discord_callback_no_email(client: AsyncClient):
+    """Discord callback without email redirects to needs_email=1."""
+    with (
+        patch.object(
+            AsyncMock,
+            "get_access_token",
+            return_value={"access_token": "fake_token"},
+        ),
+        patch.object(
+            AsyncMock,
+            "get_id_email",
+            return_value=("discord_12345", None),
+        ),
+        patch.object(
+            AsyncMock,
+            "get_profile",
+            return_value={"username": "discord_user"},
+        ),
+    ):
+        resp = await client.get(
+            "/api/auth/discord/callback?code=fakecode&state=fakestate",
+            cookies={"oauth_state": "fakestate"},
+        )
+    assert resp.status_code == 302
+    assert "needs_email=1" in resp.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_discord_callback_new_user(client: AsyncClient):
+    """Discord callback with email for a new user redirects to /link-lastfm."""
+    email = _unique_email()
+    try:
+        with (
+            patch.object(
+                AsyncMock,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch.object(
+                AsyncMock,
+                "get_id_email",
+                return_value=("discord_12345", email),
+            ),
+            patch.object(
+                AsyncMock,
+                "get_profile",
+                return_value={"username": "discord_user"},
+            ),
+        ):
+            resp = await client.get(
+                "/api/auth/discord/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/link-lastfm" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_discord_callback_returning_user(client: AsyncClient):
+    """Discord callback with email for an existing user redirects to /dashboard."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        with (
+            patch.object(
+                AsyncMock,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch.object(
+                AsyncMock,
+                "get_id_email",
+                return_value=("discord_12345", email),
+            ),
+            patch.object(
+                AsyncMock,
+                "get_profile",
+                return_value={"username": "discord_user"},
+            ),
+        ):
+            resp = await client.get(
+                "/api/auth/discord/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/dashboard" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+# ===========================================================================
+# OAuth callback error cases
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_google_callback_missing_code(client: AsyncClient):
+    """Google callback without code returns 400."""
+    resp = await client.get("/api/auth/google/callback")
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Missing authorization code"
+
+
+@pytest.mark.asyncio
+async def test_google_callback_invalid_state(client: AsyncClient):
+    """Google callback with wrong state returns 403."""
+    resp = await client.get(
+        "/api/auth/google/callback?code=xxx&state=wrong",
+        cookies={"oauth_state": "expected_state"},
+    )
+    assert resp.status_code == 403
+    assert "Invalid or expired OAuth state" in resp.json()["detail"]
+
+
+# ===========================================================================
+# /api/auth/oauth/complete-email tests
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_complete_email_success(client: AsyncClient):
+    """POST /api/auth/oauth/complete-email updates user email."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        new_email = _unique_email()
+        resp = await client.post(
+            "/api/auth/oauth/complete-email",
+            json={"email": new_email},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["detail"] == "Email updated"
+
+        me_resp = await client.get("/api/auth/me")
+        assert me_resp.status_code == 200
+        assert me_resp.json()["email"] == new_email
+    finally:
+        await _cleanup_user(email=email)
+        await _cleanup_user(email=new_email)
+
+
+@pytest.mark.asyncio
+async def test_complete_email_duplicate(client: AsyncClient):
+    """POST /api/auth/oauth/complete-email with taken email returns 409."""
+    email1 = _unique_email()
+    email2 = _unique_email()
+    try:
+        await _register_and_login(client, email1)
+        # Create a second user
+        await _register_and_login(client, email2)
+
+        # Try to set email2's email to email1's email
+        resp = await client.post(
+            "/api/auth/oauth/complete-email",
+            json={"email": email1},
+        )
+        assert resp.status_code == 409
+        assert "already exists" in resp.json()["detail"]
+    finally:
+        await _cleanup_user(email=email1)
+        await _cleanup_user(email=email2)
+
+
+@pytest.mark.asyncio
+async def test_complete_email_no_auth(client: AsyncClient):
+    """POST /api/auth/oauth/complete-email without auth returns 401."""
+    resp = await client.post(
+        "/api/auth/oauth/complete-email",
+        json={"email": "test@example.com"},
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_complete_email_invalid_format(client: AsyncClient):
+    """POST /api/auth/oauth/complete-email with invalid email returns 422."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        resp = await client.post(
+            "/api/auth/oauth/complete-email",
+            json={"email": "not-an-email"},
+        )
+        assert resp.status_code == 422
+    finally:
+        await _cleanup_user(email=email)
 
 
 # ===========================================================================

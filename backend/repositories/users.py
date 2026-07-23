@@ -124,9 +124,10 @@ async def get_or_create_user_from_google(
     provider_user_id: str,
     email: str | None = None,
     display_name: str | None = None,
-) -> User:
+) -> tuple[User, bool]:
     """Look up user by Google provider_user_id, or create a new one.
 
+    Returns (User, is_new) where is_new=True when a new user is created.
     Caller is responsible for committing the session.
     """
     now = datetime.now(timezone.utc)
@@ -142,7 +143,7 @@ async def get_or_create_user_from_google(
     )
     existing = result.scalar_one_or_none()
     if existing is not None:
-        return existing
+        return existing, False
 
     if email:
         result = await db.execute(
@@ -159,7 +160,7 @@ async def get_or_create_user_from_google(
             )
             db.add(auth_provider)
             await db.flush()
-            return user
+            return user, False
 
     user = User(
         id=str(uuid.uuid4()),
@@ -183,7 +184,7 @@ async def get_or_create_user_from_google(
     db.add(auth_provider)
     await db.flush()
     await db.refresh(user)
-    return user
+    return user, True
 
 
 async def get_or_create_user_from_discord(
@@ -191,9 +192,10 @@ async def get_or_create_user_from_discord(
     provider_user_id: str,
     email: str | None = None,
     display_name: str | None = None,
-) -> User:
+) -> tuple[User, bool]:
     """Look up user by Discord provider_user_id, or create a new one.
 
+    Returns (User, is_new) where is_new=True when a new user is created.
     Caller is responsible for committing the session.
     """
     now = datetime.now(timezone.utc)
@@ -209,7 +211,7 @@ async def get_or_create_user_from_discord(
     )
     existing = result.scalar_one_or_none()
     if existing is not None:
-        return existing
+        return existing, False
 
     if email:
         result = await db.execute(
@@ -226,7 +228,7 @@ async def get_or_create_user_from_discord(
             )
             db.add(auth_provider)
             await db.flush()
-            return user
+            return user, False
 
     user = User(
         id=str(uuid.uuid4()),
@@ -250,7 +252,7 @@ async def get_or_create_user_from_discord(
     db.add(auth_provider)
     await db.flush()
     await db.refresh(user)
-    return user
+    return user, True
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
