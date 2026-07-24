@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import Grainient from "../components/ui/Grainient";
@@ -12,10 +12,17 @@ function LinkLastfm() {
   const { linkLastfm, isLastfmLinked } = useAuth();
   const navigate = useNavigate();
 
+  // Render-level guard: redirect immediately if already linked
+  // Must be here, before the form renders, to prevent any flash
+  if (isLastfmLinked) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   useEffect(() => {
     document.title = "Link Last.fm - ListFM";
   }, []);
 
+  // Fallback useEffect guard in case isLastfmLinked changes after mount
   useEffect(() => {
     if (isLastfmLinked) {
       navigate("/dashboard");

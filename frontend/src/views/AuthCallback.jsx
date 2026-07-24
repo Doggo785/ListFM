@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "motion/react";
 import Grainient from "../components/ui/Grainient";
+import { useAuth } from "../contexts/AuthContext";
 
 function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isLastfmLinked } = useAuth();
   const [error, setError] = useState(null);
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -52,7 +54,12 @@ function AuthCallback() {
         throw new Error(data.detail || "Failed to save email. Please try again.");
       }
 
-      navigate("/link-lastfm", { replace: true });
+      // If the user already has a linked Last.fm account, skip the linking page
+      if (isLastfmLinked) {
+        navigate("/dashboard", { replace: true });
+      } else {
+        navigate("/link-lastfm", { replace: true });
+      }
     } catch (err) {
       setError(err.message);
     } finally {

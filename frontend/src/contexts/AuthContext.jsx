@@ -51,8 +51,25 @@ export function AuthProvider({ children }) {
       method: "POST",
       body: JSON.stringify({ username }),
     });
-    await checkSession();
-  }, [checkSession]);
+    // Optimistically update state so isLastfmLinked is true immediately
+    // This prevents the linking page from staying visible or the dashboard
+    // from showing "No Last.fm account linked" if the refresh call fails.
+    setUser((prev) =>
+      prev ? { ...prev, lastfm_username: username, is_lastfm_linked: true } : prev
+    );
+    setCurrentUsername(username);
+    // Refresh session with actual server data — failure is non-fatal
+    // because we already optimistically applied the linking above
+    try {
+      const data = await request("/api/auth/me");
+      setUser(data);
+      setCurrentUsername(data.lastfm_username || null);
+    } catch {
+      // Session fetch failed, but the linking itself succeeded on the backend.
+      // Optimistic state keeps the user correctly identified as linked.
+      // Real data will be fetched on next app load.
+    }
+  }, []);
 
   const isLastfmLinked = !!user?.lastfm_username;
 
