@@ -1,8 +1,11 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from models.user import User
 from models.auth_provider import AuthProvider
@@ -140,7 +143,10 @@ async def _get_or_create_user_from_provider(
 
     if email:
         result = await db.execute(
-            select(User).where(User.email == email, User.deleted_at.is_(None))
+            select(User).where(
+                func.lower(User.email) == email.lower(),
+                User.deleted_at.is_(None),
+            )
         )
         user = result.scalar_one_or_none()
         if user is not None:
@@ -154,6 +160,12 @@ async def _get_or_create_user_from_provider(
             db.add(auth_provider)
             await db.flush()
             return user, False
+
+    logger.warning(
+        "Creating new user for provider=%s provider_user_id=%s email=%s display_name=%s — "
+        "no existing user found by provider or email. This may indicate a duplicate account.",
+        provider, provider_user_id, email, display_name,
+    )
 
     user = User(
         id=str(uuid.uuid4()),
@@ -177,6 +189,11 @@ async def _get_or_create_user_from_provider(
     db.add(auth_provider)
     await db.flush()
     await db.refresh(user)
+
+    logger.info(
+        "Created new user id=%s via provider=%s provider_user_id=%s",
+        user.id, provider, provider_user_id,
+    )
     return user, True
 
 

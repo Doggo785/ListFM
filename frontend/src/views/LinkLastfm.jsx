@@ -44,7 +44,7 @@ function LinkLastfm() {
 
   return (
     <main className="flex-1 flex items-center justify-center bg-[#121212] min-h-screen px-4">
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden opacity-45">
         <Grainient
           color1="#FF6817"
           color2="#17AEFF"
@@ -87,7 +87,7 @@ function LinkLastfm() {
           <h1 className="text-3xl font-bold text-white tracking-tight">
             Link your Last.fm account
           </h1>
-          <p className="text-neutral-500 text-sm mt-2">
+          <p className="text-neutral-400 text-sm mt-2">
             Enter your Last.fm username to connect your listening history
           </p>
         </div>
