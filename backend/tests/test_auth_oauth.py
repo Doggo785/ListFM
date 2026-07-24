@@ -14,6 +14,7 @@ from sqlalchemy import select
 from models.auth_provider import AuthProvider
 from models.user import User
 
+from config import Settings
 from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
 
 
@@ -44,7 +45,15 @@ async def _register_and_login(client: AsyncClient, email: str, password: str = "
 @pytest.mark.asyncio
 async def test_google_login_no_keys(client: AsyncClient):
     """GET /api/auth/google/login without configured keys returns 400."""
-    resp = await client.get("/api/auth/google/login")
+    with patch("routers.auth_oauth.get_settings") as mock_get_settings:
+        mock_get_settings.return_value = Settings(
+            lastfm_api_key="test",
+            lastfm_api_secret="test",
+            jwt_secret="a" * 32,
+            google_oauth_client_id="",
+            google_oauth_client_secret="",
+        )
+        resp = await client.get("/api/auth/google/login")
     assert resp.status_code == 400
     assert resp.json()["detail"] == "google OAuth is not configured"
 
@@ -52,7 +61,15 @@ async def test_google_login_no_keys(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_discord_login_no_keys(client: AsyncClient):
     """GET /api/auth/discord/login without configured keys returns 400."""
-    resp = await client.get("/api/auth/discord/login")
+    with patch("routers.auth_oauth.get_settings") as mock_get_settings:
+        mock_get_settings.return_value = Settings(
+            lastfm_api_key="test",
+            lastfm_api_secret="test",
+            jwt_secret="a" * 32,
+            discord_oauth_client_id="",
+            discord_oauth_client_secret="",
+        )
+        resp = await client.get("/api/auth/discord/login")
     assert resp.status_code == 400
     assert resp.json()["detail"] == "discord OAuth is not configured"
 
