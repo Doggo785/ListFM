@@ -21,7 +21,10 @@ async def get_user_by_id(db: AsyncSession, user_id: str) -> User | None:
 
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
     result = await db.execute(
-        select(User).where(User.email == email, User.deleted_at.is_(None))
+        select(User).where(
+            func.lower(User.email) == email.lower(),
+            User.deleted_at.is_(None),
+        )
     )
     return result.scalar_one_or_none()
 
