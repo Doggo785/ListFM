@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -20,7 +21,13 @@ from models.playlist_track import PlaylistTrack
 from models.refresh_token import RefreshToken
 from models.user import User
 
-TEST_DB_URL = "postgresql+asyncpg://listfm:listfm@localhost:5432/listfm"
+# Dedicated throwaway database — NEVER point tests at the production/dev "listfm"
+# database: the _cleanup_db fixture deletes every row before/after each test.
+# Override with TEST_DATABASE_URL when the default is not available.
+TEST_DB_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://listfm:listfm@localhost:5432/listfm_test",
+)
 _test_engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
 _TestSessionLocal = async_sessionmaker(_test_engine, class_=AsyncSession, expire_on_commit=False)
 
