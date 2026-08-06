@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -124,6 +125,7 @@ async def _get_or_create_user_from_provider(
     provider_user_id: str,
     email: str | None = None,
     display_name: str | None = None,
+    email_verified: bool = False,
 ) -> tuple[User, bool]:
     """Returns (User, is_new) where is_new=True when created.
 
@@ -153,6 +155,11 @@ async def _get_or_create_user_from_provider(
         )
         user = result.scalar_one_or_none()
         if user is not None:
+            if not email_verified:
+                raise HTTPException(
+                    status_code=409,
+                    detail="An account with this email already exists",
+                )
             auth_provider = AuthProvider(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
@@ -174,7 +181,7 @@ async def _get_or_create_user_from_provider(
         id=str(uuid.uuid4()),
         email=email,
         role="user",
-        email_verified=False,
+        email_verified=email_verified,
         display_name=display_name,
         created_at=now,
         updated_at=now,
@@ -205,9 +212,12 @@ async def get_or_create_user_from_google(
     provider_user_id: str,
     email: str | None = None,
     display_name: str | None = None,
+    email_verified: bool = False,
 ) -> tuple[User, bool]:
     """Caller is responsible for committing the session."""
-    return await _get_or_create_user_from_provider(db, "google", provider_user_id, email, display_name)
+    return await _get_or_create_user_from_provider(
+        db, "google", provider_user_id, email, display_name, email_verified
+    )
 
 
 async def get_or_create_user_from_discord(
@@ -215,9 +225,12 @@ async def get_or_create_user_from_discord(
     provider_user_id: str,
     email: str | None = None,
     display_name: str | None = None,
+    email_verified: bool = False,
 ) -> tuple[User, bool]:
     """Caller is responsible for committing the session."""
-    return await _get_or_create_user_from_provider(db, "discord", provider_user_id, email, display_name)
+    return await _get_or_create_user_from_provider(
+        db, "discord", provider_user_id, email, display_name, email_verified
+    )
 
 
 async def delete_user(db: AsyncSession, user_id: str) -> bool:

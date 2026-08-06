@@ -136,6 +136,7 @@ async def test_google_callback_returning_user(client: AsyncClient):
                 "id": "google_12345",
                 "email": email,
                 "name": "Test User",
+                "verified_email": True,
             })
             mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
             resp = await client.get(
@@ -226,6 +227,7 @@ async def test_discord_callback_returning_user(client: AsyncClient):
                     "id": "discord_12345",
                     "username": "discord_user",
                     "email": email,
+                    "verified": True,
                 },
             ),
         ):
@@ -281,6 +283,137 @@ async def test_discord_callback_returning_user_no_email_from_discord(client: Asy
             )
         assert resp.status_code == 302
         assert "/dashboard" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+# ===========================================================================
+# email_verified propagation (account-takeover protection)
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_google_callback_existing_user_unverified_email_blocked(client: AsyncClient):
+    """Google callback claiming an existing user's email with verified_email=False returns 409 and does not bind."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        with (
+            patch.object(
+                GoogleOAuth2,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
+        ):
+            mock_resp = _MockGoogleResponse(200, {
+                "id": "google_attacker_123",
+                "email": email,
+                "name": "Attacker",
+                "verified_email": False,
+            })
+            mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
+            resp = await client.get(
+                "/api/auth/google/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == "An account with this email already exists"
+        assert "access_token" not in resp.cookies
+
+        # No takeover: the attacker's provider id must NOT be bound to the victim's account.
+        async with _TestSessionLocal() as db:
+            result = await db.execute(
+                select(AuthProvider).where(
+                    AuthProvider.provider == "google",
+                    AuthProvider.provider_user_id == "google_attacker_123",
+                )
+            )
+            assert result.scalar_one_or_none() is None
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_discord_callback_existing_user_unverified_email_blocked(client: AsyncClient):
+    """Discord callback claiming an existing user's email with verified=False returns 409 and does not bind."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        with (
+            patch.object(
+                DiscordOAuth2,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch.object(
+                DiscordOAuth2,
+                "get_profile",
+                return_value={
+                    "id": "discord_attacker_123",
+                    "username": "attacker",
+                    "email": email,
+                    "verified": False,
+                },
+            ),
+        ):
+            resp = await client.get(
+                "/api/auth/discord/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == "An account with this email already exists"
+        assert "access_token" not in resp.cookies
+
+        # No takeover: the attacker's provider id must NOT be bound to the victim's account.
+        async with _TestSessionLocal() as db:
+            result = await db.execute(
+                select(AuthProvider).where(
+                    AuthProvider.provider == "discord",
+                    AuthProvider.provider_user_id == "discord_attacker_123",
+                )
+            )
+            assert result.scalar_one_or_none() is None
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_google_callback_new_user_verified_email_persisted(client: AsyncClient):
+    """Google callback with verified_email=True persists email_verified=True on the new user."""
+    email = _unique_email()
+    try:
+        with (
+            patch.object(
+                GoogleOAuth2,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
+        ):
+            mock_resp = _MockGoogleResponse(200, {
+                "id": "google_12345",
+                "email": email,
+                "name": "Test User",
+                "verified_email": True,
+            })
+            mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
+            resp = await client.get(
+                "/api/auth/google/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/link-lastfm" in resp.headers["location"]
+
+        async with _TestSessionLocal() as db:
+            result = await db.execute(select(User).where(User.email == email))
+            user = result.scalar_one_or_none()
+            assert user is not None
+            assert user.email_verified is True
     finally:
         await _cleanup_user(email=email)
 

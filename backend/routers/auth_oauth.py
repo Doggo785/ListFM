@@ -76,11 +76,14 @@ async def _extract_oauth_profile(
     client: GoogleOAuth2 | DiscordOAuth2,
     access_token: str,
     provider: str,
-) -> tuple[str, str | None, dict]:
-    """Fetch OAuth profile once and extract (provider_id, email, profile_dict).
+) -> tuple[str, str | None, bool, dict]:
+    """Fetch OAuth profile once and extract (provider_id, email, email_verified, profile).
 
     For Google, uses the userinfo endpoint (no People API required).
     For Discord, uses the httpx-oauth client's get_profile().
+
+    email_verified mirrors the provider's email-verification claim
+    (Google: verified_email, Discord: verified; absent means False).
     """
     if provider == "google":
         async with httpx.AsyncClient() as http:
@@ -96,13 +99,15 @@ async def _extract_oauth_profile(
             profile = resp.json()
         provider_id = profile.get("id", "")
         email = profile.get("email")
+        email_verified = profile.get("verified_email", False) is True
     elif provider == "discord":
         profile = await client.get_profile(access_token)
         provider_id = profile.get("id", "")
         email = profile.get("email")
+        email_verified = profile.get("verified", False) is True
     else:
         raise ValueError(f"Unknown provider: {provider}")
-    return provider_id, email, profile
+    return provider_id, email, email_verified, profile
 
 
 async def _finalize_oauth_login(
@@ -185,12 +190,12 @@ async def google_callback(
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
     access_token = token["access_token"]
-    provider_id, email, profile = await _extract_oauth_profile(client, access_token, "google")
+    provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "google")
 
     display_name = profile.get("name") or email
 
     user, is_new = await get_or_create_user_from_google(
-        db, provider_user_id=provider_id, email=email, display_name=display_name
+        db, provider_user_id=provider_id, email=email, display_name=display_name, email_verified=email_verified
     )
 
     return await _finalize_oauth_login(db, request, user, is_new, settings)
@@ -245,20 +250,20 @@ async def discord_callback(
         raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
 
     access_token = token["access_token"]
-    provider_id, email, profile = await _extract_oauth_profile(client, access_token, "discord")
+    provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "discord")
 
     username = profile.get("username") or email
 
     if not email:
         user, is_new = await get_or_create_user_from_discord(
-            db, provider_user_id=provider_id, email=None, display_name=username
+            db, provider_user_id=provider_id, email=None, display_name=username, email_verified=False
         )
         if user.email is not None:
             return await _finalize_oauth_login(db, request, user, is_new=False, settings=settings)
         return await _finalize_oauth_login(db, request, user, is_new=is_new, settings=settings, needs_email=True)
 
     user, is_new = await get_or_create_user_from_discord(
-        db, provider_user_id=provider_id, email=email, display_name=username
+        db, provider_user_id=provider_id, email=email, display_name=username, email_verified=email_verified
     )
 
     return await _finalize_oauth_login(db, request, user, is_new, settings)
