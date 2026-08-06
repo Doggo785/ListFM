@@ -15,6 +15,9 @@ PERIOD_MAP = {
 def get_user_info(username: str) -> dict:
     network = get_network()
     user = network.get_user(username)
+    # Force a real API call so a non-existent username raises pylast.WSError
+    # instead of being silently swallowed (which let link-lastfm accept any name).
+    user.get_playcount()
     try:
         image_url = user.get_image(size=pylast.SIZE_LARGE)
     except Exception:
