@@ -12,12 +12,6 @@ function LinkLastfm() {
   const { linkLastfm, isLastfmLinked } = useAuth();
   const navigate = useNavigate();
 
-  // Render-level guard: redirect immediately if already linked
-  // Must be here, before the form renders, to prevent any flash
-  if (isLastfmLinked) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   useEffect(() => {
     document.title = "Link Last.fm - ListFM";
   }, []);
@@ -28,6 +22,12 @@ function LinkLastfm() {
       navigate("/dashboard");
     }
   }, [isLastfmLinked, navigate]);
+
+  // Render-level guard: redirect immediately if already linked
+  // Must be here, before the form renders, to prevent any flash
+  if (isLastfmLinked) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();

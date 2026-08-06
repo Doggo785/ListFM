@@ -87,6 +87,85 @@ function Dashboard() {
   const isFirstVisit = lastVisit === null;
   const [automations, setAutomations] = useState([]);
 
+  useEffect(() => {
+    if (!username) return;
+    const load = async () => {
+      try {
+        const data = await getAutomations();
+        setAutomations(data);
+      } catch {
+        // Automations silently fail; dashboard still renders without them.
+      }
+    };
+    load();
+  }, [username]);
+
+  useEffect(() => {
+    if (!username) return;
+    document.title = `${username} - ListFM`;
+  }, [username]);
+
+  useEffect(() => {
+    if (!username) return;
+    getUserInfo()
+      .then(async (data) => {
+        const img = data?.image || null;
+        setAvatar(img);
+        if (img) {
+          const palette = await extractColors(img);
+          setRingColors(pickRingColors(palette));
+        }
+      })
+      .catch(() => setAvatar(null));
+  }, [username]);
+
+  useEffect(() => {
+    if (!username) return;
+    const fetchRecentTracks = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getRecentTracks(50);
+        setPlaylist(data.tracks);
+      } catch {
+        setError("Failed to fetch data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRecentTracks();
+  }, [username]);
+
+  const stats = useMemo(() => {
+    if (!username) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
+    if (!playlist.length) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
+    const artists = new Set();
+    const albums = new Set();
+    const artistCounts = {};
+    playlist.forEach((t) => {
+      artists.add(t.artist);
+      if (t.album) albums.add(t.album);
+      artistCounts[t.artist] = (artistCounts[t.artist] || 0) + 1;
+    });
+    const sorted = Object.entries(artistCounts).sort((a, b) => b[1] - a[1]);
+    const topArtist = sorted[0] ? { name: sorted[0][0], plays: sorted[0][1] } : null;
+    return { tracks: playlist.length, artists: artists.size, albums: albums.size, topArtist };
+  }, [username, playlist]);
+
+  const automationCards = useMemo(() => {
+    if (!username) return [];
+    return automations.map((auto) => {
+      const name = auto.name || "Untitled";
+      const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
+      return {
+        id: auto.id,
+        title: name,
+        image: getPlaylistImageSrc(name, auto.source?.type),
+        description: buildDescription(auto),
+        glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
+      };
+    });
+  }, [username, automations]);
+
   if (!username) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
@@ -103,79 +182,6 @@ function Dashboard() {
       </div>
     );
   }
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await getAutomations();
-        setAutomations(data);
-      } catch {
-        // Automations silently fail; dashboard still renders without them.
-      }
-    };
-    load();
-  }, [username]);
-
-  useEffect(() => {
-    document.title = `${username} - ListFM`;
-  }, [username]);
-
-  useEffect(() => {
-    getUserInfo()
-      .then(async (data) => {
-        const img = data?.image || null;
-        setAvatar(img);
-        if (img) {
-          const palette = await extractColors(img);
-          setRingColors(pickRingColors(palette));
-        }
-      })
-      .catch(() => setAvatar(null));
-  }, [username]);
-
-  useEffect(() => {
-    const fetchRecentTracks = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getRecentTracks(50);
-        setPlaylist(data.tracks);
-      } catch {
-        setError("Failed to fetch data.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchRecentTracks();
-  }, [username]);
-
-  const stats = useMemo(() => {
-    if (!playlist.length) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
-    const artists = new Set();
-    const albums = new Set();
-    const artistCounts = {};
-    playlist.forEach((t) => {
-      artists.add(t.artist);
-      if (t.album) albums.add(t.album);
-      artistCounts[t.artist] = (artistCounts[t.artist] || 0) + 1;
-    });
-    const sorted = Object.entries(artistCounts).sort((a, b) => b[1] - a[1]);
-    const topArtist = sorted[0] ? { name: sorted[0][0], plays: sorted[0][1] } : null;
-    return { tracks: playlist.length, artists: artists.size, albums: albums.size, topArtist };
-  }, [playlist]);
-
-  const automationCards = useMemo(() => {
-    return automations.map((auto) => {
-      const name = auto.name || "Untitled";
-      const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
-      return {
-        id: auto.id,
-        title: name,
-        image: getPlaylistImageSrc(name, auto.source?.type),
-        description: buildDescription(auto),
-        glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
-      };
-    });
-  }, [automations]);
 
   if (isLoading) {
     return (

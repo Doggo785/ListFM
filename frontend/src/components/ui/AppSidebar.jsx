@@ -22,7 +22,6 @@ function AppSidebar({ userLabel = "User", activePage = "home" }) {
 
   useEffect(() => {
     if (!username) return;
-    setAvatar(null);
     getUserInfo()
       .then((data) => setAvatar(data?.image || null))
       .catch(() => setAvatar(null));
