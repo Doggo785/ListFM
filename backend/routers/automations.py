@@ -23,7 +23,7 @@ from services.lastfm import (
 router = APIRouter(prefix="/api", tags=["automations"])
 
 
-@router.post("/preview")
+@router.post("/automations/preview")
 def preview_automation(
     body: dict,
     username: str = Depends(get_current_user_lastfm_username),
@@ -45,13 +45,16 @@ def preview_automation(
             case "top_artists":
                 tracks = get_top_artists_tracks(username, period, limit)
             case _:
-                return {"error": f"Unknown source type: {source_type}"}
+                raise HTTPException(status_code=422, detail="Unsupported source type")
 
         tracks = deduplicate(tracks)
         tracks = enrich_tracks(username, tracks, max_enrich=limit)
-        return {"tracks": tracks, "total": len(tracks)}
-    except Exception as e:
-        return {"error": str(e)}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="Unable to fetch tracks from Last.fm")
+
+    return {"tracks": tracks, "total": len(tracks)}
 
 
 @router.get("/automations", response_model=list[AutomationRead])
