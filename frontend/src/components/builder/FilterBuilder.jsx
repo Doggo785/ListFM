@@ -288,7 +288,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
               <input
                 type="number"
                 value={condition.valueMax ?? ""}
-                onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
+                onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? null : Number(e.target.value) })}
                 placeholder="e.g. 50"
                 min="1"
                 className={`flex-1 ${INPUT_CLASSES}`}
@@ -314,7 +314,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
             <input
               type="number"
               value={condition.valueMax ?? ""}
-              onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? "" : Number(e.target.value) })}
+              onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? null : Number(e.target.value) })}
               placeholder="Max"
               className={`flex-1 ${INPUT_CLASSES}`}
             />

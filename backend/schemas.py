@@ -160,9 +160,11 @@ class AutomationCreate(BaseModel):
     description: str = ""
     source: AutomationSource
     cron: str = ""
-    filter_groups: FilterGroups = Field(default_factory=list)
+    filter_groups: FilterGroups = Field(default_factory=list, alias="filterGroups")
     output: dict = {"maxSize": 50}
     enabled: bool = True
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class AutomationUpdate(BaseModel):
@@ -170,9 +172,11 @@ class AutomationUpdate(BaseModel):
     description: Optional[str] = None
     source: Optional[AutomationSource] = None
     cron: Optional[str] = None
-    filter_groups: Optional[FilterGroups] = None
+    filter_groups: Optional[FilterGroups] = Field(default=None, alias="filterGroups")
     output: Optional[dict] = None
     enabled: Optional[bool] = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class AutomationRead(BaseModel):
@@ -183,14 +187,14 @@ class AutomationRead(BaseModel):
     description: Optional[str] = None
     source: AutomationSource
     cron: Optional[str] = None
-    filter_groups: FilterGroups
+    filter_groups: FilterGroups = Field(alias="filterGroups")
     output: dict
     enabled: bool
     created_at: datetime
     updated_at: datetime
     last_run: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     @model_validator(mode="before")
     @classmethod
