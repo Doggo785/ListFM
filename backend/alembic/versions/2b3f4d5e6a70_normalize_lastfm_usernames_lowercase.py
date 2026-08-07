@@ -1,6 +1,6 @@
 """normalize last.fm usernames to lowercase
 
-Revision ID: 2b3f4d5e6f70
+Revision ID: 2b3f4d5e6a70
 Revises: 25bb6ac10ad1
 Create Date: 2026-08-06 12:00:00.000000
 

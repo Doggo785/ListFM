@@ -4,6 +4,11 @@ Revision ID: 25bb6ac10ad1
 Revises: fb0adb70809f
 Create Date: 2026-07-23 15:00:00.000000
 
+NOTE: this non-unique index is redundant with the UNIQUE index
+idx_auth_providers_provider_user on (provider, provider_user_id) created by
+f0e1d2c3b4a5. It is kept for history/back-compat only; do not rely on it for
+uniqueness. Uniqueness integrity (op integrity, 409 on duplicate link) comes
+from the base migration's UNIQUE index, not from this one.
 """
 from typing import Sequence, Union
 
