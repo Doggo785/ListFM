@@ -218,24 +218,20 @@ export default function PlaylistDetail() {
     setRawTracks(null);
     try {
       const data = await previewAutomation(automation);
-      if (data.error) {
-        setPreviewError(data.error);
-      } else {
-        const enriched = data.tracks || [];
-        setRawTracks(enriched);
-        const filtered = applyFilterGroups(enriched, automation.filterGroups);
-        setPreviewTracks(filtered);
+      const enriched = data.tracks || [];
+      setRawTracks(enriched);
+      const filtered = applyFilterGroups(enriched, automation.filterGroups);
+      setPreviewTracks(filtered);
 
-        // Auto-save to library (fire-and-forget)
-        saveGeneratedPlaylist({
-          automation_id: automation.id,
-          source_type: automation.source?.type,
-          source_period: automation.source?.period,
-          tracks: filtered,
-          track_count: filtered.length,
-          filter_groups: automation.filterGroups || [],
-        }).catch(() => {});
-      }
+      // Auto-save to library (fire-and-forget)
+      saveGeneratedPlaylist({
+        automation_id: automation.id,
+        source_type: automation.source?.type,
+        source_period: automation.source?.period,
+        tracks: filtered,
+        track_count: filtered.length,
+        filter_groups: automation.filterGroups || [],
+      }).catch(() => {});
     } catch (err) {
       setPreviewError(err.message || "Failed to load preview");
     } finally {

@@ -57,7 +57,16 @@ export async function request(path, options = {}) {
   }
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API ${res.status}: ${body}`);
+    let message = body;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed === "object") {
+        message = parsed.detail ?? parsed.error ?? body;
+      }
+    } catch {
+      // body is not JSON — fall back to raw text
+    }
+    throw new Error(`API ${res.status}: ${message}`);
   }
   if (res.status === 204) return null;
   return res.json();
