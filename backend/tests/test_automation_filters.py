@@ -4,7 +4,11 @@ Covers:
 - create -> read round-trips the full nested filter tree losslessly
 - malformed filter trees (unknown field / impossible value type) are rejected
   with 422 (proving server-side validation)
-- PATCH updates filter_groups
+- the wire contract accepts the frontend camelCase filterGroups key and
+  serializes responses with it (PlaylistDetail reads automation.filterGroups)
+- snake_case filter_groups input (legacy callers) still accepted via
+  populate_by_name
+- PATCH updates filter groups
 """
 
 from unittest.mock import patch
@@ -149,12 +153,12 @@ async def test_create_automation_persists_nested_filter_tree(client: AsyncClient
         resp = await client.post("/api/automations", json=_create_body(tree))
         assert resp.status_code == 201
         created = resp.json()
-        assert created["filter_groups"] == tree
+        assert created["filterGroups"] == tree
 
         automation_id = created["id"]
         got = await client.get(f"/api/automations/{automation_id}")
         assert got.status_code == 200
-        assert got.json()["filter_groups"] == tree
+        assert got.json()["filterGroups"] == tree
     finally:
         await _cleanup_user_with_automations(client, email)
 
@@ -219,9 +223,113 @@ async def test_invalid_condition_value_type_rejected_422(client: AsyncClient):
         await _cleanup_user_with_automations(client, email)
 
 
+def _frontend_payload(filter_groups: list) -> dict:
+    """The EXACT payload the React app sends (camelCase filterGroups, as
+    produced by createDefaultAutomation()/updateAutomation() in the frontend).
+
+    Regression guard: the API must accept the camelCase key AND serialize
+    responses with it, because PlaylistDetail reads automation.filterGroups.
+    """
+    return {
+        "id": "00000000-0000-0000-0000-000000000000",
+        "name": "Filtered playlist",
+        "description": "test",
+        "source": {"type": "top_tracks", "period": "3m"},
+        "cron": "",
+        "filterGroups": filter_groups,
+        "output": {"maxSize": 50},
+        "enabled": True,
+        "createdAt": "2026-01-01T00:00:00Z",
+        "updatedAt": "2026-01-01T00:00:00Z",
+        "lastRun": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_create_automation_accepts_frontend_camelcase_payload(client: AsyncClient):
+    """The frontend posts the tree under the camelCase key filterGroups; it
+    must round-trip create -> read under the same key (PlaylistDetail reads
+    automation.filterGroups on load)."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        tree = _mixed_tree()
+        resp = await client.post("/api/automations", json=_frontend_payload(tree))
+        assert resp.status_code == 201
+        created = resp.json()
+        assert created["filterGroups"] == tree
+
+        automation_id = created["id"]
+        got = await client.get(f"/api/automations/{automation_id}")
+        assert got.status_code == 200
+        assert got.json()["filterGroups"] == tree
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_update_automation_accepts_camelCase_filterGroups(client: AsyncClient):
+    """PATCH must accept the camelCase filterGroups key and return it as that."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post(
+            "/api/automations", json=_create_body(_mixed_tree())
+        )
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        new_tree = [
+            {
+                "id": "g9",
+                "logic": "AND",
+                "conditions": [
+                    {
+                        "id": "c9",
+                        "field": "listeners",
+                        "operator": "gt",
+                        "value": 1000,
+                        "valueMax": None,
+                        "countMin": 0,
+                        "tagSource": "artist",
+                    }
+                ],
+                "groups": [],
+            }
+        ]
+        resp = await client.patch(
+            f"/api/automations/{automation_id}",
+            json={"filterGroups": new_tree},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["filterGroups"] == new_tree
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_snake_case_filter_groups_legacy_input_still_accepted(client: AsyncClient):
+    """Backward-compat: the snake_case key (used by older API callers and the
+    pre-contract tests) must keep working thanks to populate_by_name=True."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        tree = _mixed_tree()
+        resp = await client.post("/api/automations", json=_create_body(tree))
+        assert resp.status_code == 201
+        assert resp.json()["filterGroups"] == tree
+
+        got = await client.get(f"/api/automations/{resp.json()['id']}")
+        assert got.status_code == 200
+        assert got.json()["filterGroups"] == tree
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
 @pytest.mark.asyncio
 async def test_update_automation_filter_groups(client: AsyncClient):
-    """PATCH with new filter_groups must persist and return the updated tree."""
+    """PATCH with new filter_groups (legacy snake input) persists and returns
+    the updated tree under filterGroups."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
@@ -254,6 +362,6 @@ async def test_update_automation_filter_groups(client: AsyncClient):
             json={"filter_groups": new_tree},
         )
         assert resp.status_code == 200
-        assert resp.json()["filter_groups"] == new_tree
+        assert resp.json()["filterGroups"] == new_tree
     finally:
         await _cleanup_user_with_automations(client, email)
