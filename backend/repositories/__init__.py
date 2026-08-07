@@ -2,9 +2,7 @@ from repositories.users import (
     get_user_by_id,
     get_user_by_email,
     get_user_by_lastfm_username,
-    get_lastfm_provider,
     create_user,
-    create_user_from_lastfm,
     update_user,
     delete_user,
 )
@@ -59,7 +57,6 @@ __all__ = [
     "get_user_by_lastfm_username",
     "get_lastfm_provider",
     "create_user",
-    "create_user_from_lastfm",
     "update_user",
     "delete_user",
     # Refresh Tokens

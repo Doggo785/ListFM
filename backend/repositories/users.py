@@ -89,34 +89,6 @@ async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) ->
     return user
 
 
-async def create_user_from_lastfm(db: AsyncSession, lastfm_username: str, access_token: str | None = None) -> User:
-    """Caller is responsible for committing the session."""
-    now = datetime.now(timezone.utc)
-    user = User(
-        id=str(uuid.uuid4()),
-        role="user",
-        email_verified=False,
-        display_name=lastfm_username,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(user)
-    await db.flush()
-
-    auth_provider = AuthProvider(
-        id=str(uuid.uuid4()),
-        user_id=user.id,
-        provider="lastfm",
-        provider_user_id=lastfm_username,
-        access_token=access_token,
-        linked_at=now,
-    )
-    db.add(auth_provider)
-    await db.flush()
-    await db.refresh(user)
-    return user
-
-
 async def update_user(db: AsyncSession, user_id: str, data: UserUpdate) -> User | None:
     """Update a user. Returns None if not found.
 

@@ -36,38 +36,10 @@ class UserLogin(EmailValidatorMixin, BaseModel):
     password: str
 
 
-class UserRead(BaseModel):
-    id: str
-    email: Optional[str] = None
-    role: str
-    email_verified: bool
-    display_name: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    display_name: Optional[str] = None
-    role: str
-    lastfm_username: Optional[str] = None
-    is_lastfm_linked: bool = False
-
-
 class UserUpdate(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     display_name: Optional[str] = None
-
-
-class AuthProviderCreate(BaseModel):
-    provider: Literal["email", "lastfm", "google", "discord"]
-    provider_user_id: str
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
 
 
 class LinkLastfmRequest(BaseModel):
@@ -98,10 +70,6 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-
-
-class TokenRefresh(BaseModel):
-    refresh_token: str
 
 
 class Track(BaseModel):
