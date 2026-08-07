@@ -105,6 +105,22 @@ async def test_me_before_linking(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_list_endpoints_require_linked_account(client: AsyncClient):
+    """GET /api/automations and /api/generated-playlists return 400 before a
+    Last.fm account is linked, consistent with the other user-data endpoints."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        for path in ("/api/automations", "/api/generated-playlists"):
+            resp = await client.get(path)
+            assert resp.status_code == 400
+            assert "Last.fm" in resp.json()["detail"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
 async def test_me_after_linking(client: AsyncClient):
     """/api/auth/me returns is_lastfm_linked: true and lastfm_username after linking."""
     email = _unique_email()
@@ -126,3 +142,57 @@ async def test_me_after_linking(client: AsyncClient):
         assert data["lastfm_username"] == "linked_user"
     finally:
         await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_username_normalized_to_lowercase(client: AsyncClient):
+    """Usernames are stored lowercased so the same Last.fm account can't be
+    claimed twice via casing variants."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        mock_info = {"username": "MixedCase User", "image": None}
+        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
+            resp = await client.post(
+                "/api/auth/link-lastfm",
+                json={"username": "  MixedCase User  "},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["username"] == "mixedcase user"
+
+        me_resp = await client.get("/api/auth/me")
+        assert me_resp.json()["lastfm_username"] == "mixedcase user"
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_case_variant_conflict_detected(client: AsyncClient):
+    """A second user cannot link the same Last.fm account using a different casing."""
+    email1 = _unique_email()
+    email2 = _unique_email()
+    try:
+        await _register_and_login(client, email1)
+        mock_info = {"username": "AcctUser", "image": None}
+        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
+            resp1 = await client.post(
+                "/api/auth/link-lastfm",
+                json={"username": "AcctUser"},
+            )
+        assert resp1.status_code == 200
+        assert resp1.json()["username"] == "acctuser"
+
+        # second user tries a case variant of the same account
+        client.cookies.clear()
+        await _register_and_login(client, email2)
+        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
+            resp2 = await client.post(
+                "/api/auth/link-lastfm",
+                json={"username": "ACCTUSER"},
+            )
+        assert resp2.status_code == 409
+    finally:
+        await _cleanup_user(email=email1)
+        client.cookies.clear()
+        await _cleanup_user(email=email2)

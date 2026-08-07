@@ -10,7 +10,7 @@ from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import Settings, get_settings
@@ -28,6 +28,7 @@ from routers.deps import get_current_active_user, set_auth_cookies
 from schemas import LinkLastfmRequest, LinkLastfmResponse, OAuthCompleteEmailRequest
 from services.auth import create_access_token, create_refresh_token
 from services.lastfm import get_user_info
+from services.rate_limit import complete_email_limiter, link_lastfm_limiter, oauth_login_limiter, rate_limit
 
 router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 
@@ -143,6 +144,7 @@ async def _finalize_oauth_login(
 
 @router.get("/google/login")
 async def google_login(request: Request):
+    rate_limit(request, oauth_login_limiter)
     check_oauth_configured("google")
     settings = get_settings()
     state = secrets.token_urlsafe(32)
@@ -174,6 +176,7 @@ async def google_callback(
     oauth_state: str | None = Cookie(None),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit(request, oauth_login_limiter)
     if code is None:
         raise HTTPException(status_code=400, detail="Missing authorization code")
 
@@ -203,6 +206,7 @@ async def google_callback(
 
 @router.get("/discord/login")
 async def discord_login(request: Request):
+    rate_limit(request, oauth_login_limiter)
     check_oauth_configured("discord")
     settings = get_settings()
     state = secrets.token_urlsafe(32)
@@ -234,6 +238,7 @@ async def discord_callback(
     oauth_state: str | None = Cookie(None),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit(request, oauth_login_limiter)
     if code is None:
         raise HTTPException(status_code=400, detail="Missing authorization code")
 
@@ -272,10 +277,15 @@ async def discord_callback(
 @router.post("/link-lastfm", response_model=LinkLastfmResponse)
 async def link_lastfm(
     body: LinkLastfmRequest,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    username = body.username.strip()
+    rate_limit(request, link_lastfm_limiter)
+
+    # Last.fm usernames are case-insensitive; normalize before validating and
+    # storing so the unique (provider, provider_user_id) index is meaningful.
+    username = body.username.strip().lower()
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
 
@@ -312,6 +322,11 @@ async def link_lastfm(
 
     try:
         await db.commit()
+    except IntegrityError:
+        # Concurrent link of the same (lowercased) username by two users. The
+        # unique (provider, provider_user_id) index is the source of truth.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Last.fm username is already linked to another account")
     except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to link Last.fm account")
@@ -322,9 +337,11 @@ async def link_lastfm(
 @router.post("/oauth/complete-email")
 async def complete_oauth_email(
     body: OAuthCompleteEmailRequest,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    rate_limit(request, complete_email_limiter)
     if current_user.email is not None:
         raise HTTPException(status_code=400, detail="Email already set")
 
@@ -342,6 +359,11 @@ async def complete_oauth_email(
 
     try:
         await db.commit()
+    except IntegrityError:
+        # Concurrent registration of the same email by two accounts. The unique
+        # users.email index is the source of truth.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
     except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update email")

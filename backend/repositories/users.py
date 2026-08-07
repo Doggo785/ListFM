@@ -31,12 +31,18 @@ async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
 
 
 async def get_user_by_lastfm_username(db: AsyncSession, lastfm_username: str) -> User | None:
+    """Find a user by their linked Last.fm username (case-insensitive).
+
+    Last.fm usernames are case-insensitive, so the lookup normalizes both
+    sides to lowercase. Callers should also normalize before storing to keep
+    the unique (provider, provider_user_id) constraint meaningful.
+    """
     result = await db.execute(
         select(User)
         .join(AuthProvider)
         .where(
             AuthProvider.provider == "lastfm",
-            AuthProvider.provider_user_id == lastfm_username,
+            func.lower(AuthProvider.provider_user_id) == lastfm_username.lower(),
             User.deleted_at.is_(None),
         )
     )
@@ -172,9 +178,9 @@ async def _get_or_create_user_from_provider(
             return user, False
 
     logger.warning(
-        "Creating new user for provider=%s provider_user_id=%s email=%s display_name=%s — "
+        "Creating new user for provider=%s provider_user_id=%s — "
         "no existing user found by provider or email. This may indicate a duplicate account.",
-        provider, provider_user_id, email, display_name,
+        provider, provider_user_id,
     )
 
     user = User(

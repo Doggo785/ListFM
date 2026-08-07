@@ -28,6 +28,12 @@ login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 register_limiter = RateLimiter(max_requests=3, window_seconds=21600)
 refresh_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
+# OAuth flow guardrails: the exchange + profile fetch + link steps each hit
+# external providers (Last.fm / Google / Discord) with the app's credentials.
+link_lastfm_limiter = RateLimiter(max_requests=10, window_seconds=60)
+oauth_login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
+
 
 def rate_limit(request: Request, limiter: RateLimiter) -> None:
     ip = request.client.host if request.client else "unknown"
