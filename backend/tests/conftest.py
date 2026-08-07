@@ -2,22 +2,25 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from jose import jwt
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
 
 from config import get_settings
 from database import get_db
 from backend.main import app
-from services.rate_limit import login_limiter, register_limiter, refresh_limiter
+from services.rate_limit import (
+    login_limiter,
+    register_limiter,
+    refresh_limiter,
+    link_lastfm_limiter,
+    oauth_login_limiter,
+    complete_email_limiter,
+)
 from models.auth_provider import AuthProvider
-from models.automation import Automation
-from models.automation_history import AutomationHistory
-from models.generated_playlist import GeneratedPlaylist
-from models.playlist_track import PlaylistTrack
 from models.refresh_token import RefreshToken
 from models.user import User
 
@@ -26,10 +29,31 @@ from models.user import User
 # Override with TEST_DATABASE_URL when the default is not available.
 TEST_DB_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://listfm:listfm@localhost:5432/listfm_test",
+    "postgresql+asyncpg://listfm:listfm@localhost:5433/listfm_test",
 )
-_test_engine = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
+# Pooled engine: the test suite opens a session per request and per cleanup, so
+# a pooled engine (instead of a fresh connection per session) avoids repeated
+# connection handshakes and keeps the suite fast.
+_test_engine = create_async_engine(
+    TEST_DB_URL,
+    echo=False,
+    pool_size=5,
+    max_overflow=5,
+    pool_pre_ping=True,
+)
 _TestSessionLocal = async_sessionmaker(_test_engine, class_=AsyncSession, expire_on_commit=False)
+
+# Tables the suite writes to. CASCADE pulls in FK-referencing tables (e.g.
+# user_tracks) without needing them listed or ordered.
+_TEST_TABLES = (
+    "users",
+    "auth_providers",
+    "refresh_tokens",
+    "automations",
+    "automation_history",
+    "generated_playlists",
+    "playlist_tracks",
+)
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -45,29 +69,48 @@ async def _override_get_db():
 
 @pytest_asyncio.fixture(autouse=True)
 async def _cleanup_db():
-    """Clean all test data and rate limiter state before and after each test."""
-    login_limiter.reset()
-    register_limiter.reset()
-    refresh_limiter.reset()
+    """Clean all test data and rate limiter state before and after each test.
+
+    Truncate runs once before the test (single round-trip instead of 7 DELETEs
+    per pass). The post-test pass is kept as a safety net so a failing test
+    never leaks rows into the next test's assertions.
+    """
+    for limiter in (
+        login_limiter,
+        register_limiter,
+        refresh_limiter,
+        link_lastfm_limiter,
+        oauth_login_limiter,
+        complete_email_limiter,
+    ):
+        limiter.reset()
     async with _TestSessionLocal() as db:
-        await db.execute(delete(PlaylistTrack))
-        await db.execute(delete(AutomationHistory))
-        await db.execute(delete(GeneratedPlaylist))
-        await db.execute(delete(Automation))
-        await db.execute(delete(RefreshToken))
-        await db.execute(delete(AuthProvider))
-        await db.execute(delete(User))
+        await db.execute(text(f"TRUNCATE {', '.join(_TEST_TABLES)} RESTART IDENTITY CASCADE"))
         await db.commit()
     yield
     async with _TestSessionLocal() as db:
-        await db.execute(delete(PlaylistTrack))
-        await db.execute(delete(AutomationHistory))
-        await db.execute(delete(GeneratedPlaylist))
-        await db.execute(delete(Automation))
-        await db.execute(delete(RefreshToken))
-        await db.execute(delete(AuthProvider))
-        await db.execute(delete(User))
+        await db.execute(text(f"TRUNCATE {', '.join(_TEST_TABLES)} RESTART IDENTITY CASCADE"))
         await db.commit()
+    # pytest-asyncio runs each test on a fresh event loop; pooled connections
+    # held open across tests are bound to the previous (closed) loop. Disposing
+    # between tests keeps the pool working while still reusing connections
+    # within a single test's many sessions.
+    await _test_engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _fast_bcrypt():
+    """Speed up password hashing in tests.
+
+    passlib defaults to bcrypt rounds=12 (~0.25s per hash). Rounds=4 is far
+    faster while keeping the bcrypt format, so register/login flows in tests
+    drop from ~0.45s to a few ms. The app itself keeps the production default.
+    """
+    from services.auth import pwd_context
+
+    pwd_context.update(bcrypt__rounds=4)
+    yield
+    pwd_context.update(bcrypt__rounds=12)
 
 
 @pytest_asyncio.fixture
