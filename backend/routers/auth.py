@@ -181,6 +181,11 @@ async def refresh(
             .values(revoked=True)
         )
         await db.flush()
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to refresh token")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if stored_token.expires_at < datetime.now(timezone.utc):
