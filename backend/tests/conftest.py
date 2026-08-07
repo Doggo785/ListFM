@@ -70,11 +70,11 @@ async def _override_get_db():
 
 @pytest_asyncio.fixture(autouse=True)
 async def _cleanup_db():
-    """Clean all test data and rate limiter state before and after each test.
+    """Clean all test data and rate limiter state before each test.
 
     Truncate runs once before the test (single round-trip instead of 7 DELETEs
-    per pass). The post-test pass is kept as a safety net so a failing test
-    never leaks rows into the next test's assertions.
+    per pass). The next test's pre-test truncate wipes the same tables, so no
+    post-test pass is needed.
     """
     for limiter in (
         login_limiter,
@@ -90,9 +90,6 @@ async def _cleanup_db():
         await db.execute(text(f"TRUNCATE {', '.join(_TEST_TABLES)} RESTART IDENTITY CASCADE"))
         await db.commit()
     yield
-    async with _TestSessionLocal() as db:
-        await db.execute(text(f"TRUNCATE {', '.join(_TEST_TABLES)} RESTART IDENTITY CASCADE"))
-        await db.commit()
     # pytest-asyncio runs each test on a fresh event loop; pooled connections
     # held open across tests are bound to the previous (closed) loop. Disposing
     # between tests keeps the pool working while still reusing connections
