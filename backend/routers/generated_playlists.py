@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api", tags=["generated_playlists"])
 
 @router.get("/generated-playlists", response_model=list[GeneratedPlaylistRead])
 async def list_generated_playlists(
+    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):

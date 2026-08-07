@@ -56,6 +56,7 @@ def preview_automation(
 
 @router.get("/automations", response_model=list[AutomationRead])
 async def list_automations(
+    username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
