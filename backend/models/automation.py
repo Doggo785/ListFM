@@ -3,9 +3,9 @@ from typing import Optional
 
 from sqlalchemy import String, Boolean, Integer, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import JSONB
 
 from database import Base
+from filter_types import FilterGroup, FilterGroupListJSONB
 
 
 class Automation(Base):
@@ -19,7 +19,7 @@ class Automation(Base):
     source_type: Mapped[str] = mapped_column(String(50))  # top_tracks, recent_tracks, loved_tracks, top_artists
     source_period: Mapped[str] = mapped_column(String(20))  # 7d, 1m, 3m, 6m, 12m, overall
     cron: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    filter_groups: Mapped[list] = mapped_column(JSONB, default=list)  # Recursive filter tree as JSONB
+    filter_groups: Mapped[list[FilterGroup]] = mapped_column(FilterGroupListJSONB, default=list)  # Recursive filter tree as JSONB
     output_max_size: Mapped[int] = mapped_column(Integer, default=50)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -2,7 +2,9 @@ import re
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from filter_types import FilterGroups
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
@@ -190,7 +192,7 @@ class AutomationCreate(BaseModel):
     description: str = ""
     source: AutomationSource
     cron: str = ""
-    filter_groups: list[dict] = []
+    filter_groups: FilterGroups = Field(default_factory=list)
     output: dict = {"maxSize": 50}
     enabled: bool = True
 
@@ -200,7 +202,7 @@ class AutomationUpdate(BaseModel):
     description: Optional[str] = None
     source: Optional[AutomationSource] = None
     cron: Optional[str] = None
-    filter_groups: Optional[list[dict]] = None
+    filter_groups: Optional[FilterGroups] = None
     output: Optional[dict] = None
     enabled: Optional[bool] = None
 
@@ -213,7 +215,7 @@ class AutomationRead(BaseModel):
     description: Optional[str] = None
     source: AutomationSource
     cron: Optional[str] = None
-    filter_groups: list[dict]
+    filter_groups: FilterGroups
     output: dict
     enabled: bool
     created_at: datetime
