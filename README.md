@@ -112,12 +112,17 @@ npm run dev
 | Method | Endpoint | Description |
 |:---:|---|---|
 | `GET` | `/api/health` | Health check |
-| `GET` | `/api/{username}/info` | User info (avatar, profile) |
-| `GET` | `/api/{username}/recent-tracks` | Recently played tracks |
-| `GET` | `/api/{username}/top-tags` | Top genre tags |
-| `GET` | `/api/{username}/top-tracks` | Top tracks by period |
-| `GET` | `/api/{username}/loved-tracks` | Loved / favorited tracks |
-| `GET` | `/api/{username}/source-tracks` | Flexible source endpoint |
+
+### Protected (requires auth + linked Last.fm account)
+
+| Method | Endpoint | Description |
+|:---:|---|---|
+| `GET` | `/api/info` | User info (avatar, profile) |
+| `GET` | `/api/recent-tracks` | Recently played tracks |
+| `GET` | `/api/top-tags` | Top genre tags |
+| `GET` | `/api/top-tracks` | Top tracks by period |
+| `GET` | `/api/loved-tracks` | Loved / favorited tracks |
+| `GET` | `/api/source-tracks` | Flexible source endpoint |
 | `POST` | `/api/automations/preview` | Preview automation results |
 
 ### Authentication
@@ -140,13 +145,15 @@ npm run dev
 
 | Method | Endpoint | Description |
 |:---:|---|---|
-| `GET` | `/api/{username}/automations` | List automations |
-| `POST` | `/api/{username}/automations` | Create automation |
-| `PATCH` | `/api/{username}/automations/{id}` | Update automation |
-| `DELETE` | `/api/{username}/automations/{id}` | Delete automation |
-| `GET` | `/api/{username}/generated-playlists` | List generated playlists |
-| `POST` | `/api/{username}/generated-playlists` | Save generated playlist |
-| `DELETE` | `/api/{username}/generated-playlists/{id}` | Delete generated playlist |
+| `GET` | `/api/automations` | List automations |
+| `POST` | `/api/automations` | Create automation |
+| `PATCH` | `/api/automations/{id}` | Update automation |
+| `DELETE` | `/api/automations/{id}` | Delete automation |
+| `GET` | `/api/generated-playlists` | List generated playlists |
+| `POST` | `/api/generated-playlists` | Save generated playlist |
+| `DELETE` | `/api/generated-playlists/{id}` | Delete generated playlist |
+
+> The user is resolved from the authenticated JWT, so there is no `{username}` path prefix. Endpoints that consume Last.fm data require a linked Last.fm account (see `POST /api/auth/link-lastfm`).
 
 ---
 
@@ -193,8 +200,14 @@ ListFM/
 | `DATABASE_URL` | PostgreSQL connection string | ✅ |
 | `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | ✅ |
 | `COOKIE_SECURE` | Set to `true` for HTTPS deployments | |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client ID (for "Sign in with Google") | |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth client secret | |
+| `DISCORD_OAUTH_CLIENT_ID` | Discord OAuth client ID (for "Sign in with Discord") | |
+| `DISCORD_OAUTH_CLIENT_SECRET` | Discord OAuth client secret | |
+| `OAUTH_REDIRECT_BASE` | Base URL the OAuth callback redirects back to (e.g. `http://localhost:8000`) | |
+| `FRONTEND_URL` | Frontend origin used for post-login redirects (e.g. `http://localhost:5173`) | |
 
-Get your Last.fm keys at **[last.fm/api/account/create](https://www.last.fm/api/account/create)**
+Get your Last.fm keys at **[last.fm/api/account/create](https://www.last.fm/api/account/create)**. Google and Discord OAuth are optional — the login buttons only appear when the matching client ID/secret are configured.
 
 ---
 
