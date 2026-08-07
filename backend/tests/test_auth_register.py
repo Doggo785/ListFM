@@ -1,7 +1,15 @@
+import time
 import uuid
 
 import pytest
 from httpx import AsyncClient
+
+from services.rate_limit import (
+    DUPLICATE_EMAIL_MESSAGE,
+    RateLimiter,
+    register_email_limiter,
+    register_limiter,
+)
 
 from .conftest import _cleanup_user, _unique_email
 
@@ -62,9 +70,54 @@ async def test_register_duplicate_email(client: AsyncClient):
             json={"email": email, "password": "StrongP@ss1!"},
         )
         assert resp2.status_code == 409
-        assert "already exists" in resp2.json()["detail"]
+        # Byte-identical to the shared constant so the response body does not
+        # reveal whether the email exists (anti-enumeration).
+        assert resp2.json()["detail"] == DUPLICATE_EMAIL_MESSAGE
     finally:
         await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_register_email_limiter_429_same_email(client: AsyncClient):
+    """The per-email register limiter throttles the 4th attempt for the same
+    email even after the IP limiter is reset (attacker rotating IPs but
+    reusing the same victim email)."""
+    email_a = _unique_email()
+    email_b = _unique_email()
+    password = "StrongP@ss1!"
+    try:
+        # Burn 3 requests on the same email (1 success + 2 duplicates).
+        statuses = []
+        for _ in range(3):
+            resp = await client.post(
+                "/api/auth/register",
+                json={"email": email_a, "password": password},
+            )
+            statuses.append(resp.status_code)
+        assert statuses == [201, 409, 409]
+
+        # Reset ONLY the IP limiter — simulates the attacker changing IP.
+        register_limiter.reset()
+
+        # 4th attempt on the same email is throttled by the per-email limiter.
+        resp4 = await client.post(
+            "/api/auth/register",
+            json={"email": email_a, "password": password},
+        )
+        assert resp4.status_code == 429
+
+        # A different email from the same IP is not throttled — proves the
+        # limiter is keyed per-email, not globally.
+        resp_b = await client.post(
+            "/api/auth/register",
+            json={"email": email_b, "password": password},
+        )
+        assert resp_b.status_code == 201
+    finally:
+        await _cleanup_user(email=email_a)
+        await _cleanup_user(email=email_b)
+        register_limiter.reset()
+        register_email_limiter.reset()
 
 
 @pytest.mark.asyncio
@@ -95,3 +148,18 @@ async def test_register_email_normalized(client: AsyncClient):
         assert resp2.status_code == 409
     finally:
         await _cleanup_user(email=normalized)
+
+
+def test_rate_limiter_evicts_expired_keys():
+    """A key whose hits all fall outside the window is evicted so the limiter
+    does not accumulate unlimited in-memory keys."""
+    limiter = RateLimiter(max_requests=100, window_seconds=60)
+    key = f"key-{uuid.uuid4().hex}"
+    old = time.monotonic() - 120
+    limiter._requests[key] = [old]
+    limiter._clean(key, time.monotonic())
+    assert key not in limiter._requests
+
+    limiter.check(key)
+    limiter.check("other")
+    assert key in limiter._requests or limiter._checks_since_sweep > 0

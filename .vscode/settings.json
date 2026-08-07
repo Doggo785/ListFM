@@ -1,3 +1,4 @@
 {
-    "python.terminal.useEnvFile": true
+    "python.terminal.useEnvFile": true,
+    "postman.settings.dotenv-detection-notification-visibility": false
 }

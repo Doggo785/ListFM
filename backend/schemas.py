@@ -2,7 +2,9 @@ import re
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from filter_types import FilterGroups
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
@@ -14,10 +16,8 @@ def _validate_email(v: str) -> str:
     return normalized
 
 
-class UserCreate(BaseModel):
-    email: str
-    password: str
-    display_name: Optional[str] = None
+class EmailValidatorMixin:
+    """Shared email validator for Pydantic models."""
 
     @field_validator("email")
     @classmethod
@@ -25,26 +25,15 @@ class UserCreate(BaseModel):
         return _validate_email(v)
 
 
-class UserLogin(BaseModel):
+class UserCreate(EmailValidatorMixin, BaseModel):
     email: str
     password: str
-
-    @field_validator("email")
-    @classmethod
-    def validate_email(cls, v: str) -> str:
-        return _validate_email(v)
-
-
-class UserRead(BaseModel):
-    id: str
-    email: Optional[str] = None
-    role: str
-    email_verified: bool
     display_name: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+
+class UserLogin(EmailValidatorMixin, BaseModel):
+    email: str
+    password: str
 
 
 class UserUpdate(BaseModel):
@@ -53,11 +42,13 @@ class UserUpdate(BaseModel):
     display_name: Optional[str] = None
 
 
-class AuthProviderCreate(BaseModel):
-    provider: Literal["email", "lastfm"]
-    provider_user_id: str
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
+class LinkLastfmRequest(BaseModel):
+    username: str
+
+
+class LinkLastfmResponse(BaseModel):
+    username: str
+    image: str | None = None
 
 
 class AuthProviderRead(BaseModel):
@@ -70,15 +61,15 @@ class AuthProviderRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class OAuthCompleteEmailRequest(EmailValidatorMixin, BaseModel):
+    email: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-
-
-class TokenRefresh(BaseModel):
-    refresh_token: str
 
 
 class Track(BaseModel):
@@ -169,7 +160,7 @@ class AutomationCreate(BaseModel):
     description: str = ""
     source: AutomationSource
     cron: str = ""
-    filter_groups: list[dict] = []
+    filter_groups: FilterGroups = Field(default_factory=list)
     output: dict = {"maxSize": 50}
     enabled: bool = True
 
@@ -179,7 +170,7 @@ class AutomationUpdate(BaseModel):
     description: Optional[str] = None
     source: Optional[AutomationSource] = None
     cron: Optional[str] = None
-    filter_groups: Optional[list[dict]] = None
+    filter_groups: Optional[FilterGroups] = None
     output: Optional[dict] = None
     enabled: Optional[bool] = None
 
@@ -192,7 +183,7 @@ class AutomationRead(BaseModel):
     description: Optional[str] = None
     source: AutomationSource
     cron: Optional[str] = None
-    filter_groups: list[dict]
+    filter_groups: FilterGroups
     output: dict
     enabled: bool
     created_at: datetime

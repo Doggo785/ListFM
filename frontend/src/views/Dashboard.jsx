@@ -1,5 +1,7 @@
+// SIZE_OK: 326 pure LOC — single page component with cohesive state; splitting would introduce prop drilling for no gain
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
 import CountUp from "../components/elements/CountUp";
@@ -15,11 +17,10 @@ import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/Playli
 import {
   getGreeting,
   getLastVisit,
-  setLastVisit,
   formatRelativeTime,
 } from "../lib/dashboard-helpers";
 import {
-  IconSearch,
+  IconHome,
   IconHeadphones,
   IconPlus,
 } from "@tabler/icons-react";
@@ -73,7 +74,8 @@ function buildDescription(auto) {
 }
 
 function Dashboard() {
-  const { username } = useParams();
+  const { user } = useAuth();
+  const username = user?.lastfm_username;
   const navigate = useNavigate();
   const [playlist, setPlaylist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,28 +88,26 @@ function Dashboard() {
   const [automations, setAutomations] = useState([]);
 
   useEffect(() => {
+    if (!username) return;
     const load = async () => {
       try {
-        const data = await getAutomations(username);
+        const data = await getAutomations();
         setAutomations(data);
-      } catch (err) {
-        console.error("Failed to load automations:", err);
+      } catch {
+        // Automations silently fail; dashboard still renders without them.
       }
     };
     load();
   }, [username]);
 
   useEffect(() => {
+    if (!username) return;
     document.title = `${username} - ListFM`;
   }, [username]);
 
   useEffect(() => {
-    setLastVisit(username);
-    sessionStorage.setItem("listfm_current_username", username);
-  }, [username]);
-
-  useEffect(() => {
-    getUserInfo(username)
+    if (!username) return;
+    getUserInfo()
       .then(async (data) => {
         const img = data?.image || null;
         setAvatar(img);
@@ -120,14 +120,14 @@ function Dashboard() {
   }, [username]);
 
   useEffect(() => {
+    if (!username) return;
     const fetchRecentTracks = async () => {
       setIsLoading(true);
       try {
-        const data = await getRecentTracks(username, 50);
+        const data = await getRecentTracks(50);
         setPlaylist(data.tracks);
-      } catch (err) {
+      } catch {
         setError("Failed to fetch data.");
-        console.error(err);
       } finally {
         setIsLoading(false);
       }
@@ -136,6 +136,7 @@ function Dashboard() {
   }, [username]);
 
   const stats = useMemo(() => {
+    if (!username) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
     if (!playlist.length) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
     const artists = new Set();
     const albums = new Set();
@@ -148,9 +149,10 @@ function Dashboard() {
     const sorted = Object.entries(artistCounts).sort((a, b) => b[1] - a[1]);
     const topArtist = sorted[0] ? { name: sorted[0][0], plays: sorted[0][1] } : null;
     return { tracks: playlist.length, artists: artists.size, albums: albums.size, topArtist };
-  }, [playlist]);
+  }, [username, playlist]);
 
   const automationCards = useMemo(() => {
+    if (!username) return [];
     return automations.map((auto) => {
       const name = auto.name || "Untitled";
       const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
@@ -162,7 +164,24 @@ function Dashboard() {
         glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
       };
     });
-  }, [automations]);
+  }, [username, automations]);
+
+  if (!username) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
+        <div className="text-center">
+          <p className="text-white font-medium mb-2">No Last.fm account linked</p>
+          <p className="text-neutral-500 text-sm">Link your Last.fm account to view your dashboard.</p>
+          <button
+            onClick={() => navigate("/link-lastfm")}
+            className="mt-4 px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
+          >
+            Link Last.fm
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -181,7 +200,7 @@ function Dashboard() {
             onClick={() => navigate("/")}
             className="mt-4 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[#ff530b] transition-colors"
           >
-            Back to Search
+            Back to Home
           </button>
         </div>
       </div>
@@ -328,8 +347,8 @@ function Dashboard() {
               onClick={() => navigate("/")}
               className="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 hover:text-white transition-colors"
             >
-              <IconSearch size={16} strokeWidth={1.5} />
-              Search
+              <IconHome size={16} strokeWidth={1.5} />
+              Home
             </button>
           </motion.div>
         </motion.div>

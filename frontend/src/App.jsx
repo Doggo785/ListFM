@@ -3,37 +3,24 @@ import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
 import ScrollToTop from "./components/elements/ScrollToTop";
-import SearchHome from "./views/SearchHome";
+import Landing from "./views/Landing";
 import Login from "./views/Login";
 import Register from "./views/Register";
 import Dashboard from "./views/Dashboard";
+import AuthCallback from "./views/AuthCallback";
+import LinkLastfm from "./views/LinkLastfm";
 import PlaylistNew from "./views/PlaylistNew";
 import PlaylistDetail from "./views/PlaylistDetail";
 import AuthGuard from "./components/AuthGuard";
 
-function getLastUsername() {
-  try {
-    const currentUsername = sessionStorage.getItem("listfm_current_username");
-    if (currentUsername) return currentUsername;
-    
-    const data = JSON.parse(localStorage.getItem("listfm_last_visit") || "{}");
-    const usernames = Object.keys(data);
-    return usernames.length > 0 ? usernames[usernames.length - 1] : null;
-  } catch {
-    return null;
-  }
-}
-
-function getUsernameFromPath(pathname) {
-  const match = pathname.match(/^\/dashboard\/([^/]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
 function App() {
   const location = useLocation();
-  const showSidebar = location.pathname !== "/" && location.pathname !== "/login" && location.pathname !== "/register";
-  const usernameFromUrl = getUsernameFromPath(location.pathname);
-  const lastUsername = getLastUsername();
+  const showSidebar =
+    location.pathname !== "/" &&
+    location.pathname !== "/login" &&
+    location.pathname !== "/register" &&
+    location.pathname !== "/auth/callback" &&
+    location.pathname !== "/link-lastfm";
 
   return (
     <div className="app-container">
@@ -42,7 +29,7 @@ function App() {
         className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
       >
         {showSidebar && (
-          <AppSidebar username={usernameFromUrl || lastUsername} />
+          <AppSidebar />
         )}
         <div className="min-w-0 flex-1">
           <AnimatePresence mode="wait">
@@ -55,9 +42,9 @@ function App() {
               className="h-full"
             >
               <Routes location={location}>
-                <Route path="/" element={<SearchHome />} />
+                <Route path="/" element={<Landing />} />
                 <Route
-                  path="/dashboard/:username"
+                  path="/dashboard"
                   element={
                     <AuthGuard>
                       <Dashboard />
@@ -66,12 +53,7 @@ function App() {
                 />
                 <Route
                   path="/playlists"
-                  element={
-                    <Navigate
-                      to={lastUsername ? `/dashboard/${lastUsername}` : "/"}
-                      replace
-                    />
-                  }
+                  element={<Navigate to="/" replace />}
                 />
                 <Route
                   path="/playlists/new"
@@ -91,6 +73,15 @@ function App() {
                 />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route
+                  path="/link-lastfm"
+                  element={
+                    <AuthGuard>
+                      <LinkLastfm />
+                    </AuthGuard>
+                  }
+                />
               </Routes>
             </motion.div>
           </AnimatePresence>

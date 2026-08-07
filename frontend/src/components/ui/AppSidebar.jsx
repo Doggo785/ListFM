@@ -13,16 +13,16 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const iconClass = "text-neutral-200 h-5 w-5 flex-shrink-0";
 
-function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
+function AppSidebar({ userLabel = "User", activePage = "home" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const [avatar, setAvatar] = useState(null);
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const username = user?.lastfm_username;
 
   useEffect(() => {
     if (!username) return;
-    setAvatar(null);
-    getUserInfo(username)
+    getUserInfo()
       .then((data) => setAvatar(data?.image || null))
       .catch(() => setAvatar(null));
   }, [username]);
@@ -30,7 +30,7 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
   const links = [
     {
       label: "Home",
-      href: username ? `/dashboard/${username}` : "/",
+      href: "/dashboard",
       icon: <IconHome className={iconClass} />,
     },
     {
@@ -41,7 +41,7 @@ function AppSidebar({ username, userLabel = "User", activePage = "home" }) {
     {
       label: "Stats",
       href:
-        activePage === "dashboard" && username ? `/dashboard/${username}` : "#",
+        activePage === "dashboard" ? "/dashboard" : "#",
       icon: <IconChartBar className={iconClass} />,
     },
     {

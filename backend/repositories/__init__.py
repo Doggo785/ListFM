@@ -3,9 +3,13 @@ from repositories.users import (
     get_user_by_email,
     get_user_by_lastfm_username,
     create_user,
-    create_user_from_lastfm,
     update_user,
     delete_user,
+)
+from repositories.refresh_tokens import (
+    create_refresh_token,
+    get_refresh_token_by_hash,
+    revoke_refresh_token_family,
 )
 from repositories.tracks import (
     get_track_by_id,
@@ -51,10 +55,14 @@ __all__ = [
     "get_user_by_id",
     "get_user_by_email",
     "get_user_by_lastfm_username",
+    "get_lastfm_provider",
     "create_user",
-    "create_user_from_lastfm",
     "update_user",
     "delete_user",
+    # Refresh Tokens
+    "create_refresh_token",
+    "get_refresh_token_by_hash",
+    "revoke_refresh_token_family",
     # Tracks
     "get_track_by_id",
     "get_track_by_artist_title",

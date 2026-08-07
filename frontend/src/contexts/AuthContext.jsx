@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { request } from "../lib/api.js";
+import { request, setCurrentUsername } from "../lib/api.js";
 
 const AuthContext = createContext(null);
 
@@ -11,8 +11,10 @@ export function AuthProvider({ children }) {
     try {
       const data = await request("/api/auth/me");
       setUser(data);
+      setCurrentUsername(data.lastfm_username || null);
     } catch {
       setUser(null);
+      setCurrentUsername(null);
     } finally {
       setLoading(false);
     }
@@ -41,21 +43,51 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     await request("/api/auth/logout", { method: "POST" });
     setUser(null);
+    setCurrentUsername(null);
   }, []);
+
+  const linkLastfm = useCallback(async (username) => {
+    await request("/api/auth/link-lastfm", {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    });
+    // Optimistically update state so isLastfmLinked is true immediately
+    // This prevents the linking page from staying visible or the dashboard
+    // from showing "No Last.fm account linked" if the refresh call fails.
+    setUser((prev) =>
+      prev ? { ...prev, lastfm_username: username, is_lastfm_linked: true } : prev
+    );
+    setCurrentUsername(username);
+    // Refresh session with actual server data — failure is non-fatal
+    // because we already optimistically applied the linking above
+    try {
+      const data = await request("/api/auth/me");
+      setUser(data);
+      setCurrentUsername(data.lastfm_username || null);
+    } catch {
+      // Session fetch failed, but the linking itself succeeded on the backend.
+      // Optimistic state keeps the user correctly identified as linked.
+      // Real data will be fetched on next app load.
+    }
+  }, []);
+
+  const isLastfmLinked = !!user?.lastfm_username;
 
   const value = useMemo(() => ({
     user,
     isAuthenticated: !!user,
+    isLastfmLinked,
     login,
     register,
     logout,
+    linkLastfm,
     loading,
-  }), [user, loading, login, register, logout]);
+  }), [user, loading, isLastfmLinked, login, register, logout, linkLastfm]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth() { // eslint-disable-line react-refresh/only-export-components
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");

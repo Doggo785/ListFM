@@ -5,19 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import get_settings
 from database import get_db
 from models.user import User
-from repositories.users import get_user_by_id, get_user_by_lastfm_username
+from repositories.users import get_lastfm_provider, get_user_by_id
 from services.auth import decode_token
-
-
-async def resolve_user_id(db: AsyncSession, username: str) -> str:
-    """Resolve a Last.fm username to a user ID.
-
-    Raises HTTPException(404) if the user is not found.
-    """
-    user = await get_user_by_lastfm_username(db, username)
-    if user is None:
-        raise HTTPException(status_code=404, detail=f"User '{username}' not found")
-    return user.id
 
 
 async def get_current_user(
@@ -50,14 +39,25 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """Return the current user only if they are not soft-deleted."""
     if current_user.deleted_at is not None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return current_user
 
 
+async def get_current_user_lastfm_username(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    provider = await get_lastfm_provider(db, current_user.id)
+    if provider is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No Last.fm account linked. Please link your Last.fm account first.",
+        )
+    return provider.provider_user_id
+
+
 def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
-    """Set httpOnly cookies for access_token and refresh_token."""
     settings = get_settings()
 
     response.set_cookie(
@@ -79,6 +79,5 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str) 
 
 
 def clear_auth_cookies(response: Response) -> None:
-    """Clear the auth cookies."""
     response.delete_cookie(key="access_token", httponly=True, samesite="lax")
     response.delete_cookie(key="refresh_token", httponly=True, samesite="lax")

@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import threading
+from contextlib import nullcontext
+
 import pylast
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import get_settings
@@ -15,6 +20,9 @@ PERIOD_MAP = {
 def get_user_info(username: str) -> dict:
     network = get_network()
     user = network.get_user(username)
+    # Force a real API call so a non-existent username raises pylast.WSError
+    # instead of being silently swallowed (which let link-lastfm accept any name).
+    user.get_playcount()
     try:
         image_url = user.get_image(size=pylast.SIZE_LARGE)
     except Exception:
@@ -120,7 +128,14 @@ def _normalize_tags(raw_tags: list[dict]) -> list[dict]:
     ]
 
 
-def get_track_full_info(network: pylast.LastFMNetwork, username: str, artist: str, title: str, tag_caches: dict | None = None) -> dict:
+def get_track_full_info(
+    network: pylast.LastFMNetwork,
+    username: str,
+    artist: str,
+    title: str,
+    tag_caches: dict | None = None,
+    tag_lock: threading.Lock | None = None,
+) -> dict:
     result = {
         "listeners": 0,
         "global_playcount": 0,
@@ -157,20 +172,22 @@ def get_track_full_info(network: pylast.LastFMNetwork, username: str, artist: st
     caches = tag_caches if tag_caches is not None else {}
     artist_cache = caches.setdefault("artist", {})
     album_cache = caches.setdefault("album", {})
+    cache_guard = tag_lock if tag_lock is not None else nullcontext()
 
     try:
         artist_key = artist.strip().lower()
-        if artist_key in artist_cache:
-            result["artist_tags"] = artist_cache[artist_key]
-        else:
-            artist_obj = network.get_artist(artist)
-            raw_tags = [
-                {"name": t.item.name, "count": int(t.weight)}
-                for t in artist_obj.get_top_tags(limit=10)
-                if int(t.weight) > 0
-            ]
-            result["artist_tags"] = _normalize_tags(raw_tags)
-            artist_cache[artist_key] = result["artist_tags"]
+        with cache_guard:
+            if artist_key in artist_cache:
+                result["artist_tags"] = artist_cache[artist_key]
+            else:
+                artist_obj = network.get_artist(artist)
+                raw_tags = [
+                    {"name": t.item.name, "count": int(t.weight)}
+                    for t in artist_obj.get_top_tags(limit=10)
+                    if int(t.weight) > 0
+                ]
+                result["artist_tags"] = _normalize_tags(raw_tags)
+                artist_cache[artist_key] = result["artist_tags"]
     except Exception:
         pass
 
@@ -179,20 +196,21 @@ def get_track_full_info(network: pylast.LastFMNetwork, username: str, artist: st
         if album and album.title:
             album_name = album.title
             album_key = f"{artist.strip().lower()}|{album_name.strip().lower()}"
-            if album_key in album_cache:
-                result["album_tags"] = album_cache[album_key]
-            else:
-                try:
-                    album_obj = network.get_album(artist, album_name)
-                    raw_tags = [
-                        {"name": t.item.name, "count": int(t.weight)}
-                        for t in album_obj.get_top_tags(limit=10)
-                        if int(t.weight) > 0
-                    ]
-                    result["album_tags"] = _normalize_tags(raw_tags)
-                except Exception:
-                    result["album_tags"] = []
-                album_cache[album_key] = result["album_tags"]
+            with cache_guard:
+                if album_key in album_cache:
+                    result["album_tags"] = album_cache[album_key]
+                else:
+                    try:
+                        album_obj = network.get_album(artist, album_name)
+                        raw_tags = [
+                            {"name": t.item.name, "count": int(t.weight)}
+                            for t in album_obj.get_top_tags(limit=10)
+                            if int(t.weight) > 0
+                        ]
+                        result["album_tags"] = _normalize_tags(raw_tags)
+                    except Exception:
+                        result["album_tags"] = []
+                    album_cache[album_key] = result["album_tags"]
     except Exception:
         pass
 
@@ -204,12 +222,13 @@ def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> li
     to_enrich = tracks[:max_enrich]
     tail = tracks[max_enrich:]
     tag_caches = {}
+    cache_lock = threading.Lock()
 
     def _enrich_one(track):
         artist = track.get("artist", "")
         title = track.get("title", "")
         result = dict(track)
-        result.update(get_track_full_info(network, username, artist, title, tag_caches))
+        result.update(get_track_full_info(network, username, artist, title, tag_caches, cache_lock))
         return result
 
     enriched_order = [None] * len(to_enrich)
