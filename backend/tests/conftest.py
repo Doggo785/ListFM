@@ -140,6 +140,24 @@ def _unique_email() -> str:
     return f"test-{uuid.uuid4().hex[:12]}@test.example.com"
 
 
+async def _register_and_login(
+    client: AsyncClient, email: str, password: str = "StrongP@ss1!"
+):
+    """Register a new user and log in. Returns the login response."""
+    reg = await client.post(
+        "/api/auth/register",
+        json={"email": email, "password": password},
+    )
+    assert reg.status_code == 201
+    client.cookies.clear()
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": email, "password": password},
+    )
+    assert resp.status_code == 200
+    return resp
+
+
 def _get_user_id_from_cookies(client: AsyncClient) -> str:
     settings = get_settings()
     token = client.cookies.get("access_token")

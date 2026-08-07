@@ -6,23 +6,7 @@ import pylast
 import pytest
 from httpx import AsyncClient
 
-from .conftest import _cleanup_user, _unique_email
-
-
-async def _register_and_login(client: AsyncClient, email: str, password: str = "StrongP@ss1!"):
-    """Register a new user and log in. Returns the login response."""
-    reg = await client.post(
-        "/api/auth/register",
-        json={"email": email, "password": password},
-    )
-    assert reg.status_code == 201
-    client.cookies.clear()
-    resp = await client.post(
-        "/api/auth/login",
-        json={"email": email, "password": password},
-    )
-    assert resp.status_code == 200
-    return resp
+from .conftest import _cleanup_user, _register_and_login, _unique_email
 
 
 @pytest.mark.asyncio

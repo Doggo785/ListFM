@@ -16,26 +16,13 @@ from models.auth_provider import AuthProvider
 from models.user import User
 
 from config import Settings
-from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
-
-
-# ---------------------------------------------------------------------------
-# Helper: register + login to get cookies
-# ---------------------------------------------------------------------------
-async def _register_and_login(client: AsyncClient, email: str, password: str = "StrongP@ss1!"):
-    """Register a new user and log in. Returns the login response."""
-    reg = await client.post(
-        "/api/auth/register",
-        json={"email": email, "password": password},
-    )
-    assert reg.status_code == 201
-    client.cookies.clear()
-    resp = await client.post(
-        "/api/auth/login",
-        json={"email": email, "password": password},
-    )
-    assert resp.status_code == 200
-    return resp
+from .conftest import (
+    _TestSessionLocal,
+    _cleanup_user,
+    _get_user_id_from_cookies,
+    _register_and_login,
+    _unique_email,
+)
 
 
 # ===========================================================================

@@ -1,3 +1,4 @@
+import time
 import uuid
 
 import pytest
@@ -5,6 +6,7 @@ from httpx import AsyncClient
 
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
+    RateLimiter,
     register_email_limiter,
     register_limiter,
 )
@@ -146,3 +148,18 @@ async def test_register_email_normalized(client: AsyncClient):
         assert resp2.status_code == 409
     finally:
         await _cleanup_user(email=normalized)
+
+
+def test_rate_limiter_evicts_expired_keys():
+    """A key whose hits all fall outside the window is evicted so the limiter
+    does not accumulate unlimited in-memory keys."""
+    limiter = RateLimiter(max_requests=100, window_seconds=60)
+    key = f"key-{uuid.uuid4().hex}"
+    old = time.monotonic() - 120
+    limiter._requests[key] = [old]
+    limiter._clean(key, time.monotonic())
+    assert key not in limiter._requests
+
+    limiter.check(key)
+    limiter.check("other")
+    assert key in limiter._requests or limiter._checks_since_sweep > 0
