@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import patch
 
+import pylast
 import pytest
 from httpx import AsyncClient
 from httpx_oauth.clients.discord import DiscordOAuth2
@@ -572,7 +573,7 @@ async def test_link_lastfm_invalid_username(client: AsyncClient):
     try:
         await _register_and_login(client, email)
 
-        with patch("routers.auth_oauth.get_user_info", side_effect=Exception("User not found")):
+        with patch("routers.auth_oauth.get_user_info", side_effect=pylast.WSError(None, 6, "User not found")):
             resp = await client.post(
                 "/api/auth/link-lastfm",
                 json={"username": "nonexistent_user_xyz"},

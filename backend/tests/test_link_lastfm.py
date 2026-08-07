@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import pylast
 import pytest
 from httpx import AsyncClient
 
@@ -52,13 +53,33 @@ async def test_invalid_lastfm_username(client: AsyncClient):
     try:
         await _register_and_login(client, email)
 
-        with patch("routers.auth_oauth.get_user_info", side_effect=Exception("not found")):
+        with patch("routers.auth_oauth.get_user_info", side_effect=pylast.WSError(None, 6, "User not found")):
             resp = await client.post(
                 "/api/auth/link-lastfm",
                 json={"username": "zzz_no_such_user_999"},
             )
         assert resp.status_code == 400
         assert resp.json()["detail"] == "Invalid Last.fm username"
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_lastfm_upstream_failure_is_502(client: AsyncClient):
+    """A genuine Last.fm outage/network failure is NOT a bad username: it must
+    return 502 with a generic message that leaks no internal exception text."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        with patch("routers.auth_oauth.get_user_info", side_effect=Exception("network down")):
+            resp = await client.post(
+                "/api/auth/link-lastfm",
+                json={"username": "existing_user"},
+            )
+        assert resp.status_code == 502
+        assert "network down" not in resp.json()["detail"]
+        assert "Invalid Last.fm username" not in resp.json()["detail"]
     finally:
         await _cleanup_user(email=email)
 

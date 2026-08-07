@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 import httpx
+import pylast
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
@@ -297,8 +298,14 @@ async def link_lastfm(
 
     try:
         info = await asyncio.to_thread(get_user_info, username)
-    except Exception:
+    except pylast.WSError:
+        # pylast.WSError means the username does not exist on Last.fm.
         raise HTTPException(status_code=400, detail="Invalid Last.fm username")
+    except Exception:
+        # Anything else is a genuine upstream failure (outage, network) — do
+        # not mislead the user into thinking their username is wrong, and do
+        # not leak internal exception text.
+        raise HTTPException(status_code=502, detail="Unable to reach Last.fm. Please try again later.")
 
     existing_user = await get_user_by_lastfm_username(db, username)
     if existing_user is not None and existing_user.id != current_user.id:
