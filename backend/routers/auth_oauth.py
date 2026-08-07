@@ -28,7 +28,13 @@ from routers.deps import get_current_active_user, set_auth_cookies
 from schemas import LinkLastfmRequest, LinkLastfmResponse, OAuthCompleteEmailRequest
 from services.auth import create_access_token, create_refresh_token
 from services.lastfm import get_user_info
-from services.rate_limit import complete_email_limiter, link_lastfm_limiter, oauth_login_limiter, rate_limit
+from services.rate_limit import (
+    DUPLICATE_EMAIL_MESSAGE,
+    complete_email_limiter,
+    link_lastfm_limiter,
+    oauth_login_limiter,
+    rate_limit,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 
@@ -349,7 +355,7 @@ async def complete_oauth_email(
     if existing is not None and existing.id != current_user.id:
         raise HTTPException(
             status_code=409,
-            detail="An account with this email already exists",
+            detail=DUPLICATE_EMAIL_MESSAGE,
         )
 
     current_user.email = body.email
@@ -363,7 +369,7 @@ async def complete_oauth_email(
         # Concurrent registration of the same email by two accounts. The unique
         # users.email index is the source of truth.
         await db.rollback()
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
+        raise HTTPException(status_code=409, detail=DUPLICATE_EMAIL_MESSAGE)
     except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update email")

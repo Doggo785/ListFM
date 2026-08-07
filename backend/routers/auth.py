@@ -26,7 +26,16 @@ from routers.deps import (
     get_current_active_user,
     set_auth_cookies,
 )
-from services.rate_limit import rate_limit, login_limiter, register_limiter, refresh_limiter
+from services.rate_limit import (
+    DUPLICATE_EMAIL_MESSAGE,
+    rate_limit,
+    rate_limit_by_key,
+    rate_limit_email_key,
+    login_limiter,
+    register_limiter,
+    register_email_limiter,
+    refresh_limiter,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -84,9 +93,10 @@ async def register(
     if len(body.password) < 8:
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
 
+    rate_limit_by_key(register_email_limiter, rate_limit_email_key(email))
     existing = await get_user_by_email(db, email)
     if existing is not None:
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
+        raise HTTPException(status_code=409, detail=DUPLICATE_EMAIL_MESSAGE)
 
     # Create user (also creates auth_provider entry)
     user_data = UserCreate(email=email, password=body.password, display_name=body.display_name)

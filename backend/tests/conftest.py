@@ -15,6 +15,7 @@ from backend.main import app
 from services.rate_limit import (
     login_limiter,
     register_limiter,
+    register_email_limiter,
     refresh_limiter,
     link_lastfm_limiter,
     oauth_login_limiter,
@@ -78,6 +79,7 @@ async def _cleanup_db():
     for limiter in (
         login_limiter,
         register_limiter,
+        register_email_limiter,
         refresh_limiter,
         link_lastfm_limiter,
         oauth_login_limiter,

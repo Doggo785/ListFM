@@ -1,6 +1,12 @@
+import hashlib
 import time
 from collections import defaultdict
 from fastapi import HTTPException, Request
+
+
+# Shared across register / complete-email / provider-bind so the response body
+# never reveals whether an email already exists (anti-enumeration).
+DUPLICATE_EMAIL_MESSAGE = "An account with this email already exists"
 
 
 class RateLimiter:
@@ -26,6 +32,9 @@ class RateLimiter:
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 register_limiter = RateLimiter(max_requests=3, window_seconds=21600)
+# Per-email register guardrail: stops an attacker who rotates IPs but reuses
+# the same victim email. Keyed by sha256(email.lower()).
+register_email_limiter = RateLimiter(max_requests=3, window_seconds=21600)
 refresh_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
 # OAuth flow guardrails: the exchange + profile fetch + link steps each hit
@@ -38,3 +47,11 @@ complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
 def rate_limit(request: Request, limiter: RateLimiter) -> None:
     ip = request.client.host if request.client else "unknown"
     limiter.check(ip)
+
+
+def rate_limit_by_key(limiter: RateLimiter, key: str) -> None:
+    limiter.check(key)
+
+
+def rate_limit_email_key(email: str) -> str:
+    return hashlib.sha256(email.lower().encode()).hexdigest()

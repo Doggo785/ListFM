@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 from models.user import User
 from models.auth_provider import AuthProvider
 from schemas import UserCreate, UserUpdate
+from services.rate_limit import DUPLICATE_EMAIL_MESSAGE
 
 
 async def get_user_by_id(db: AsyncSession, user_id: str) -> User | None:
@@ -164,7 +165,7 @@ async def _get_or_create_user_from_provider(
             if not email_verified:
                 raise HTTPException(
                     status_code=409,
-                    detail="An account with this email already exists",
+                    detail=DUPLICATE_EMAIL_MESSAGE,
                 )
             auth_provider = AuthProvider(
                 id=str(uuid.uuid4()),
