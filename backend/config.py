@@ -1,5 +1,7 @@
 from pathlib import Path
-from pydantic import field_validator
+from urllib.parse import urlsplit
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -33,6 +35,20 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("jwt_secret must be at least 32 characters")
         return v
+
+    @model_validator(mode="after")
+    def validate_cookie_secure(self) -> "Settings":
+        if self.cookie_secure:
+            return self
+        local_hosts = {"localhost", "127.0.0.1", "::1"}
+        for url in (self.frontend_url, self.oauth_redirect_base):
+            host = urlsplit(url).hostname
+            if host is not None and host not in local_hosts:
+                raise ValueError(
+                    "cookie_secure=False is only allowed for localhost deployments. "
+                    + f"Non-local host '{host}' detected; set COOKIE_SECURE=true in production."
+                )
+        return self
 
     model_config = {"env_file": str(_ENV_FILE), "env_file_encoding": "utf-8"}
 
