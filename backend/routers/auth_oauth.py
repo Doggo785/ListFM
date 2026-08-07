@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 
 import httpx
 import pylast
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse, RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
@@ -41,6 +41,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 
 OAUTH_STATE_COOKIE = "oauth_state"
 OAUTH_STATE_MAX_AGE = 600  # 10 minutes
+
+
+def _clear_oauth_state_cookie(response: Response) -> None:
+    response.delete_cookie(key=OAUTH_STATE_COOKIE, httponly=True, samesite="lax")
 
 
 def _google_client() -> GoogleOAuth2:
@@ -185,10 +189,14 @@ async def google_callback(
 ):
     rate_limit(request, oauth_login_limiter)
     if code is None:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
+        resp = JSONResponse(status_code=400, content={"detail": "Missing authorization code"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     if not state or state != oauth_state:
-        raise HTTPException(status_code=403, detail="Invalid or expired OAuth state")
+        resp = JSONResponse(status_code=403, content={"detail": "Invalid or expired OAuth state"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     client = _google_client()
     settings = get_settings()
@@ -197,7 +205,9 @@ async def google_callback(
     try:
         token = await client.get_access_token(code, redirect_uri)
     except GetAccessTokenError:
-        raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+        resp = JSONResponse(status_code=400, content={"detail": "Failed to exchange authorization code"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     access_token = token["access_token"]
     provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "google")
@@ -247,10 +257,14 @@ async def discord_callback(
 ):
     rate_limit(request, oauth_login_limiter)
     if code is None:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
+        resp = JSONResponse(status_code=400, content={"detail": "Missing authorization code"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     if not state or state != oauth_state:
-        raise HTTPException(status_code=403, detail="Invalid or expired OAuth state")
+        resp = JSONResponse(status_code=403, content={"detail": "Invalid or expired OAuth state"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     client = _discord_client()
     settings = get_settings()
@@ -259,7 +273,9 @@ async def discord_callback(
     try:
         token = await client.get_access_token(code, redirect_uri)
     except GetAccessTokenError:
-        raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+        resp = JSONResponse(status_code=400, content={"detail": "Failed to exchange authorization code"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     access_token = token["access_token"]
     provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "discord")

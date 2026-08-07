@@ -441,6 +441,9 @@ async def test_google_callback_invalid_state(client: AsyncClient):
     )
     assert resp.status_code == 403
     assert "Invalid or expired OAuth state" in resp.json()["detail"]
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "oauth_state=" in set_cookie
+    assert "Max-Age=0" in set_cookie
 
 
 # ===========================================================================
