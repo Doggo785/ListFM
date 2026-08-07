@@ -1,24 +1,26 @@
-import hashlib
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from jose import JWTError
-from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
-from models.auth_provider import AuthProvider
-from models.refresh_token import RefreshToken
 from models.user import User
-from repositories.users import create_user, get_user_by_email
+from repositories.refresh_tokens import (
+    create_refresh_token as store_refresh_token,
+    get_refresh_token_by_hash,
+    revoke_refresh_token_family,
+)
+from repositories.users import create_user, get_lastfm_provider, get_user_by_email
 from schemas import TokenResponse, UserCreate, UserLogin
 from services.auth import (
     create_access_token,
     create_refresh_token,
     decode_token,
     hash_password,
+    hash_refresh_token,
     verify_password,
 )
 from routers.deps import (
@@ -38,33 +40,6 @@ from services.rate_limit import (
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-def _hash_token(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-async def _store_refresh_token(
-    db: AsyncSession,
-    user_id: str,
-    token: str,
-    family: str,
-    request: Request,
-) -> RefreshToken:
-    settings = get_settings()
-    now = datetime.now(timezone.utc)
-    rt = RefreshToken(
-        id=str(uuid.uuid4()),
-        user_id=user_id,
-        token_hash=_hash_token(token),
-        family=family,
-        expires_at=now + timedelta(days=settings.refresh_token_expire_days),
-        user_agent=request.headers.get("user-agent", "")[:500] or None,
-        ip_address=request.client.host if request.client else None,
-    )
-    db.add(rt)
-    await db.flush()
-    return rt
 
 
 def _build_token_response(
@@ -107,7 +82,7 @@ async def register(
     refresh_token = create_refresh_token(user.id)
 
     family = str(uuid.uuid4())
-    await _store_refresh_token(db, user.id, refresh_token, family, request)
+    await store_refresh_token(db, user.id, refresh_token, family, request)
 
     try:
         await db.commit()
@@ -141,7 +116,7 @@ async def login(
     refresh_token = create_refresh_token(user.id)
 
     family = str(uuid.uuid4())
-    await _store_refresh_token(db, user.id, refresh_token, family, request)
+    await store_refresh_token(db, user.id, refresh_token, family, request)
 
     try:
         await db.commit()
@@ -174,23 +149,15 @@ async def refresh(
     if user_id is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    token_hash = _hash_token(refresh_token)
-    result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-    )
-    stored_token = result.scalar_one_or_none()
+    token_hash = hash_refresh_token(refresh_token)
+    stored_token = await get_refresh_token_by_hash(db, token_hash)
 
     if stored_token is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if stored_token.revoked:
         # Token reuse detected — revoke entire family to prevent stolen token usage
-        await db.execute(
-            update(RefreshToken)
-            .where(RefreshToken.family == stored_token.family, RefreshToken.revoked == False)
-            .values(revoked=True)
-        )
-        await db.flush()
+        await revoke_refresh_token_family(db, stored_token.family)
         try:
             await db.commit()
         except Exception:
@@ -206,7 +173,7 @@ async def refresh(
     new_access_token = create_access_token(user_id)
     new_refresh_token = create_refresh_token(user_id)
 
-    new_rt = await _store_refresh_token(db, user_id, new_refresh_token, family, request)
+    new_rt = await store_refresh_token(db, user_id, new_refresh_token, family, request)
 
     stored_token.revoked = True
     stored_token.replaced_by = new_rt.id
@@ -230,11 +197,8 @@ async def logout(
     db: AsyncSession = Depends(get_db),
 ):
     if refresh_token is not None:
-        token_hash = _hash_token(refresh_token)
-        result = await db.execute(
-            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-        )
-        stored_token = result.scalar_one_or_none()
+        token_hash = hash_refresh_token(refresh_token)
+        stored_token = await get_refresh_token_by_hash(db, token_hash)
         if stored_token is not None:
             stored_token.revoked = True
             await db.flush()
@@ -255,13 +219,7 @@ async def me(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AuthProvider).where(
-            AuthProvider.user_id == current_user.id,
-            AuthProvider.provider == "lastfm",
-        )
-    )
-    lastfm_provider = result.scalar_one_or_none()
+    lastfm_provider = await get_lastfm_provider(db, current_user.id)
     lastfm_username = lastfm_provider.provider_user_id if lastfm_provider else None
 
     return {

@@ -50,6 +50,16 @@ async def get_user_by_lastfm_username(db: AsyncSession, lastfm_username: str) ->
     return result.scalar_one_or_none()
 
 
+async def get_lastfm_provider(db: AsyncSession, user_id: str) -> AuthProvider | None:
+    result = await db.execute(
+        select(AuthProvider).where(
+            AuthProvider.user_id == user_id,
+            AuthProvider.provider == "lastfm",
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) -> User:
     """Caller is responsible for committing the session."""
     now = datetime.now(timezone.utc)

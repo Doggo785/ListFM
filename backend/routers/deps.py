@@ -1,13 +1,11 @@
 from fastapi import Cookie, Depends, HTTPException, Response
 from jose import JWTError
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
 from database import get_db
-from models.auth_provider import AuthProvider
 from models.user import User
-from repositories.users import get_user_by_id
+from repositories.users import get_lastfm_provider, get_user_by_id
 from services.auth import decode_token
 
 
@@ -50,13 +48,7 @@ async def get_current_user_lastfm_username(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> str:
-    result = await db.execute(
-        select(AuthProvider).where(
-            AuthProvider.user_id == current_user.id,
-            AuthProvider.provider == "lastfm",
-        )
-    )
-    provider = result.scalar_one_or_none()
+    provider = await get_lastfm_provider(db, current_user.id)
     if provider is None:
         raise HTTPException(
             status_code=400,

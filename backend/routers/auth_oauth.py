@@ -10,7 +10,6 @@ from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,13 +17,14 @@ from config import Settings, get_settings
 from database import get_db
 from models.auth_provider import AuthProvider
 from models.user import User
+from repositories.refresh_tokens import create_refresh_token as store_refresh_token
 from repositories.users import (
+    get_lastfm_provider,
     get_or_create_user_from_discord,
     get_or_create_user_from_google,
     get_user_by_email,
     get_user_by_lastfm_username,
 )
-from routers.auth import _store_refresh_token
 from routers.deps import get_current_active_user, set_auth_cookies
 from schemas import LinkLastfmRequest, LinkLastfmResponse, OAuthCompleteEmailRequest
 from services.auth import create_access_token, create_refresh_token
@@ -130,7 +130,7 @@ async def _finalize_oauth_login(
     jwt_refresh = create_refresh_token(user.id)
 
     family = str(uuid.uuid4())
-    await _store_refresh_token(db, user.id, jwt_refresh, family, request)
+    await store_refresh_token(db, user.id, jwt_refresh, family, request)
 
     try:
         await db.commit()
@@ -311,13 +311,7 @@ async def link_lastfm(
     if existing_user is not None and existing_user.id != current_user.id:
         raise HTTPException(status_code=409, detail="Last.fm username is already linked to another account")
 
-    result = await db.execute(
-        select(AuthProvider).where(
-            AuthProvider.user_id == current_user.id,
-            AuthProvider.provider == "lastfm",
-        )
-    )
-    existing_provider = result.scalar_one_or_none()
+    existing_provider = await get_lastfm_provider(db, current_user.id)
     if existing_provider is not None:
         await db.delete(existing_provider)
         await db.flush()
