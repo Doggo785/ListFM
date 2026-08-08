@@ -25,9 +25,9 @@ def user_recent_tracks(limit: int = 5, username: str = Depends(get_current_user_
 
 
 @router.get("/top-tags")
-def user_top_tags(period: str = "3m", username: str = Depends(get_current_user_lastfm_username)):
+def user_top_tags(username: str = Depends(get_current_user_lastfm_username)):
     try:
-        return {"tags": get_top_tags(username, period)}
+        return {"tags": get_top_tags(username)}
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Last.fm API error: {e}")
 
