@@ -11,14 +11,7 @@ from repositories.automations import (
     update_automation,
     delete_automation,
 )
-from services.lastfm import (
-    get_top_tracks,
-    get_recent_tracks,
-    get_loved_tracks,
-    get_top_artists_tracks,
-    enrich_tracks,
-    deduplicate,
-)
+from services.automation_runner import run_automation_pipeline, UnsupportedSourceTypeError
 
 router = APIRouter(prefix="/api", tags=["automations"])
 
@@ -32,29 +25,25 @@ def preview_automation(
     source = automation.get("source", {})
     source_type = source.get("type", "top_tracks")
     period = source.get("period", "3m")
-    limit = min(automation.get("output", {}).get("maxSize", 15), 15)
+    max_size = automation.get("output", {}).get("maxSize", 50)
+    filter_groups = automation.get("filterGroups") or automation.get("filter_groups") or []
 
     try:
-        match source_type:
-            case "top_tracks":
-                tracks = get_top_tracks(username, period, limit)
-            case "recent_tracks":
-                tracks = get_recent_tracks(username, limit)
-            case "loved_tracks":
-                tracks = get_loved_tracks(username, limit)
-            case "top_artists":
-                tracks = get_top_artists_tracks(username, period, limit)
-            case _:
-                raise HTTPException(status_code=422, detail="Unsupported source type")
-
-        tracks = deduplicate(tracks)
-        tracks = enrich_tracks(username, tracks, max_enrich=limit)
+        result = run_automation_pipeline(
+            username=username,
+            source_type=source_type,
+            period=period,
+            filter_groups=filter_groups,
+            max_tracks=max_size,
+        )
+    except UnsupportedSourceTypeError:
+        raise HTTPException(status_code=422, detail="Unsupported source type")
     except HTTPException:
         raise
     except Exception:
         raise HTTPException(status_code=502, detail="Unable to fetch tracks from Last.fm")
 
-    return {"tracks": tracks, "total": len(tracks)}
+    return result
 
 
 @router.get("/automations", response_model=list[AutomationRead])
