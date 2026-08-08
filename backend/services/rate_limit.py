@@ -63,9 +63,23 @@ oauth_login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
 
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP: first entry of X-Forwarded-For when present,
+    else the socket peer address.
+
+    Tradeoff: X-Forwarded-For is trusted — correct only when a trusted proxy
+    overwrites it (dev: no proxy → request.client.host; prod behind proxy →
+    XFF). Without this, every user behind the proxy shares the proxy IP and
+    the limiter either blocks everyone or throttles nobody.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def rate_limit(request: Request, limiter: RateLimiter) -> None:
-    ip = request.client.host if request.client else "unknown"
-    limiter.check(ip)
+    limiter.check(_client_ip(request))
 
 
 def rate_limit_by_key(limiter: RateLimiter, key: str) -> None:
