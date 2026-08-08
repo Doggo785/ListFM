@@ -50,6 +50,87 @@ def get_field_value(track, field, tag_source):
     return track.get(field)
 
 
+def _find_tag_match(tags, value, count_min):
+    """First tag whose name matches (case-insensitive) with count >= count_min."""
+    for t in tags:
+        name = _get(t, "name")
+        count = _get(t, "count")
+        if (
+            name
+            and str(name).lower() == str(value).lower()
+            and count is not None
+            and count >= count_min
+        ):
+            return t
+    return None
+
+
+_TAG_OPERATORS = {
+    "contains": lambda match: match is not None,
+    "not_contains": lambda match: match is None,
+    "eq": lambda match: match is not None,
+}
+
+
+def _evaluate_tag_condition(field_value, operator, value, count_min):
+    """tags field: match by name (case-insensitive) AND count >= countMin."""
+    tags = field_value if isinstance(field_value, list) else []
+    match = _find_tag_match(tags, value, count_min)
+    handler = _TAG_OPERATORS.get(operator)
+    return handler(match) if handler is not None else False
+
+
+def _evaluate_boolean_condition(field_value, operator, value):
+    """userloved field: `is` compares bool(field_value) to the coerced value."""
+    if operator != "is":
+        return False
+    bool_val = value is True or value == "true" or value == 1
+    return bool(field_value) == bool_val
+
+
+def _between(num, target, field_value, value, value_max):
+    """Numeric between: needs valueMax; False when valueMax is NaN."""
+    max_val = _to_number(value_max)
+    if math.isnan(max_val):
+        return False
+    return num >= target and num <= max_val
+
+
+_NUMERIC_OPERATORS = {
+    "eq": lambda num, target, field_value, value, value_max: num == target,
+    "neq": lambda num, target, field_value, value, value_max: num != target,
+    "gt": lambda num, target, field_value, value, value_max: num > target,
+    "gte": lambda num, target, field_value, value, value_max: num >= target,
+    "lt": lambda num, target, field_value, value, value_max: num < target,
+    "lte": lambda num, target, field_value, value, value_max: num <= target,
+    "between": _between,
+    "within_days": lambda num, target, field_value, value, value_max: num <= target * 86400,
+    "before": lambda num, target, field_value, value, value_max: num >= target * 86400,
+    "contains": lambda num, target, field_value, value, value_max: str(field_value).lower().find(str(value).lower()) != -1,
+    "not_contains": lambda num, target, field_value, value, value_max: str(field_value).lower().find(str(value).lower()) == -1,
+}
+
+
+def _evaluate_numeric_condition(field, operator, field_value, value, value_max):
+    """Numeric compare ops with JS-style NaN handling.
+
+    contains/not_contains live here too: they substring-search the stringified
+    field value, mirroring the JS switch's numeric branch.
+    """
+    num = _to_number(field_value)
+    target = _to_number(value)
+
+    if math.isnan(target):
+        return False
+    if math.isnan(num):
+        return field == "timestamp"
+
+    handler = _NUMERIC_OPERATORS.get(operator)
+    if handler is None:
+        return False
+    return handler(num, target, field_value, value, value_max)
+
+
 def evaluate_condition(track, condition):
     field = _get(condition, "field")
     operator = _get(condition, "operator")
@@ -61,67 +142,10 @@ def evaluate_condition(track, condition):
     field_value = get_field_value(track, field, tag_source)
 
     if field == "tags":
-        tags = field_value if isinstance(field_value, list) else []
-        match = None
-        for t in tags:
-            name = _get(t, "name")
-            count = _get(t, "count")
-            if (
-                name
-                and str(name).lower() == str(value).lower()
-                and count is not None
-                and count >= count_min
-            ):
-                match = t
-                break
-        if operator == "contains":
-            return match is not None
-        if operator == "not_contains":
-            return match is None
-        if operator == "eq":
-            return match is not None
-        return False
-
+        return _evaluate_tag_condition(field_value, operator, value, count_min)
     if field == "userloved":
-        bool_val = value is True or value == "true" or value == 1
-        if operator == "is":
-            return bool(field_value) == bool_val
-        return False
-
-    num = _to_number(field_value)
-    target = _to_number(value)
-
-    if math.isnan(target):
-        return False
-    if math.isnan(num):
-        return field == "timestamp"
-
-    if operator == "eq":
-        return num == target
-    if operator == "neq":
-        return num != target
-    if operator == "gt":
-        return num > target
-    if operator == "gte":
-        return num >= target
-    if operator == "lt":
-        return num < target
-    if operator == "lte":
-        return num <= target
-    if operator == "between":
-        max_val = _to_number(value_max)
-        if math.isnan(max_val):
-            return False
-        return num >= target and num <= max_val
-    if operator == "within_days":
-        return num <= target * 86400
-    if operator == "before":
-        return num >= target * 86400
-    if operator == "contains":
-        return str(field_value).lower().find(str(value).lower()) != -1
-    if operator == "not_contains":
-        return str(field_value).lower().find(str(value).lower()) == -1
-    return False
+        return _evaluate_boolean_condition(field_value, operator, value)
+    return _evaluate_numeric_condition(field, operator, field_value, value, value_max)
 
 
 def evaluate_group(track, group):

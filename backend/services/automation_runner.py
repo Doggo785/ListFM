@@ -117,6 +117,25 @@ def _filter_groups_to_json(filter_groups):
     ]
 
 
+async def _mark_success(db: AsyncSession, history, result: dict, automation: Automation) -> None:
+    """Record a completed run on the history row and bump last_run."""
+    history.status = "completed"
+    history.tracks_generated = result["total"]
+    history.tracks_before_filter = result["before_filter"]
+    history.tracks_after_filter = result["total"]
+    history.completed_at = datetime.now(timezone.utc)
+    automation.last_run = datetime.now(timezone.utc)
+    await db.flush()
+
+
+async def _mark_failure(db: AsyncSession, history, exc: Exception) -> None:
+    """Record a failed run on the history row."""
+    history.status = "failed"
+    history.error_message = str(exc)[:2000]
+    history.completed_at = datetime.now(timezone.utc)
+    await db.flush()
+
+
 async def run_automation(db: AsyncSession, automation: Automation) -> None:
     """Run one automation's pipeline and record history + last_run.
 
@@ -144,19 +163,10 @@ async def run_automation(db: AsyncSession, automation: Automation) -> None:
             automation.output_max_size,
         )
     except Exception as exc:  # noqa: BLE001 - record any pipeline failure
-        history.status = "failed"
-        history.error_message = str(exc)[:2000]
-        history.completed_at = datetime.now(timezone.utc)
-        await db.flush()
+        await _mark_failure(db, history, exc)
         return
 
-    history.status = "completed"
-    history.tracks_generated = result["total"]
-    history.tracks_before_filter = result["before_filter"]
-    history.tracks_after_filter = result["total"]
-    history.completed_at = datetime.now(timezone.utc)
-    automation.last_run = datetime.now(timezone.utc)
-    await db.flush()
+    await _mark_success(db, history, result, automation)
 
 
 async def run_due_automations(session_factory=async_session) -> None:
