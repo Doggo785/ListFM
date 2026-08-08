@@ -11,6 +11,7 @@ from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     get_refresh_token_by_hash,
+    revoke_all_user_refresh_tokens,
     revoke_refresh_token_family,
 )
 from repositories.users import create_user, get_lastfm_provider, get_user_by_email
@@ -82,6 +83,7 @@ async def register(
     refresh_token = create_refresh_token(user.id)
 
     family = str(uuid.uuid4())
+    await revoke_all_user_refresh_tokens(db, user.id)
     await store_refresh_token(db, user.id, refresh_token, family, request)
 
     try:
@@ -116,6 +118,7 @@ async def login(
     refresh_token = create_refresh_token(user.id)
 
     family = str(uuid.uuid4())
+    await revoke_all_user_refresh_tokens(db, user.id)
     await store_refresh_token(db, user.id, refresh_token, family, request)
 
     try:

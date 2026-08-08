@@ -17,7 +17,10 @@ from config import Settings, get_settings
 from database import get_db
 from models.auth_provider import AuthProvider
 from models.user import User
-from repositories.refresh_tokens import create_refresh_token as store_refresh_token
+from repositories.refresh_tokens import (
+    create_refresh_token as store_refresh_token,
+    revoke_all_user_refresh_tokens,
+)
 from repositories.users import (
     get_lastfm_provider,
     get_or_create_user_from_discord,
@@ -134,6 +137,7 @@ async def _finalize_oauth_login(
     jwt_refresh = create_refresh_token(user.id)
 
     family = str(uuid.uuid4())
+    await revoke_all_user_refresh_tokens(db, user.id)
     await store_refresh_token(db, user.id, jwt_refresh, family, request)
 
     try:

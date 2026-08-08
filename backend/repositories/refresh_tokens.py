@@ -50,3 +50,14 @@ async def revoke_refresh_token_family(db: AsyncSession, family: str) -> int:
     )
     await db.flush()
     return result.rowcount
+
+
+async def revoke_all_user_refresh_tokens(db: AsyncSession, user_id: str) -> int:
+    """Revoke every non-revoked refresh token belonging to a user. Returns affected row count."""
+    result = await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
+        .values(revoked=True)
+    )
+    await db.flush()
+    return result.rowcount

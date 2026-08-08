@@ -1,18 +1,20 @@
 """Tests for OAuth redirect endpoints and /api/auth/link-lastfm."""
 
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pylast
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 
 from sqlalchemy import select
 
 from models.auth_provider import AuthProvider
+from models.refresh_token import RefreshToken
 from models.user import User
 
 from config import Settings
@@ -133,6 +135,68 @@ async def test_google_callback_returning_user(client: AsyncClient):
             )
         assert resp.status_code == 302
         assert "/dashboard" in resp.headers["location"]
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_oauth_finalize_revokes_previous_families(client: AsyncClient):
+    """OAuth login for an existing user revokes all prior refresh tokens."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+        old_refresh = client.cookies.get("refresh_token")
+        assert old_refresh is not None
+
+        with (
+            patch.object(
+                GoogleOAuth2,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
+        ):
+            mock_resp = _MockGoogleResponse(200, {
+                "id": "google_12345",
+                "email": email,
+                "name": "Test User",
+                "verified_email": True,
+            })
+            mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
+            resp = await client.get(
+                "/api/auth/google/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+        assert resp.status_code == 302
+        assert "/dashboard" in resp.headers["location"]
+
+        # The pre-OAuth refresh token must now be revoked.
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as fresh:
+            fresh.cookies.set("refresh_token", old_refresh)
+            r = await fresh.post("/api/auth/refresh")
+            assert r.status_code == 401
+
+        user_id = _get_user_id_from_cookies(client)
+        current_hash = hashlib.sha256(
+            client.cookies.get("refresh_token").encode()
+        ).hexdigest()
+        async with _TestSessionLocal() as db:
+            result = await db.execute(
+                select(RefreshToken).where(RefreshToken.user_id == user_id)
+            )
+            tokens = result.scalars().all()
+            assert len(tokens) >= 2, (
+                f"Expected at least 2 refresh tokens, got {len(tokens)}"
+            )
+            newest = next(t for t in tokens if t.token_hash == current_hash)
+            assert newest.revoked is False
+            for token in tokens:
+                if token.id != newest.id:
+                    assert token.revoked is True, (
+                        f"Prior refresh token {token.id} must be revoked after OAuth login"
+                    )
     finally:
         await _cleanup_user(email=email)
 
