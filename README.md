@@ -197,7 +197,7 @@ ListFM/
 |---|---|:---:|
 | `LASTFM_API_KEY` | Last.fm API key | ✅ |
 | `LASTFM_API_SECRET` | Last.fm API secret | ✅ |
-| `DATABASE_URL` | PostgreSQL connection string | ✅ |
+| `DATABASE_URL` | PostgreSQL connection string — local Docker Postgres runs on port `5433`, CI on port `5432` | ✅ |
 | `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | ✅ |
 | `COOKIE_SECURE` | Set to `true` for HTTPS deployments | |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client ID (for "Sign in with Google") | |
