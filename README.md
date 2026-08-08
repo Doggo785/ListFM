@@ -83,6 +83,8 @@ npm install
 
 ### Development
 
+> Local dev uses Docker Postgres on port `5433` (CI uses the standard `5432`).
+
 Open **two terminals** from the project root:
 
 ```bash
