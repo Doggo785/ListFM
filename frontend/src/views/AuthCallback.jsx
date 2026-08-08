@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "motion/react";
 import Grainient from "../components/ui/Grainient";
 import { useAuth } from "../contexts/AuthContext";
+import { request } from "@/lib/api";
 
 function AuthCallback() {
   const [searchParams] = useSearchParams();
@@ -42,17 +43,10 @@ function AuthCallback() {
     setError(null);
 
     try {
-      const resp = await fetch("/api/auth/oauth/complete-email", {
+      await request("/api/auth/oauth/complete-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ email: email.trim() }),
       });
-
-      if (!resp.ok) {
-        const data = await resp.json().catch(() => ({}));
-        throw new Error(data.detail || "Failed to save email. Please try again.");
-      }
 
       // If the user already has a linked Last.fm account, skip the linking page
       if (isLastfmLinked) {
