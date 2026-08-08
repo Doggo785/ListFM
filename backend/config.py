@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     cookie_secure: bool = False
+    enable_scheduler: bool = False
 
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""

@@ -69,7 +69,7 @@ async def test_preview_upstream_failure_returns_502(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         with patch(
-            "routers.automations.get_top_tracks",
+            "services.automation_runner.get_top_tracks",
             side_effect=Exception("secret internal traceback"),
         ):
             resp = await client.post(
@@ -94,8 +94,8 @@ async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
             {"artist": "Artist A", "title": "Song A"},
             {"artist": "Artist B", "title": "Song B"},
         ]
-        with patch("routers.automations.get_top_tracks", return_value=tracks), patch(
-            "routers.automations.enrich_tracks", return_value=tracks
+        with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
+            "services.automation_runner.enrich_tracks", return_value=tracks
         ):
             resp = await client.post(
                 "/api/automations/preview",
@@ -105,5 +105,57 @@ async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
         data = resp.json()
         assert data["tracks"] == tracks
         assert data["total"] == 2
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_applies_server_side_filters(client: AsyncClient):
+    """A successful preview applies the filter tree server-side and reports
+    before_filter/source_tracks alongside the existing {tracks, total} keys."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        tracks = [
+            {"artist": "Artist A", "title": "Song A", "userplaycount": 5},
+            {"artist": "Artist B", "title": "Song B", "userplaycount": 20},
+        ]
+        body = {
+            "automation": {
+                "source": {"type": "top_tracks", "period": "3m"},
+                "output": {"maxSize": 50},
+                "filterGroups": [
+                    {
+                        "id": "g1",
+                        "logic": "AND",
+                        "conditions": [
+                            {
+                                "id": "c1",
+                                "field": "userplaycount",
+                                "operator": "gte",
+                                "value": 10,
+                                "valueMax": None,
+                                "countMin": 0,
+                                "tagSource": "artist",
+                            }
+                        ],
+                        "groups": [],
+                    }
+                ],
+            }
+        }
+        with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
+            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            resp = await client.post(
+                "/api/automations/preview",
+                json=body,
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["tracks"] == [tracks[1]]
+        assert data["total"] == 1
+        assert data["before_filter"] == 2
+        assert data["source_tracks"] == tracks
     finally:
         await _cleanup_user(email=email)

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config import get_settings
 from database import engine
 from routers.users import router as users_router
@@ -9,13 +10,38 @@ from routers.automations import router as automations_router
 from routers.auth import router as auth_router
 from routers.auth_oauth import router as auth_oauth_router
 from routers.generated_playlists import router as generated_playlists_router
+from services.automation_runner import run_due_automations
 
 settings = get_settings()
 
 
+def create_scheduler() -> AsyncIOScheduler | None:
+    """Create the automation sweep scheduler, or None when disabled.
+
+    ENABLE_SCHEDULER defaults to false so `--reload` dev stays single-job.
+    """
+    if not settings.enable_scheduler:
+        return None
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        run_due_automations,
+        trigger="interval",
+        seconds=60,
+        id="automation_sweep",
+        max_instances=1,
+        coalesce=True,
+    )
+    return scheduler
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    scheduler = create_scheduler()
+    if scheduler is not None:
+        scheduler.start()
     yield
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
     await engine.dispose()
 
 
