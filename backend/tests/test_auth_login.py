@@ -80,6 +80,28 @@ async def test_login_wrong_password(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_login_password_over_72_bytes_422(client: AsyncClient):
+    """A >72-byte password is rejected at validation (422), not bcrypt-truncated
+    into a 401. Documented behavior change: pre-existing users with such
+    passwords are un-loginable (422) until they reset."""
+    email = _unique_email()
+    try:
+        await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        client.cookies.clear()
+
+        resp = await client.post(
+            "/api/auth/login",
+            json={"email": email, "password": "a" * 73},
+        )
+        assert resp.status_code == 422
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
 async def test_login_nonexistent_email(client: AsyncClient):
     resp = await client.post(
         "/api/auth/login",
