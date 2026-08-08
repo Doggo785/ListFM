@@ -83,6 +83,8 @@ npm install
 
 ### Development
 
+> Local dev uses Docker Postgres on port `5433` (CI uses the standard `5432`).
+
 Open **two terminals** from the project root:
 
 ```bash
@@ -197,7 +199,7 @@ ListFM/
 |---|---|:---:|
 | `LASTFM_API_KEY` | Last.fm API key | ✅ |
 | `LASTFM_API_SECRET` | Last.fm API secret | ✅ |
-| `DATABASE_URL` | PostgreSQL connection string — local Docker Postgres runs on port `5433`, CI on port `5432` | ✅ |
+| `DATABASE_URL` | PostgreSQL connection string | ✅ |
 | `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | ✅ |
 | `COOKIE_SECURE` | Set to `true` for HTTPS deployments | |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client ID (for "Sign in with Google") | |
