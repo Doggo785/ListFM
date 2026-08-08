@@ -131,6 +131,28 @@ async def test_register_weak_password(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_register_password_over_72_bytes_422(client: AsyncClient):
+    """bcrypt caps at 72 BYTES — a 73-char ASCII password must be rejected
+    instead of silently truncated."""
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": _unique_email(), "password": "a" * 73},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_register_password_multibyte_72_bytes_ok(client: AsyncClient):
+    """36 emoji chars = 144 bytes (4 bytes each) — rejected even though only
+    36 characters, proving the limit counts bytes, not characters."""
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": _unique_email(), "password": "\U0001F600" * 36},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_register_email_normalized(client: AsyncClient):
     raw_email = f"  Test-{uuid.uuid4().hex[:8]}@Example.COM  "
     normalized = raw_email.strip().lower()

@@ -25,13 +25,29 @@ class EmailValidatorMixin:
         return _validate_email(v)
 
 
-class UserCreate(EmailValidatorMixin, BaseModel):
+class PasswordValidatorMixin:
+    """Shared password validator for Pydantic models.
+
+    bcrypt silently truncates passwords at 72 BYTES, so the limit must count
+    bytes (utf-8), not characters — a naive max_length=72 would let a
+    multibyte password through and truncate it at hash time.
+    """
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 bytes")
+        return v
+
+
+class UserCreate(EmailValidatorMixin, PasswordValidatorMixin, BaseModel):
     email: str
     password: str
     display_name: Optional[str] = None
 
 
-class UserLogin(EmailValidatorMixin, BaseModel):
+class UserLogin(EmailValidatorMixin, PasswordValidatorMixin, BaseModel):
     email: str
     password: str
 
