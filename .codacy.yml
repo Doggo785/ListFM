@@ -1,0 +1,7 @@
+---
+exclude_paths:
+  - "**/tests/**"
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/*.test.*"
+  - "**/*.spec.*"
