@@ -55,7 +55,7 @@ def get_recent_tracks(username: str, limit: int = 5) -> list[dict]:
     ]
 
 
-def get_top_tags(username: str, period: str = "3m") -> list[dict]:
+def get_top_tags(username: str) -> list[dict]:
     network = get_network()
     user = network.get_user(username)
     top_tags = user.get_top_tags(limit=10)
