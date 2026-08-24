@@ -11,6 +11,7 @@ from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     get_refresh_token_by_hash,
+    revoke_all_user_refresh_tokens,
     revoke_refresh_token_family,
 )
 from repositories.users import create_user, get_lastfm_provider, get_user_by_email
@@ -55,6 +56,38 @@ def _build_token_response(
     )
 
 
+async def _establish_session(
+    db: AsyncSession,
+    user: User,
+    request: Request,
+    response: Response,
+    *,
+    error_detail: str,
+) -> tuple[str, str]:
+    """Create tokens, revoke stale refresh tokens, persist the new one, and set cookies.
+
+    Shared by register() and login(). Commits the session; on failure rolls back
+    and raises a 500 with the caller-provided detail. Returns the tokens so the
+    caller can build the TokenResponse body.
+    """
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+
+    family = str(uuid.uuid4())
+    await revoke_all_user_refresh_tokens(db, user.id)
+    await store_refresh_token(db, user.id, refresh_token, family, request)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=error_detail)
+
+    set_auth_cookies(response, access_token, refresh_token)
+
+    return access_token, refresh_token
+
+
 @router.post("/register", response_model=TokenResponse, status_code=201)
 async def register(
     body: UserCreate,
@@ -78,19 +111,9 @@ async def register(
     password_hash = hash_password(body.password)
     user = await create_user(db, user_data, password_hash)
 
-    access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
-
-    family = str(uuid.uuid4())
-    await store_refresh_token(db, user.id, refresh_token, family, request)
-
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to create account")
-
-    set_auth_cookies(response, access_token, refresh_token)
+    access_token, refresh_token = await _establish_session(
+        db, user, request, response, error_detail="Failed to create account"
+    )
 
     return _build_token_response(access_token, refresh_token)
 
@@ -112,19 +135,9 @@ async def login(
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
-
-    family = str(uuid.uuid4())
-    await store_refresh_token(db, user.id, refresh_token, family, request)
-
-    try:
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to log in")
-
-    set_auth_cookies(response, access_token, refresh_token)
+    access_token, refresh_token = await _establish_session(
+        db, user, request, response, error_detail="Failed to log in"
+    )
 
     return _build_token_response(access_token, refresh_token)
 

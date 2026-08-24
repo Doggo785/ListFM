@@ -156,3 +156,87 @@ async def test_refresh_reuse_revokes_entire_family(client: AsyncClient):
 async def test_refresh_no_cookie_returns_401(client: AsyncClient):
     resp = await client.post("/api/auth/refresh")
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_revokes_previous_families(client: AsyncClient):
+    """A fresh login must revoke every prior refresh token (one active session)."""
+    email = _unique_email()
+    try:
+        await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        client.cookies.clear()
+        resp = await client.post(
+            "/api/auth/login",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        assert resp.status_code == 200
+        token_a = client.cookies.get("refresh_token")
+        assert token_a is not None
+
+        # Second login — token A must be dead afterwards.
+        client.cookies.clear()
+        resp2 = await client.post(
+            "/api/auth/login",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        assert resp2.status_code == 200
+
+        # Token A now returns 401 on /api/auth/refresh.
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as fresh:
+            fresh.cookies.set("refresh_token", token_a)
+            resp = await fresh.post("/api/auth/refresh")
+            assert resp.status_code == 401
+
+        # DB: every row for the user except the newest is revoked.
+        user_id = _get_user_id_from_cookies(client)
+        current_hash = hashlib.sha256(
+            client.cookies.get("refresh_token").encode()
+        ).hexdigest()
+        async with _TestSessionLocal() as db:
+            result = await db.execute(
+                select(RefreshToken).where(RefreshToken.user_id == user_id)
+            )
+            tokens = result.scalars().all()
+            assert len(tokens) >= 2, (
+                f"Expected at least 2 refresh tokens, got {len(tokens)}"
+            )
+            newest = next(t for t in tokens if t.token_hash == current_hash)
+            assert newest.revoked is False
+            for token in tokens:
+                if token.id != newest.id:
+                    assert token.revoked is True, (
+                        f"Prior refresh token {token.id} must be revoked after re-login"
+                    )
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_register_no_revoke_crash(client: AsyncClient):
+    """Register still works and creates exactly one active token family."""
+    email = _unique_email()
+    try:
+        resp = await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        assert resp.status_code == 201
+
+        user_id = _get_user_id_from_cookies(client)
+        async with _TestSessionLocal() as db:
+            result = await db.execute(
+                select(RefreshToken).where(RefreshToken.user_id == user_id)
+            )
+            tokens = result.scalars().all()
+            assert len(tokens) == 1, (
+                f"Expected exactly 1 refresh token after register, got {len(tokens)}"
+            )
+            assert tokens[0].revoked is False
+            assert len({t.family for t in tokens}) == 1
+    finally:
+        await _cleanup_user(email=email)
