@@ -35,7 +35,7 @@ function AppSidebar({ userLabel = "User", activePage = "home" }) {
     },
     {
       label: "Playlists",
-      href: "#",
+      href: "/playlists",
       icon: <IconPlaylist className={iconClass} />,
     },
     {

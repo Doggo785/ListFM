@@ -152,6 +152,23 @@ export async function deleteAutomation(id) {
 }
 
 /**
+ * @returns {Promise<Array>} generated playlists
+ */
+export async function getGeneratedPlaylists() {
+  requireUsername();
+  return request("/api/generated-playlists");
+}
+
+/**
+ * @param {string} id — generated playlist UUID
+ * @returns {Promise<object>} generated playlist
+ */
+export async function getGeneratedPlaylist(id) {
+  requireUsername();
+  return request(`/api/generated-playlists/${id}`);
+}
+
+/**
  * @param {object} playlist — { automation_id, name, source_type, source_period, tracks, track_count, filter_groups }
  * @returns {Promise<object>} saved playlist
  */

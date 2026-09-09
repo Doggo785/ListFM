@@ -34,6 +34,8 @@ export default function PlaylistNew() {
   const username = user?.lastfm_username;
   const [step, setStep] = useState(1);
   const [data, setData] = useState(createDefaultAutomation());
+  const [createError, setCreateError] = useState(null);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     document.title = "New Playlist - ListFM";
@@ -47,12 +49,21 @@ export default function PlaylistNew() {
   };
 
   const handleCreate = async () => {
-    if (!username) return;
+    if (!username) {
+      setCreateError("Link your Last.fm account before creating an automation.");
+      return;
+    }
+    if (creating) return;
+    setCreating(true);
+    setCreateError(null);
     try {
       await createAutomation(data);
       navigate("/playlists");
     } catch (err) {
       console.error("Failed to create automation:", err);
+      setCreateError(err.message || "Failed to create automation");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -95,6 +106,12 @@ export default function PlaylistNew() {
 
         <StepIndicator currentStep={step} steps={STEPS} />
 
+        {createError && (
+          <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center mt-4">
+            <p className="text-sm text-red-400">{createError}</p>
+          </div>
+        )}
+
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex-1">{renderStep()}</div>
 
@@ -123,10 +140,11 @@ export default function PlaylistNew() {
               <Button
                 size="lg"
                 onClick={handleCreate}
-                className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90"
+                disabled={creating}
+                className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <IconCheck size={16} className="mr-2" />
-                Create automation
+                {creating ? "Creating..." : "Create automation"}
               </Button>
             )}
           </div>

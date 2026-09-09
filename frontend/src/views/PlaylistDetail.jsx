@@ -120,6 +120,9 @@ export default function PlaylistDetail() {
   const [previewTracks, setPreviewTracks] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
+  const [librarySaveError, setLibrarySaveError] = useState(null);
 
   useEffect(() => {
     document.title = automation?.name ? `${automation.name} - ListFM` : "Playlist - ListFM";
@@ -171,26 +174,31 @@ export default function PlaylistDetail() {
   }, []);
 
   const handleSave = async () => {
+    setSaveError(null);
     try {
       await updateAutomation(automation.id, automation);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error("Failed to save automation:", err);
+      setSaveError(err.message || "Failed to save automation");
     }
   };
 
   const confirmDelete = async () => {
+    setDeleteError(null);
     try {
       await deleteAutomation(automation.id);
       navigate("/playlists");
     } catch (err) {
       console.error("Failed to delete automation:", err);
+      setDeleteError(err.message || "Failed to delete automation");
     }
   };
 
   const handleSaveToLibrary = async () => {
     if (!saveName.trim() || !previewTracks) return;
+    setLibrarySaveError(null);
     try {
       await saveGeneratedPlaylist({
         automation_id: automation.id,
@@ -207,6 +215,7 @@ export default function PlaylistDetail() {
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error("Failed to save playlist:", err);
+      setLibrarySaveError(err.message || "Failed to save playlist");
     }
   };
 
@@ -222,16 +231,6 @@ export default function PlaylistDetail() {
       setRawTracks(enriched);
       const filtered = applyFilterGroups(enriched, automation.filterGroups);
       setPreviewTracks(filtered);
-
-      // Auto-save to library (fire-and-forget)
-      saveGeneratedPlaylist({
-        automation_id: automation.id,
-        source_type: automation.source?.type,
-        source_period: automation.source?.period,
-        tracks: filtered,
-        track_count: filtered.length,
-        filter_groups: automation.filterGroups || [],
-      }).catch(() => {});
     } catch (err) {
       setPreviewError(err.message || "Failed to load preview");
     } finally {
@@ -338,6 +337,18 @@ export default function PlaylistDetail() {
             </div>
           </div>
         </motion.header>
+
+        {saveError && (
+          <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center mb-6">
+            <p className="text-sm text-red-400">{saveError}</p>
+          </div>
+        )}
+
+        {deleteError && (
+          <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center mb-6">
+            <p className="text-sm text-red-400">{deleteError}</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 items-start">
           <div className="space-y-6 pb-16">
@@ -646,6 +657,11 @@ export default function PlaylistDetail() {
               <p className="text-sm text-neutral-400 mb-4">
                 Give your playlist a name to find it later.
               </p>
+              {librarySaveError && (
+                <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center mb-4">
+                  <p className="text-sm text-red-400">{librarySaveError}</p>
+                </div>
+              )}
               <input
                 type="text"
                 value={saveName}
