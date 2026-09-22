@@ -24,7 +24,6 @@ import FilterBuilder from "@/components/builder/FilterBuilder";
 import CronEditor from "@/components/builder/CronEditor";
 import {
   previewAutomation,
-  saveGeneratedPlaylist,
   getAutomation,
   updateAutomation,
   deleteAutomation,
@@ -112,17 +111,12 @@ export default function PlaylistDetail() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const [saveName, setSaveName] = useState("");
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
   const [rawTracks, setRawTracks] = useState(null);
   const [previewTracks, setPreviewTracks] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
-  const [librarySaveError, setLibrarySaveError] = useState(null);
 
   useEffect(() => {
     document.title = automation?.name ? `${automation.name} - ListFM` : "Playlist - ListFM";
@@ -193,29 +187,6 @@ export default function PlaylistDetail() {
     } catch (err) {
       console.error("Failed to delete automation:", err);
       setDeleteError(err.message || "Failed to delete automation");
-    }
-  };
-
-  const handleSaveToLibrary = async () => {
-    if (!saveName.trim() || !previewTracks) return;
-    setLibrarySaveError(null);
-    try {
-      await saveGeneratedPlaylist({
-        automation_id: automation.id,
-        name: saveName.trim(),
-        source_type: automation.source?.type,
-        source_period: automation.source?.period,
-        tracks: previewTracks,
-        track_count: previewTracks.length,
-        filter_groups: automation.filterGroups || [],
-      });
-      setShowSaveModal(false);
-      setSaveName("");
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err) {
-      console.error("Failed to save playlist:", err);
-      setLibrarySaveError(err.message || "Failed to save playlist");
     }
   };
 
@@ -569,24 +540,6 @@ export default function PlaylistDetail() {
                       </div>
                     )}
                   </div>
-
-                  {previewTracks && previewTracks.length > 0 && (
-                    <div className="px-5 py-4 border-t border-white/5 shrink-0">
-                      {saveSuccess ? (
-                        <div className="text-center text-sm text-green-400 font-medium py-2">
-                          Saved to library!
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setShowSaveModal(true)}
-                          className="w-full rounded-xl bg-[#ff530b] text-white py-3 text-sm font-semibold hover:bg-[#ff530b]/90 transition-colors shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
-                        >
-                          Save to Library
-                        </button>
-                      )}
-                    </div>
-                  )}
                 </div>
               </BorderGlow>
             </motion.div>
@@ -636,66 +589,6 @@ export default function PlaylistDetail() {
           </div>
         )}
 
-        {showSaveModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowSaveModal(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2 }}
-              className="relative z-10 w-full max-w-sm rounded-2xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-6"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="rounded-lg bg-[#ff530b]/10 p-2">
-                  <IconDeviceFloppy size={18} className="text-[#ff530b]" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Save to Library</h3>
-              </div>
-              <p className="text-sm text-neutral-400 mb-4">
-                Give your playlist a name to find it later.
-              </p>
-              {librarySaveError && (
-                <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center mb-4">
-                  <p className="text-sm text-red-400">{librarySaveError}</p>
-                </div>
-              )}
-              <input
-                type="text"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                placeholder="e.g. Summer Vibes 2024"
-                className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3 text-base text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all shadow-inner mb-4"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveToLibrary();
-                  if (e.key === "Escape") setShowSaveModal(false);
-                }}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSaveModal(false)}
-                  className="border-neutral-700 bg-transparent text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSaveToLibrary}
-                  disabled={!saveName.trim()}
-                  className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <IconDeviceFloppy size={14} className="mr-1.5" />
-                  Save
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
       </div>
     </div>
   );
