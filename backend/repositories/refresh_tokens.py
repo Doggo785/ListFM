@@ -17,7 +17,6 @@ async def create_refresh_token(
     family: str,
     request: Request,
 ) -> RefreshToken:
-    """Construct and persist a RefreshToken row. Caller commits the session."""
     settings = get_settings()
     now = datetime.now(timezone.utc)
     rt = RefreshToken(
@@ -42,7 +41,6 @@ async def get_refresh_token_by_hash(db: AsyncSession, token_hash: str) -> Refres
 
 
 async def revoke_refresh_token_family(db: AsyncSession, family: str) -> int:
-    """Revoke every non-revoked token in a family. Returns affected row count."""
     result = await db.execute(
         update(RefreshToken)
         .where(RefreshToken.family == family, RefreshToken.revoked == False)
@@ -53,7 +51,6 @@ async def revoke_refresh_token_family(db: AsyncSession, family: str) -> int:
 
 
 async def revoke_all_user_refresh_tokens(db: AsyncSession, user_id: str) -> int:
-    """Revoke every non-revoked refresh token belonging to a user. Returns affected row count."""
     result = await db.execute(
         update(RefreshToken)
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
