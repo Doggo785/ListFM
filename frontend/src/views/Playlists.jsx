@@ -11,16 +11,7 @@ import {
   describeCron,
   isValidCron,
 } from "@/lib/automation-rules";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-};
+import { fadeUp, stagger } from "@/lib/animation";
 
 function buildSourceLine(auto) {
   const source = SOURCE_TYPE_LABELS[auto.source?.type] || auto.source?.type || "Unknown source";
