@@ -100,28 +100,29 @@ async def _extract_oauth_profile(
     email_verified mirrors the provider's email-verification claim
     (Google: verified_email, Discord: verified; absent means False).
     """
-    if provider == "google":
-        async with httpx.AsyncClient() as http:
-            resp = await http.get(
-                "https://www.googleapis.com/oauth2/v2/userinfo",
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-            if resp.status_code >= 400:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Failed to fetch Google profile: {resp.status_code}",
+    match provider:
+        case "google":
+            async with httpx.AsyncClient() as http:
+                resp = await http.get(
+                    "https://www.googleapis.com/oauth2/v2/userinfo",
+                    headers={"Authorization": f"Bearer {access_token}"},
                 )
-            profile = resp.json()
-        provider_id = profile.get("id", "")
-        email = profile.get("email")
-        email_verified = profile.get("verified_email", False) is True
-    elif provider == "discord":
-        profile = await client.get_profile(access_token)
-        provider_id = profile.get("id", "")
-        email = profile.get("email")
-        email_verified = profile.get("verified", False) is True
-    else:
-        raise ValueError(f"Unknown provider: {provider}")
+                if resp.status_code >= 400:
+                    raise HTTPException(
+                        status_code=502,
+                        detail=f"Failed to fetch Google profile: {resp.status_code}",
+                    )
+                profile = resp.json()
+            provider_id = profile.get("id", "")
+            email = profile.get("email")
+            email_verified = profile.get("verified_email", False) is True
+        case "discord":
+            profile = await client.get_profile(access_token)
+            provider_id = profile.get("id", "")
+            email = profile.get("email")
+            email_verified = profile.get("verified", False) is True
+        case _:
+            raise ValueError(f"Unknown provider: {provider}")
     return provider_id, email, email_verified, profile
 
 
