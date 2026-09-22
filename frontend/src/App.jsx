@@ -14,14 +14,11 @@ import PlaylistDetail from "./views/PlaylistDetail";
 import Playlists from "./views/Playlists";
 import AuthGuard from "./components/AuthGuard";
 
+const NO_SIDEBAR_PATHS = ["/", "/login", "/register", "/auth/callback", "/link-lastfm"];
+
 function App() {
   const location = useLocation();
-  const showSidebar =
-    location.pathname !== "/" &&
-    location.pathname !== "/login" &&
-    location.pathname !== "/register" &&
-    location.pathname !== "/auth/callback" &&
-    location.pathname !== "/link-lastfm";
+  const showSidebar = !NO_SIDEBAR_PATHS.includes(location.pathname);
 
   return (
     <div className="app-container">
