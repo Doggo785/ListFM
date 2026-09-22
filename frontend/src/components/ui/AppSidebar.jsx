@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   IconHome,
   IconChartBar,
@@ -13,9 +13,10 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const iconClass = "text-neutral-200 h-5 w-5 flex-shrink-0";
 
-function AppSidebar({ userLabel = "User", activePage = "home" }) {
+function AppSidebar({ userLabel = "User" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const [avatar, setAvatar] = useState(null);
   const { user, logout } = useAuth();
   const username = user?.lastfm_username;
@@ -27,27 +28,37 @@ function AppSidebar({ userLabel = "User", activePage = "home" }) {
       .catch(() => setAvatar(null));
   }, [username]);
 
+  const isActive = (href) =>
+    typeof href === "string" && href.startsWith("/") &&
+    location.pathname.startsWith(href);
+
+  const linkClass = (href) =>
+    isActive(href) ? "text-white font-medium" : undefined;
+
   const links = [
     {
       label: "Home",
       href: "/dashboard",
       icon: <IconHome className={iconClass} />,
+      className: linkClass("/dashboard"),
     },
     {
       label: "Playlists",
       href: "/playlists",
       icon: <IconPlaylist className={iconClass} />,
+      className: linkClass("/playlists"),
     },
     {
       label: "Stats",
-      href:
-        activePage === "dashboard" ? "/dashboard" : "#",
+      href: null,
       icon: <IconChartBar className={iconClass} />,
+      className: undefined,
     },
     {
       label: "Profile",
-      href: "#",
+      href: null,
       icon: <IconUser className={iconClass} />,
+      className: undefined,
     },
   ];
 
@@ -63,8 +74,8 @@ function AppSidebar({ userLabel = "User", activePage = "home" }) {
             <h1 className="text-2xl font-black text-[#ff530b]">ListFM</h1>
           </button>
           <div className="flex flex-col gap-2">
-            {links.map((link) => (
-              <SidebarLink key={link.label} link={link} />
+            {links.map(({ className, ...link }) => (
+              <SidebarLink key={link.label} link={link} className={className} />
             ))}
           </div>
         </div>

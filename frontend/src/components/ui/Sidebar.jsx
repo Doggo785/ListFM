@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useState, createContext, useContext } from "react";
+import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { IconMenu2, IconX } from "@tabler/icons-react";
 
@@ -145,16 +146,12 @@ export const SidebarLink = ({
 }) => {
   const { open, animate } = useSidebar();
   const showExpanded = !animate || open;
+  const isInternal =
+    typeof link.href === "string" && link.href.startsWith("/");
+  const isDead = !link.href || link.href === "#";
 
-  return (
-    <a
-      href={link.href}
-      className={cn(
-        "flex items-center justify-start gap-2 group/sidebar py-2",
-        className,
-      )}
-      {...props}
-    >
+  const content = (
+    <>
       {link.icon}
       <motion.span
         animate={{
@@ -165,6 +162,36 @@ export const SidebarLink = ({
       >
         {link.label}
       </motion.span>
+    </>
+  );
+  const baseClass = cn(
+    "flex items-center justify-start gap-2 group/sidebar py-2",
+    className,
+  );
+
+  if (isDead) {
+    return (
+      <span
+        className={cn(baseClass, "opacity-50 cursor-not-allowed")}
+        aria-disabled="true"
+        {...props}
+      >
+        {content}
+      </span>
+    );
+  }
+
+  if (isInternal) {
+    return (
+      <Link to={link.href} className={baseClass} {...props}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <a href={link.href} className={baseClass} {...props}>
+      {content}
     </a>
   );
 };
