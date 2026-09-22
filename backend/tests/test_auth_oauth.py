@@ -27,11 +27,6 @@ from .conftest import (
 )
 
 
-# ===========================================================================
-# OAuth key validation tests
-# ===========================================================================
-
-
 @pytest.mark.asyncio
 async def test_google_login_no_keys(client: AsyncClient):
     """GET /api/auth/google/login without configured keys returns 400."""
@@ -62,11 +57,6 @@ async def test_discord_login_no_keys(client: AsyncClient):
         resp = await client.get("/api/auth/discord/login")
     assert resp.status_code == 400
     assert resp.json()["detail"] == "discord OAuth is not configured"
-
-
-# ===========================================================================
-# OAuth callback tests (mocked httpx-oauth)
-# ===========================================================================
 
 
 class _MockGoogleResponse:
@@ -339,11 +329,6 @@ async def test_discord_callback_returning_user_no_email_from_discord(client: Asy
         await _cleanup_user(email=email)
 
 
-# ===========================================================================
-# email_verified propagation (account-takeover protection)
-# ===========================================================================
-
-
 @pytest.mark.asyncio
 async def test_google_callback_existing_user_unverified_email_blocked(client: AsyncClient):
     """Google callback claiming an existing user's email with verified_email=False returns 409 and does not bind."""
@@ -470,11 +455,6 @@ async def test_google_callback_new_user_verified_email_persisted(client: AsyncCl
         await _cleanup_user(email=email)
 
 
-# ===========================================================================
-# OAuth callback error cases
-# ===========================================================================
-
-
 @pytest.mark.asyncio
 async def test_google_callback_missing_code(client: AsyncClient):
     """Google callback without code returns 400."""
@@ -495,11 +475,6 @@ async def test_google_callback_invalid_state(client: AsyncClient):
     set_cookie = resp.headers.get("set-cookie", "")
     assert "oauth_state=" in set_cookie
     assert "Max-Age=0" in set_cookie
-
-
-# ===========================================================================
-# /api/auth/oauth/complete-email tests
-# ===========================================================================
 
 
 @pytest.mark.asyncio
@@ -539,7 +514,6 @@ async def test_complete_email_duplicate(client: AsyncClient):
     email2 = _unique_email()
     try:
         await _register_and_login(client, email1)
-        user1_id = _get_user_id_from_cookies(client)
 
         await _register_and_login(client, email2)
         user2_id = _get_user_id_from_cookies(client)
@@ -592,11 +566,6 @@ async def test_complete_email_invalid_format(client: AsyncClient):
         assert resp.status_code == 422
     finally:
         await _cleanup_user(email=email)
-
-
-# ===========================================================================
-# link-lastfm tests
-# ===========================================================================
 
 
 @pytest.mark.asyncio
