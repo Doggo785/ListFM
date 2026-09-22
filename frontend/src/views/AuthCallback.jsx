@@ -33,7 +33,7 @@ function AuthCallback() {
     }
 
     setError("Invalid authentication response. Please try again.");
-  }, [searchParams, navigate]);
+  }, [searchParams]);
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();
@@ -48,7 +48,6 @@ function AuthCallback() {
         body: JSON.stringify({ email: email.trim() }),
       });
 
-      // If the user already has a linked Last.fm account, skip the linking page
       if (isLastfmLinked) {
         navigate("/dashboard", { replace: true });
       } else {
