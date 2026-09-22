@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import Loader from "../components/elements/Loader";
+import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import { getAutomations } from "@/lib/api";
 import {
   SOURCE_TYPE_LABELS,
@@ -73,20 +74,7 @@ function Playlists() {
   }, [username, fetchAutomations]);
 
   if (!username) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
-        <div className="text-center">
-          <p className="text-white font-medium mb-2">No Last.fm account linked</p>
-          <p className="text-neutral-500 text-sm">Link your Last.fm account to view your playlists.</p>
-          <button
-            onClick={() => navigate("/link-lastfm")}
-            className="mt-4 px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
-          >
-            Link Last.fm
-          </button>
-        </div>
-      </div>
-    );
+    return <AccountLinkPrompt message="Link your Last.fm account to view your playlists." />;
   }
 
   if (isLoading) {

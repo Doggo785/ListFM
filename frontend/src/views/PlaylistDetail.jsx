@@ -110,6 +110,8 @@ export default function PlaylistDetail() {
   const [saved, setSaved] = useState(false);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [rawTracks, setRawTracks] = useState(null);
   const [previewTracks, setPreviewTracks] = useState(null);
@@ -168,6 +170,8 @@ export default function PlaylistDetail() {
   }, []);
 
   const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
     setSaveError(null);
     try {
       await updateAutomation(automation.id, automation);
@@ -176,10 +180,14 @@ export default function PlaylistDetail() {
     } catch (err) {
       console.error("Failed to save automation:", err);
       setSaveError(err.message || "Failed to save automation");
+    } finally {
+      setSaving(false);
     }
   };
 
   const confirmDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
     setDeleteError(null);
     try {
       await deleteAutomation(automation.id);
@@ -187,6 +195,7 @@ export default function PlaylistDetail() {
     } catch (err) {
       console.error("Failed to delete automation:", err);
       setDeleteError(err.message || "Failed to delete automation");
+      setDeleting(false);
     }
   };
 
@@ -286,6 +295,7 @@ export default function PlaylistDetail() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting}
                 className="border-red-900/50 bg-transparent text-red-400 hover:bg-red-950 hover:text-red-300"
               >
                 <IconTrash size={14} className="mr-1.5" />
@@ -294,9 +304,12 @@ export default function PlaylistDetail() {
               <Button
                 size="sm"
                 onClick={handleSave}
+                disabled={saving}
                 className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
               >
-                {saved ? (
+                {saving ? (
+                  "Saving..."
+                ) : saved ? (
                   "Saved!"
                 ) : (
                   <>
@@ -579,10 +592,11 @@ export default function PlaylistDetail() {
                 <Button
                   size="sm"
                   onClick={confirmDelete}
+                  disabled={deleting}
                   className="bg-red-600 text-white hover:bg-red-700"
                 >
                   <IconTrash size={14} className="mr-1.5" />
-                  Delete
+                  {deleting ? "Deleting..." : "Delete"}
                 </Button>
               </div>
             </motion.div>
