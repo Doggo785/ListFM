@@ -24,10 +24,10 @@ import FilterBuilder from "@/components/builder/FilterBuilder";
 import CronEditor from "@/components/builder/CronEditor";
 import {
   previewAutomation,
-  getAutomation,
   updateAutomation,
   deleteAutomation,
 } from "@/lib/api";
+import { useAutomation } from "@/hooks/useAutomation";
 import {
   SOURCE_TYPES,
   SOURCE_TYPE_LABELS,
@@ -105,6 +105,11 @@ export default function PlaylistDetail() {
   const { user } = useAuth();
   const username = user?.lastfm_username;
 
+  const {
+    automation: loadedAutomation,
+    error: automationError,
+  } = useAutomation(username && id ? id : null);
+
   const [automation, setAutomation] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -125,17 +130,19 @@ export default function PlaylistDetail() {
   }, [automation?.name]);
 
   useEffect(() => {
-    const loadAutomation = async () => {
-      if (!username || !id) return;
-      try {
-        const found = await getAutomation(id);
-        setAutomation(found);
-      } catch {
-        setNotFound(true);
-      }
-    };
-    loadAutomation();
-  }, [id, username]);
+    if (loadedAutomation) {
+      setAutomation(loadedAutomation);
+      setNotFound(false);
+    }
+  }, [loadedAutomation]);
+
+  useEffect(() => {
+    if (automationError) {
+      setNotFound(true);
+    } else if (loadedAutomation) {
+      setNotFound(false);
+    }
+  }, [automationError, loadedAutomation]);
 
   const update = useCallback((patch) => {
     setAutomation((prev) => ({ ...prev, ...patch, updatedAt: new Date().toISOString() }));
