@@ -8,7 +8,12 @@ describe("countByAutomation", () => {
       { automation_id: "a1" },
       { automation_id: "a2" },
     ]);
-    expect(result).toEqual({ a1: 2, a2: 1 });
+    expect(result).toEqual(
+      new Map([
+        ["a1", 2],
+        ["a2", 1],
+      ])
+    );
   });
 
   it("skips playlists without automation_id", () => {
@@ -17,10 +22,10 @@ describe("countByAutomation", () => {
       { name: "orphan" },
       { automation_id: "a1" },
     ]);
-    expect(result).toEqual({ a1: 1 });
+    expect(result).toEqual(new Map([["a1", 1]]));
   });
 
-  it("returns empty object for empty list", () => {
-    expect(countByAutomation([])).toEqual({});
+  it("returns empty map for empty list", () => {
+    expect(countByAutomation([])).toEqual(new Map());
   });
 });

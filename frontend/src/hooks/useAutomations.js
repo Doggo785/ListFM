@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAutomations, getGeneratedPlaylists } from "@/lib/api";
 
-export function countByAutomation(generatedPlaylists) {
-  const counts = {};
+export function countByAutomation(generatedPlaylists = []) {
+  const counts = new Map();
   for (const playlist of generatedPlaylists) {
     const key = playlist.automation_id;
     if (!key) continue;
-    counts[key] = (counts[key] || 0) + 1;
+    counts.set(key, (counts.get(key) || 0) + 1);
   }
   return counts;
 }
@@ -14,7 +14,7 @@ export function countByAutomation(generatedPlaylists) {
 export function useAutomations(username) {
   const [automations, setAutomations] = useState([]);
   const [generatedPlaylists, setGeneratedPlaylists] = useState([]);
-  const [counts, setCounts] = useState({});
+  const [counts, setCounts] = useState(() => new Map());
   const [isLoading, setIsLoading] = useState(Boolean(username));
   const [error, setError] = useState(null);
 
@@ -56,7 +56,7 @@ export function useAutomations(username) {
     if (!username) {
       setAutomations([]);
       setGeneratedPlaylists([]);
-      setCounts({});
+      setCounts(new Map());
       setError(null);
       setIsLoading(false);
       return;

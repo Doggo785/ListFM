@@ -92,7 +92,9 @@ function Playlists() {
     );
   }
 
-  const cards = automations.map((auto) => buildCard(auto, counts[auto.id] || 0));
+  const cards = automations.map((auto) =>
+    buildCard(auto, counts.get(auto.id) || 0)
+  );
 
   return (
     <main className="flex-1 overflow-y-auto bg-[#121212] min-h-screen">
