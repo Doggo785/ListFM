@@ -26,9 +26,12 @@ async def test_login_success(client: AsyncClient):
         assert resp.status_code == 200
         data = resp.json()
         assert data["token_type"] == "bearer"
-        assert "access_token" in data
-        assert "refresh_token" in data
+        # Cookies only: no token value in the body, both delivered as cookies.
+        assert "access_token" not in data
+        assert "refresh_token" not in data
         assert "expires_in" in data
+        assert client.cookies.get("access_token") is not None
+        assert client.cookies.get("refresh_token") is not None
     finally:
         await _cleanup_user(email=email)
 

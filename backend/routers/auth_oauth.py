@@ -44,10 +44,20 @@ router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 
 OAUTH_STATE_COOKIE = "oauth_state"
 OAUTH_STATE_MAX_AGE = 600  # 10 minutes
+OAUTH_HTTP_TIMEOUT = 10.0  # seconds for outbound OAuth provider calls
 
 
 def _clear_oauth_state_cookie(response: Response) -> None:
-    response.delete_cookie(key=OAUTH_STATE_COOKIE, httponly=True, samesite="lax")
+    # Mirror the login-step set_cookie flags (secure/path) so the browser
+    # actually drops the cookie.
+    settings = get_settings()
+    response.delete_cookie(
+        key=OAUTH_STATE_COOKIE,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        path="/",
+    )
 
 
 def _google_client() -> GoogleOAuth2:
@@ -102,7 +112,7 @@ async def _extract_oauth_profile(
     """
     match provider:
         case "google":
-            async with httpx.AsyncClient() as http:
+            async with httpx.AsyncClient(timeout=OAUTH_HTTP_TIMEOUT) as http:
                 resp = await http.get(
                     "https://www.googleapis.com/oauth2/v2/userinfo",
                     headers={"Authorization": f"Bearer {access_token}"},
@@ -110,14 +120,17 @@ async def _extract_oauth_profile(
                 if resp.status_code >= 400:
                     raise HTTPException(
                         status_code=502,
-                        detail=f"Failed to fetch Google profile: {resp.status_code}",
+                        detail="Failed to fetch Google profile",
                     )
                 profile = resp.json()
             provider_id = profile.get("id", "")
             email = profile.get("email")
             email_verified = profile.get("verified_email", False) is True
         case "discord":
-            profile = await client.get_profile(access_token)
+            # httpx-oauth manages its own client: bound the call instead.
+            profile = await asyncio.wait_for(
+                client.get_profile(access_token), timeout=OAUTH_HTTP_TIMEOUT
+            )
             provider_id = profile.get("id", "")
             email = profile.get("email")
             email_verified = profile.get("verified", False) is True
@@ -153,7 +166,7 @@ async def _finalize_oauth_login(
         redirect_path = "/link-lastfm" if is_new else "/dashboard"
         resp = RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
 
-    resp.delete_cookie(key=OAUTH_STATE_COOKIE)
+    _clear_oauth_state_cookie(resp)
     set_auth_cookies(resp, jwt_access, jwt_refresh)
     return resp
 
@@ -213,9 +226,18 @@ async def google_callback(
         resp = JSONResponse(status_code=400, content={"detail": "Failed to exchange authorization code"})
         _clear_oauth_state_cookie(resp)
         return resp
+    except (httpx.HTTPError, asyncio.TimeoutError):
+        resp = JSONResponse(status_code=502, content={"detail": "OAuth provider unavailable"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     access_token = token["access_token"]
-    provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "google")
+    try:
+        provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "google")
+    except HTTPException:
+        raise
+    except (httpx.HTTPError, asyncio.TimeoutError):
+        raise HTTPException(status_code=502, detail="Failed to fetch Google profile")
 
     display_name = profile.get("name") or email
 
@@ -281,9 +303,18 @@ async def discord_callback(
         resp = JSONResponse(status_code=400, content={"detail": "Failed to exchange authorization code"})
         _clear_oauth_state_cookie(resp)
         return resp
+    except (httpx.HTTPError, asyncio.TimeoutError):
+        resp = JSONResponse(status_code=502, content={"detail": "OAuth provider unavailable"})
+        _clear_oauth_state_cookie(resp)
+        return resp
 
     access_token = token["access_token"]
-    provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "discord")
+    try:
+        provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "discord")
+    except HTTPException:
+        raise
+    except (httpx.HTTPError, asyncio.TimeoutError):
+        raise HTTPException(status_code=502, detail="Failed to fetch Discord profile")
 
     username = profile.get("username") or email
 

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from jose import JWTError
+import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
@@ -43,14 +43,9 @@ from services.rate_limit import (
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def _build_token_response(
-    access_token: str,
-    refresh_token: str,
-) -> TokenResponse:
+def _build_token_response() -> TokenResponse:
     settings = get_settings()
     return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
     )
@@ -63,12 +58,12 @@ async def _establish_session(
     response: Response,
     *,
     error_detail: str,
-) -> tuple[str, str]:
+) -> None:
     """Create tokens, revoke stale refresh tokens, persist the new one, and set cookies.
 
     Shared by register() and login(). Commits the session; on failure rolls back
-    and raises a 500 with the caller-provided detail. Returns the tokens so the
-    caller can build the TokenResponse body.
+    and raises a 500 with the caller-provided detail. Both tokens live in their
+    httpOnly cookies only — nothing token-related goes in the response body.
     """
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
@@ -84,8 +79,6 @@ async def _establish_session(
         raise HTTPException(status_code=500, detail=error_detail)
 
     set_auth_cookies(response, access_token, refresh_token)
-
-    return access_token, refresh_token
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
@@ -111,11 +104,11 @@ async def register(
     password_hash = hash_password(body.password)
     user = await create_user(db, user_data, password_hash)
 
-    access_token, refresh_token = await _establish_session(
+    await _establish_session(
         db, user, request, response, error_detail="Failed to create account"
     )
 
-    return _build_token_response(access_token, refresh_token)
+    return _build_token_response()
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -135,11 +128,11 @@ async def login(
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    access_token, refresh_token = await _establish_session(
+    await _establish_session(
         db, user, request, response, error_detail="Failed to log in"
     )
 
-    return _build_token_response(access_token, refresh_token)
+    return _build_token_response()
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -154,9 +147,9 @@ async def refresh(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        payload = decode_token(refresh_token)
+        payload = decode_token(refresh_token, expected_typ="refresh")
         user_id: str | None = payload.get("sub")
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if user_id is None:
@@ -200,7 +193,7 @@ async def refresh(
 
     set_auth_cookies(response, new_access_token, new_refresh_token)
 
-    return _build_token_response(new_access_token, new_refresh_token)
+    return _build_token_response()
 
 
 @router.post("/logout")
