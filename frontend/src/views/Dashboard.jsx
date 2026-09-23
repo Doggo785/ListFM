@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
+import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import CountUp from "../components/elements/CountUp";
-import TiltedCard from "../components/ui/PlaylistCard";
+import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
 import { getAutomations, getUserInfo, getRecentTracks } from "@/lib/api";
 import {
   SOURCE_TYPE_LABELS,
@@ -13,7 +14,7 @@ import {
   describeCron,
   isValidCron,
 } from "@/lib/automation-rules";
-import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
+import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
 import {
   getGreeting,
   getLastVisit,
@@ -22,31 +23,9 @@ import {
 import {
   IconHome,
   IconHeadphones,
-  IconPlus,
 } from "@tabler/icons-react";
 import { extractColors, pickRingColors } from "../lib/color-extract";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-};
-
-const CARD_DEFAULTS = {
-  containerHeight: "420px",
-  containerWidth: "300px",
-  imageHeight: "420px",
-  imageWidth: "300px",
-  rotateAmplitude: 6,
-  scaleOnHover: 1.04,
-  showMobileWarning: false,
-  showTooltip: false,
-  displayOverlayContent: true,
-};
+import { fadeUp, stagger } from "../lib/animation";
 
 function StatBlock({ value, label, color, delay = 0 }) {
   return (
@@ -153,34 +132,14 @@ function Dashboard() {
 
   const automationCards = useMemo(() => {
     if (!username) return [];
-    return automations.map((auto) => {
-      const name = auto.name || "Untitled";
-      const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
-      return {
-        id: auto.id,
-        title: name,
-        image: getPlaylistImageSrc(name, auto.source?.type),
-        description: buildDescription(auto),
-        glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
-      };
-    });
+    return automations.map((auto) => ({
+      ...buildAutomationCardBase(auto),
+      description: buildDescription(auto),
+    }));
   }, [username, automations]);
 
   if (!username) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
-        <div className="text-center">
-          <p className="text-white font-medium mb-2">No Last.fm account linked</p>
-          <p className="text-neutral-500 text-sm">Link your Last.fm account to view your dashboard.</p>
-          <button
-            onClick={() => navigate("/link-lastfm")}
-            className="mt-4 px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
-          >
-            Link Last.fm
-          </button>
-        </div>
-      </div>
-    );
+    return <AccountLinkPrompt message="Link your Last.fm account to view your dashboard." />;
   }
 
   if (isLoading) {
@@ -325,20 +284,7 @@ function Dashboard() {
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => navigate("/playlists/new")}
-                className="shrink-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
-                aria-label="Create a new automated playlist"
-              >
-                <TiltedCard
-                  {...CARD_DEFAULTS}
-                  icon={IconPlus}
-                  altText="+"
-                  captionText="New playlist"
-                  countdownText=""
-                />
-              </button>
+              <NewPlaylistCard onClick={() => navigate("/playlists/new")} />
             </div>
           </motion.section>
 

@@ -72,27 +72,16 @@ export async function request(path, options = {}) {
   return res.json();
 }
 
-/**
- * @returns {Promise<object>} user info with image
- */
 export async function getUserInfo() {
   requireUsername();
   return request("/api/info");
 }
 
-/**
- * @param {number} limit — max tracks to return
- * @returns {Promise<{ tracks: Array }>}
- */
 export async function getRecentTracks(limit = 50) {
   requireUsername();
   return request(`/api/recent-tracks?limit=${limit}`);
 }
 
-/**
- * @param {object} automation — full automation object
- * @returns {{ tracks: Array, totalMatched: number }}
- */
 export async function previewAutomation(automation) {
   requireUsername();
   return request("/api/automations/preview", {
@@ -106,19 +95,11 @@ export async function getAutomations() {
   return request("/api/automations");
 }
 
-/**
- * @param {string} id — automation UUID
- * @returns {Promise<object>} automation
- */
 export async function getAutomation(id) {
   requireUsername();
   return request(`/api/automations/${id}`);
 }
 
-/**
- * @param {object} automation — automation data (name, source, filterGroups, etc.)
- * @returns {Promise<object>} created automation with id
- */
 export async function createAutomation(automation) {
   requireUsername();
   return request("/api/automations", {
@@ -127,11 +108,6 @@ export async function createAutomation(automation) {
   });
 }
 
-/**
- * @param {string} id — automation UUID
- * @param {object} automation — partial automation data to update
- * @returns {Promise<object>} updated automation
- */
 export async function updateAutomation(id, automation) {
   requireUsername();
   return request(`/api/automations/${id}`, {
@@ -140,10 +116,6 @@ export async function updateAutomation(id, automation) {
   });
 }
 
-/**
- * @param {string} id — automation UUID
- * @returns {Promise<void>}
- */
 export async function deleteAutomation(id) {
   requireUsername();
   return request(`/api/automations/${id}`, {
@@ -151,10 +123,16 @@ export async function deleteAutomation(id) {
   });
 }
 
-/**
- * @param {object} playlist — { automation_id, name, source_type, source_period, tracks, track_count, filter_groups }
- * @returns {Promise<object>} saved playlist
- */
+export async function getGeneratedPlaylists() {
+  requireUsername();
+  return request("/api/generated-playlists");
+}
+
+export async function getGeneratedPlaylist(id) {
+  requireUsername();
+  return request(`/api/generated-playlists/${id}`);
+}
+
 export async function saveGeneratedPlaylist(playlist) {
   requireUsername();
   return request("/api/generated-playlists", {

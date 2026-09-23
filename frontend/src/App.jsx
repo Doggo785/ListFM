@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
@@ -11,16 +11,14 @@ import AuthCallback from "./views/AuthCallback";
 import LinkLastfm from "./views/LinkLastfm";
 import PlaylistNew from "./views/PlaylistNew";
 import PlaylistDetail from "./views/PlaylistDetail";
+import Playlists from "./views/Playlists";
 import AuthGuard from "./components/AuthGuard";
+
+const NO_SIDEBAR_PATHS = ["/", "/login", "/register", "/auth/callback", "/link-lastfm"];
 
 function App() {
   const location = useLocation();
-  const showSidebar =
-    location.pathname !== "/" &&
-    location.pathname !== "/login" &&
-    location.pathname !== "/register" &&
-    location.pathname !== "/auth/callback" &&
-    location.pathname !== "/link-lastfm";
+  const showSidebar = !NO_SIDEBAR_PATHS.includes(location.pathname);
 
   return (
     <div className="app-container">
@@ -53,7 +51,11 @@ function App() {
                 />
                 <Route
                   path="/playlists"
-                  element={<Navigate to="/" replace />}
+                  element={
+                    <AuthGuard>
+                      <Playlists />
+                    </AuthGuard>
+                  }
                 />
                 <Route
                   path="/playlists/new"

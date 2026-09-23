@@ -1,5 +1,7 @@
 import { useRef } from "react";
 import { motion, useMotionValue, useSpring } from "motion/react";
+import { IconPlus } from "@tabler/icons-react";
+import { CARD_DEFAULTS } from "@/lib/playlist-cards";
 
 const springValues = {
   damping: 30,
@@ -193,5 +195,24 @@ export default function TiltedCard({
         </motion.figcaption>
       )}
     </figure>
+  );
+}
+
+export function NewPlaylistCard({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="shrink-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
+      aria-label="Create a new automated playlist"
+    >
+      <TiltedCard
+        {...CARD_DEFAULTS}
+        icon={IconPlus}
+        altText="+"
+        captionText="New playlist"
+        countdownText=""
+      />
+    </button>
   );
 }
