@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from filter_types import FilterGroups
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-LASTFM_USERNAME_REGEX = re.compile(r"^[a-z0-9_-]{1,64}$")
+LASTFM_USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
 def _validate_email(v: str) -> str:

@@ -1,4 +1,5 @@
 import asyncio
+import functools
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,18 +35,20 @@ async def preview_automation(
     automation = body.automation
 
     # The pipeline is synchronous (pylast + ThreadPoolExecutor): keep it off
-    # the event loop, like the scheduled sweep does.
+    # the event loop, like the scheduled sweep does. functools.partial carries
+    # keyword arguments through run_in_executor (which only forwards *args),
+    # so a future parameter reorder in the pipeline cannot silently misbind.
     loop = asyncio.get_running_loop()
+    pipeline = functools.partial(
+        run_automation_pipeline,
+        username=username,
+        source_type=automation.source.type,
+        period=automation.source.period,
+        filter_groups=automation.filter_groups,
+        max_tracks=automation.output.maxSize,
+    )
     try:
-        result = await loop.run_in_executor(
-            None,
-            run_automation_pipeline,
-            username,
-            automation.source.type,
-            automation.source.period,
-            automation.filter_groups,
-            automation.output.maxSize,
-        )
+        result = await loop.run_in_executor(None, pipeline)
     except UnsupportedSourceTypeError:
         raise HTTPException(status_code=422, detail="Unsupported source type")
     except HTTPException:
