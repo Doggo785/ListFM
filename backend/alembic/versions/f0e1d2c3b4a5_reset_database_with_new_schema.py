@@ -1,10 +1,17 @@
 """reset database with new schema
 
 Revision ID: f0e1d2c3b4a5
-Revises: 
+Revises:
 Create Date: 2026-06-10 12:00:00.000000
 
+SAFETY: this is a destructive base migration (DROP TABLE ... CASCADE).
+On a fresh database the DROPs are harmless no-ops. If the managed schema
+already exists, upgrade() and downgrade() refuse to run unless
+ALLOW_DESTRUCTIVE_MIGRATION=1 is set explicitly, so this revision can never
+replay against production data by accident (P0-5, 2026-09-23).
+
 """
+import os
 from typing import Sequence, Union
 
 from alembic import op
@@ -18,10 +25,43 @@ down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+# Tables owned by this reset. If any of them exists, the schema is not fresh.
+_MANAGED_TABLES = (
+    "playlist_tracks",
+    "automation_history",
+    "user_tracks",
+    "album_tags",
+    "track_tags",
+    "tags",
+    "tracks",
+    "albums",
+    "refresh_tokens",
+    "auth_providers",
+    "users",
+    "generated_playlists",
+    "automations",
+)
+
+
+def _managed_schema_present() -> bool:
+    from sqlalchemy import inspect
+
+    existing = set(inspect(op.get_bind()).get_table_names())
+    return bool(existing & set(_MANAGED_TABLES))
+
+
+def _refuse_unless_explicit() -> None:
+    if _managed_schema_present() and os.environ.get("ALLOW_DESTRUCTIVE_MIGRATION") != "1":
+        raise RuntimeError(
+            "f0e1d2c3b4a5 refuses to DROP existing tables: set "
+            "ALLOW_DESTRUCTIVE_MIGRATION=1 to re-run this reset on purpose."
+        )
+
 
 def upgrade() -> None:
-    """Reset database with new schema."""
-    
+    """Reset database with new schema (destructive — see module docstring)."""
+    _refuse_unless_explicit()
+
     # Drop existing tables in reverse dependency order (IF EXISTS for safety)
     op.execute("DROP TABLE IF EXISTS playlist_tracks CASCADE")
     op.execute("DROP TABLE IF EXISTS automation_history CASCADE")
@@ -233,7 +273,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
+    """Downgrade schema (destructive — same explicit opt-in as upgrade)."""
+    _refuse_unless_explicit()
     op.drop_table('automation_history')
     op.drop_table('playlist_tracks')
     op.drop_table('generated_playlists')
