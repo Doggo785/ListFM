@@ -26,8 +26,8 @@ async def test_refresh_success(client: AsyncClient):
         resp = await client.post("/api/auth/refresh")
         assert resp.status_code == 200
         data = resp.json()
-        assert "access_token" in data
-        # Cookies only: the refresh token must not leak into the body.
+        # Cookies only: no token value in the body, both delivered as cookies.
+        assert "access_token" not in data
         assert "refresh_token" not in data
         assert data["token_type"] == "bearer"
     finally:

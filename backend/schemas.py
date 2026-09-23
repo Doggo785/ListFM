@@ -97,9 +97,10 @@ class OAuthCompleteEmailRequest(EmailValidatorMixin, BaseModel):
 
 
 class TokenResponse(BaseModel):
-    # Cookies only: the refresh token is never exposed in the body, only as
-    # an httpOnly cookie. The frontend ignores this body (session via /me).
-    access_token: str
+    # Cookies only: neither token is exposed in the body, both travel as
+    # httpOnly cookies. The frontend ignores this body (session via /me).
+    # Keeping the body also shrinks XSS exfiltration surface: there is no
+    # JS-readable copy of any token anywhere.
     token_type: str = "bearer"
     expires_in: int
 
