@@ -6,15 +6,22 @@ listfm_test database (autouse truncate in conftest).
 """
 
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy import update
+from httpx import AsyncClient
+from sqlalchemy import select, update
 
 from models.artist_tag import ArtistTag
+from models.track import Track
+from models.user import User
 from repositories.tags import get_fresh_artist_tags, upsert_artist_tag
+from repositories.user_tracks import get_user_track
 from services import lastfm
+from services.automation_runner import run_automation_pipeline_cached
+from services.enrich_cache import enrich_tracks_cached
 from services.lastfm import (
     _throttled_call,
     get_lastfm_call_count,
@@ -22,7 +29,30 @@ from services.lastfm import (
     reset_lastfm_call_count,
 )
 
-from .conftest import _TestSessionLocal
+from .conftest import _TestSessionLocal, _cleanup_user, _unique_email
+
+
+def _live_info(**over):
+    info = {
+        "listeners": 10,
+        "global_playcount": 20,
+        "userplaycount": 5,
+        "userloved": True,
+        "artist_tags": [{"name": "rock", "count": 100}],
+        "album": "Cached Album",
+        "album_tags": [{"name": "indie", "count": 90}],
+    }
+    info.update(over)
+    return info
+
+
+async def _make_user_id() -> str:
+    """Minimal throwaway user row (autouse truncate cleans it up)."""
+    async with _TestSessionLocal() as db:
+        user_id = str(uuid.uuid4())
+        db.add(User(id=user_id))
+        await db.commit()
+        return user_id
 
 
 @pytest.mark.asyncio
@@ -129,3 +159,121 @@ async def test_full_info_reports_album_title():
     assert info["userplaycount"] == 42
     assert info["artist_tags"] == []
     assert info["album_tags"] == []
+
+
+@pytest.mark.asyncio
+async def test_cached_enrich_second_run_makes_no_live_calls():
+    """A warm cache serves identical tracks with zero live fetches."""
+    user_id = await _make_user_id()
+    suffix = uuid.uuid4().hex[:8]
+    tracks = [
+        {"artist": f"Warm Artist {suffix}", "title": f"Warm Song {suffix} {i}"}
+        for i in range(3)
+    ]
+    live = [{**t, **_live_info()} for t in tracks]
+    async with _TestSessionLocal() as db:
+        with patch(
+            "services.enrich_cache.enrich_tracks", return_value=live
+        ) as mock_enrich:
+            out1, stats1 = await enrich_tracks_cached(
+                db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+            )
+            assert stats1 == {"hits": 0, "misses": 3, "lastfm_calls": 0}
+            out2, stats2 = await enrich_tracks_cached(
+                db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+            )
+            assert mock_enrich.call_count == 1
+    assert stats2["hits"] == 3
+    assert stats2["misses"] == 0
+    assert stats2["lastfm_calls"] == 0
+    assert out2 == out1
+    assert out2[0]["listeners"] == 10
+    assert out2[0]["album"] == "Cached Album"
+    assert out2[0]["artist_tags"] == [{"name": "rock", "count": 100}]
+    assert out2[0]["album_tags"] == [{"name": "indie", "count": 90}]
+    assert out2[0]["userplaycount"] == 5
+    assert [t["title"] for t in out2] == [t["title"] for t in out1]
+
+
+@pytest.mark.asyncio
+async def test_cached_enrich_persists_and_reuses_user_data(client: AsyncClient):
+    """userplaycount/userloved round-trip through user_tracks keyed by user."""
+    email = _unique_email()
+    try:
+        reg = await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        assert reg.status_code == 201
+        async with _TestSessionLocal() as db:
+            user_id = (
+                await db.execute(select(User.id).where(User.email == email))
+            ).scalar_one()
+        suffix = uuid.uuid4().hex[:8]
+        tracks = [{"artist": f"User Artist {suffix}", "title": f"User Song {suffix}"}]
+        live = [{**tracks[0], **_live_info(userplaycount=77, userloved=False)}]
+        async with _TestSessionLocal() as db:
+            with patch(
+                "services.enrich_cache.enrich_tracks", return_value=live
+            ) as mock_enrich:
+                out1, _ = await enrich_tracks_cached(
+                    db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+                )
+                assert out1[0]["userplaycount"] == 77
+                assert out1[0]["userloved"] is False
+                track_id = (
+                    await db.execute(
+                        select(Track.id).where(
+                            Track.artist == tracks[0]["artist"],
+                            Track.title == tracks[0]["title"],
+                        )
+                    )
+                ).scalar_one()
+                row = await get_user_track(db, user_id, track_id)
+                assert row is not None
+                assert row.user_playcount == 77
+                assert row.userloved is False
+                out2, stats2 = await enrich_tracks_cached(
+                    db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+                )
+                assert mock_enrich.call_count == 1
+        assert stats2["hits"] == 1
+        assert out2[0]["userplaycount"] == 77
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_cached_reports_cache_stats():
+    """The cached pipeline returns the sync keys plus cache counters."""
+    user_id = await _make_user_id()
+    suffix = uuid.uuid4().hex[:8]
+    tracks = [{"artist": f"Pipe Artist {suffix}", "title": f"Pipe Song {suffix}"}]
+    live = [{**tracks[0], **_live_info()}]
+    async with _TestSessionLocal() as db:
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch("services.enrich_cache.enrich_tracks", return_value=live):
+            first = await run_automation_pipeline_cached(
+                db,
+                user_id=user_id,
+                username="u",
+                source_type="top_tracks",
+                period="3m",
+                filter_groups=[],
+                max_tracks=10,
+            )
+            assert first["total"] == 1
+            assert first["cache_misses"] == 1
+            second = await run_automation_pipeline_cached(
+                db,
+                user_id=user_id,
+                username="u",
+                source_type="top_tracks",
+                period="3m",
+                filter_groups=[],
+                max_tracks=10,
+            )
+            assert second["cache_hits"] == 1
+            assert second["lastfm_calls"] == 0
+            assert second["tracks"] == first["tracks"]

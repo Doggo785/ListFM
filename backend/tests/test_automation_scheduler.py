@@ -98,7 +98,7 @@ async def test_scheduler_tick_runs_due_automation(client: AsyncClient):
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
 
@@ -157,7 +157,7 @@ async def test_scheduler_run_persists_playlist_and_links_history(client: AsyncCl
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
 
@@ -228,7 +228,7 @@ async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -290,7 +290,7 @@ async def test_run_now_triggers_manual_run(client: AsyncClient):
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             resp = await client.post(f"/api/automations/{automation_id}/run")
         assert resp.status_code == 200
@@ -347,7 +347,7 @@ async def test_playlist_tracks_endpoint_returns_ordered_tracks(client: AsyncClie
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             run_resp = await client.post(f"/api/automations/{automation_id}/run")
         assert run_resp.status_code == 200
@@ -382,7 +382,7 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             run_resp = await client.post(f"/api/automations/{automation_id}/run")
         playlist_id = run_resp.json()["generated_playlist_id"]
