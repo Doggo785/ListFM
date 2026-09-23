@@ -170,6 +170,16 @@ async def get_recent_user_tracks(
     ]
 
 
+async def _tracks_by_key(
+    db: AsyncSession, pairs: list[tuple[str, str]]
+) -> dict[tuple[str, str], Track]:
+    """Map (artist, title) pairs to their track rows (bulk lookup)."""
+    existing = await db.execute(
+        select(Track).where(tuple_(Track.artist, Track.title).in_(pairs))
+    )
+    return {(t.artist, t.title): t for t in existing.scalars().all()}
+
+
 async def bulk_store_recent_plays(
     db: AsyncSession,
     user_id: str,
@@ -195,10 +205,7 @@ async def bulk_store_recent_plays(
         return
 
     pairs = list(dated)
-    existing = await db.execute(
-        select(Track).where(tuple_(Track.artist, Track.title).in_(pairs))
-    )
-    by_key = {(t.artist, t.title): t for t in existing.scalars().all()}
+    by_key = await _tracks_by_key(db, pairs)
     missing = [p for p in pairs if p not in by_key]
     if missing:
         now = datetime.now(timezone.utc)
@@ -219,10 +226,7 @@ async def bulk_store_recent_plays(
             .on_conflict_do_nothing(index_elements=["artist", "title"])
         )
         await db.flush()
-        existing = await db.execute(
-            select(Track).where(tuple_(Track.artist, Track.title).in_(pairs))
-        )
-        by_key = {(t.artist, t.title): t for t in existing.scalars().all()}
+        by_key = await _tracks_by_key(db, pairs)
 
     now = datetime.now(timezone.utc)
     stmt = insert(UserTrack).values(
