@@ -62,7 +62,9 @@ async def save_generated_playlist(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    playlist = await create_generated_playlist(db, current_user.id, username, data)
+    playlist = await create_generated_playlist(
+        db, current_user.id, username, data, mark_fetched=False
+    )
     try:
         await db.commit()
     except SQLAlchemyError:

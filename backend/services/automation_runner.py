@@ -259,6 +259,9 @@ async def _persist_result_playlist(
             track_count=len(tracks),
             filter_groups=_filter_groups_to_json(automation.filter_groups),
         ),
+        # Persist only: these rows carry no fetched data (the enrich cache
+        # wrote the real values already), so never stamp them as fetched.
+        mark_fetched=False,
     )
 
 
