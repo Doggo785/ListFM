@@ -47,7 +47,16 @@ OAUTH_STATE_MAX_AGE = 600  # 10 minutes
 
 
 def _clear_oauth_state_cookie(response: Response) -> None:
-    response.delete_cookie(key=OAUTH_STATE_COOKIE, httponly=True, samesite="lax")
+    # Mirror the login-step set_cookie flags (secure/path) so the browser
+    # actually drops the cookie.
+    settings = get_settings()
+    response.delete_cookie(
+        key=OAUTH_STATE_COOKIE,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        path="/",
+    )
 
 
 def _google_client() -> GoogleOAuth2:
@@ -153,7 +162,7 @@ async def _finalize_oauth_login(
         redirect_path = "/link-lastfm" if is_new else "/dashboard"
         resp = RedirectResponse(url=f"{settings.frontend_url}{redirect_path}", status_code=302)
 
-    resp.delete_cookie(key=OAUTH_STATE_COOKIE)
+    _clear_oauth_state_cookie(resp)
     set_auth_cookies(resp, jwt_access, jwt_refresh)
     return resp
 

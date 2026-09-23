@@ -48,7 +48,9 @@ class PasswordValidatorMixin:
 
     @field_validator("password")
     @classmethod
-    def validate_password(cls, v: str) -> str:
+    def validate_password(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
         if len(v.encode("utf-8")) > 72:
             raise ValueError("Password must be at most 72 bytes")
         return v
@@ -65,7 +67,7 @@ class UserLogin(EmailValidatorMixin, PasswordValidatorMixin, BaseModel):
     password: str
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(PasswordValidatorMixin, BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     display_name: Optional[str] = None

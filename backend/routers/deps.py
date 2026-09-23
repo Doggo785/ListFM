@@ -66,6 +66,7 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str) 
         httponly=True,
         samesite="lax",
         secure=settings.cookie_secure,
+        path="/",
         max_age=settings.access_token_expire_minutes * 60,
     )
     response.set_cookie(
@@ -74,10 +75,20 @@ def set_auth_cookies(response: Response, access_token: str, refresh_token: str) 
         httponly=True,
         samesite="lax",
         secure=settings.cookie_secure,
+        path="/",
         max_age=settings.refresh_token_expire_days * 86400,
     )
 
 
 def clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie(key="access_token", httponly=True, samesite="lax")
-    response.delete_cookie(key="refresh_token", httponly=True, samesite="lax")
+    # Mirror set_auth_cookies flags exactly, otherwise the browser keeps the
+    # cookies (deletion only applies to the same path/secure scope).
+    settings = get_settings()
+    for key in ("access_token", "refresh_token"):
+        response.delete_cookie(
+            key=key,
+            httponly=True,
+            samesite="lax",
+            secure=settings.cookie_secure,
+            path="/",
+        )
