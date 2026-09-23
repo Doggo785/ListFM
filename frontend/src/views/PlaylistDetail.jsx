@@ -275,6 +275,14 @@ export default function PlaylistDetail() {
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
   };
 
+  const formatRunDuration = (startIso, endIso) => {
+    const start = new Date(startIso).getTime();
+    const end = new Date(endIso).getTime();
+    if (Number.isNaN(start) || Number.isNaN(end) || end < start) return null;
+    const secs = Math.round((end - start) / 1000);
+    return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  };
+
   const statusDot = (status) =>
     status === "completed"
       ? "bg-green-500"
@@ -573,11 +581,15 @@ export default function PlaylistDetail() {
                       </button>
                       {expanded && (
                         <div className="px-4 pb-4 pt-1 border-t border-neutral-800/60">
-                          {entry.completed_at && (
-                            <p className="text-xs text-neutral-500 mt-2">
-                              Finished {formatRunDate(entry.completed_at)}
-                            </p>
-                          )}
+                          {entry.completed_at && (() => {
+                            const duration = formatRunDuration(entry.started_at, entry.completed_at);
+                            return (
+                              <p className="text-xs text-neutral-500 mt-2">
+                                Finished {formatRunDate(entry.completed_at)}
+                                {duration && ` (took ${duration})`}
+                              </p>
+                            );
+                          })()}
                           {entry.status === "failed" && entry.error_message && (
                             <p className="text-xs text-red-400 mt-2 break-words">
                               {entry.error_message}
