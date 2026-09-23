@@ -33,20 +33,13 @@ from repositories.tags import (
 )
 from repositories.tracks import CACHE_TTL, get_or_create_track, get_track_by_artist_title
 from repositories.user_tracks import get_user_track, upsert_user_track
-from services.lastfm import enrich_tracks, get_lastfm_call_count
+from services.lastfm import enrich_tracks, epoch_to_datetime, get_lastfm_call_count
 
 logger = logging.getLogger(__name__)
 
 
 def _fresh(ts) -> bool:
     return ts is not None and ts >= (datetime.now(timezone.utc) - CACHE_TTL)
-
-
-def _to_datetime(ts) -> datetime | None:
-    try:
-        return datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts is not None else None
-    except (TypeError, ValueError, OverflowError, OSError):
-        return None
 
 
 async def _read_cached_track(db: AsyncSession, *, user_id: str, track: dict) -> dict | None:
@@ -120,9 +113,9 @@ async def _write_back(
             db,
             user_id,
             track.id,
-            user_playcount=info.get("userplaycount", 0) or 0,
-            userloved=bool(info.get("userloved", False)),
-            last_played_at=_to_datetime(base.get("timestamp")),
+                user_playcount=info.get("userplaycount", 0) or 0,
+                userloved=bool(info.get("userloved", False)),
+                last_played_at=epoch_to_datetime(base.get("timestamp")),
         )
 
 

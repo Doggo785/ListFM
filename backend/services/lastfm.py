@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from contextlib import nullcontext
+from datetime import datetime, timezone
 
 import pylast
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -51,6 +52,14 @@ def reset_lastfm_call_count() -> None:
 def get_lastfm_call_count() -> int:
     with _throttle_lock:
         return _lastfm_call_count
+
+
+def epoch_to_datetime(ts) -> datetime | None:
+    """Last.fm epoch seconds (or None) to aware datetime, forgiving."""
+    try:
+        return datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts is not None else None
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
 
 
 def get_user_info(username: str) -> dict:
