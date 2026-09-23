@@ -1,5 +1,5 @@
 from fastapi import Cookie, Depends, HTTPException, Response
-from jose import JWTError
+import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
@@ -21,9 +21,9 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        payload = decode_token(access_token)
+        payload = decode_token(access_token, expected_typ="access")
         user_id: str | None = payload.get("sub")
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if user_id is None:

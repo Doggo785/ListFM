@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from jose import JWTError
+import jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
@@ -154,9 +154,9 @@ async def refresh(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     try:
-        payload = decode_token(refresh_token)
+        payload = decode_token(refresh_token, expected_typ="refresh")
         user_id: str | None = payload.get("sub")
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if user_id is None:

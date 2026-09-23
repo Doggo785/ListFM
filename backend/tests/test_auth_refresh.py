@@ -240,3 +240,39 @@ async def test_register_no_revoke_crash(client: AsyncClient):
             assert len({t.family for t in tokens}) == 1
     finally:
         await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_refresh_rejects_access_token(client: AsyncClient):
+    """An access token presented as the refresh cookie must be rejected (typ)."""
+    email = _unique_email()
+    try:
+        await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        access = client.cookies.get("access_token")
+        assert access is not None
+        client.cookies.set("refresh_token", access)
+        resp = await client.post("/api/auth/refresh")
+        assert resp.status_code == 401
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_me_rejects_refresh_token(client: AsyncClient):
+    """A refresh token presented as the access cookie must be rejected (typ)."""
+    email = _unique_email()
+    try:
+        await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        refresh = client.cookies.get("refresh_token")
+        assert refresh is not None
+        client.cookies.set("access_token", refresh)
+        resp = await client.get("/api/auth/me")
+        assert resp.status_code == 401
+    finally:
+        await _cleanup_user(email=email)
