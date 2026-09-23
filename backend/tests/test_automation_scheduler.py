@@ -9,7 +9,7 @@ Covers:
 from unittest.mock import patch
 
 import pytest
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, select
 
 from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
@@ -212,6 +212,68 @@ async def test_scheduler_failed_run_persists_no_playlist(client: AsyncClient):
             assert playlists == []
     finally:
         await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient):
+    """GET /automations/{id}/history returns the run rows with playlist links."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with patch("services.automation_runner.is_due", return_value=True), patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            await run_due_automations(session_factory=_TestSessionLocal)
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        resp = await client.get(f"/api/automations/{automation_id}/history")
+        assert resp.status_code == 200
+        entries = resp.json()
+        assert len(entries) == 2
+        for entry in entries:
+            assert entry["automation_id"] == automation_id
+            assert entry["status"] == "completed"
+            assert entry["generated_playlist_id"] is not None
+            assert entry["tracks_generated"] == 1
+        started = [e["started_at"] for e in entries]
+        assert started == sorted(started, reverse=True)
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_404_unknown_or_foreign(client: AsyncClient):
+    """History of an unknown id — or another user's automation — is 404."""
+    email = _unique_email()
+    other_email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        resp = await client.get("/api/automations/00000000-0000-0000-0000-000000000000/history")
+        assert resp.status_code == 404
+
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as fresh:
+            reg = await fresh.post(
+                "/api/auth/register",
+                json={"email": other_email, "password": "StrongP@ss1!"},
+            )
+            assert reg.status_code == 201
+            resp = await fresh.get(f"/api/automations/{automation_id}/history")
+            assert resp.status_code == 404
+    finally:
+        await _cleanup_user_with_automations(client, email)
+        await _cleanup_user(email=other_email)
 
 
 def test_scheduler_disabled_when_flag_false():

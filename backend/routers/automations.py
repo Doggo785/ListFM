@@ -8,9 +8,11 @@ from schemas import (
     AutomationCreate,
     AutomationUpdate,
     AutomationRead,
+    AutomationHistoryRead,
     PreviewRequest,
     LASTFM_USERNAME_REGEX,
 )
+from repositories.automation_history import get_automation_history
 from models.user import User
 from routers.deps import get_current_user_lastfm_username, get_current_active_user
 from repositories.automations import (
@@ -78,6 +80,21 @@ async def get_single_automation(
     if automation is None:
         raise HTTPException(status_code=404, detail="Automation not found")
     return automation
+
+
+@router.get(
+    "/automations/{automation_id}/history",
+    response_model=list[AutomationHistoryRead],
+)
+async def get_automation_history_entries(
+    automation_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    automation = await get_automation(db, automation_id, current_user.id)
+    if automation is None:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    return await get_automation_history(db, automation_id)
 
 
 @router.post("/automations", response_model=AutomationRead, status_code=201)

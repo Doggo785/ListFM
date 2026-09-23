@@ -7,6 +7,7 @@ this module only inserts rows. No read API or UI yet (write-only phase).
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.automation_history import AutomationHistory
@@ -46,3 +47,16 @@ async def create_automation_history(
     db.add(history)
     await db.flush()
     return history
+
+
+async def get_automation_history(
+    db: AsyncSession, automation_id: str, limit: int = 50
+) -> list[AutomationHistory]:
+    """Read an automation's run history, newest first."""
+    result = await db.execute(
+        select(AutomationHistory)
+        .where(AutomationHistory.automation_id == automation_id)
+        .order_by(AutomationHistory.started_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
