@@ -1,12 +1,14 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
+from apscheduler.triggers.cron import CronTrigger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from filter_types import FilterGroups
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+LASTFM_USERNAME_REGEX = re.compile(r"^[a-z0-9_-]{1,64}$")
 
 
 def _validate_email(v: str) -> str:
@@ -14,6 +16,17 @@ def _validate_email(v: str) -> str:
     if not EMAIL_REGEX.match(normalized):
         raise ValueError("Invalid email format")
     return normalized
+
+
+def _validate_cron(v: str) -> str:
+    """Accept empty (unscheduled) or a crontab the scheduler can parse."""
+    if not v:
+        return v
+    try:
+        CronTrigger.from_crontab(v, timezone=timezone.utc)
+    except Exception as e:
+        raise ValueError(f"Invalid cron expression: {e}")
+    return v
 
 
 class EmailValidatorMixin:
@@ -171,28 +184,55 @@ class AutomationSource(BaseModel):
     period: Literal["7d", "1m", "3m", "6m", "12m", "overall"]
 
 
+class AutomationOutput(BaseModel):
+    # Wire key stays camelCase to match the frontend contract (#12).
+    maxSize: int = Field(default=50, ge=0, le=200)
+
+    @field_validator("maxSize")
+    @classmethod
+    def zero_means_default(cls, v: int) -> int:
+        # Explicit 0 (or absent) means "no preference" -> default 50.
+        return 50 if v == 0 else v
+
+
 class AutomationCreate(BaseModel):
     name: str
     description: str = ""
     source: AutomationSource
-    cron: str = ""
+    cron: str = Field(default="", max_length=100)
     filter_groups: FilterGroups = Field(default_factory=list, alias="filterGroups")
-    output: dict = {"maxSize": 50}
+    output: AutomationOutput = Field(default_factory=AutomationOutput)
     enabled: bool = True
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("cron")
+    @classmethod
+    def validate_cron(cls, v: str) -> str:
+        return _validate_cron(v)
+
+
+class PreviewRequest(BaseModel):
+    """Preview body: the full automation draft, validated like a create."""
+
+    automation: AutomationCreate
 
 
 class AutomationUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     source: Optional[AutomationSource] = None
-    cron: Optional[str] = None
+    cron: Optional[str] = Field(default=None, max_length=100)
     filter_groups: Optional[FilterGroups] = Field(default=None, alias="filterGroups")
-    output: Optional[dict] = None
+    output: Optional[AutomationOutput] = None
     enabled: Optional[bool] = None
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @field_validator("cron")
+    @classmethod
+    def validate_cron(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_cron(v) if v is not None else v
 
 
 class AutomationRead(BaseModel):

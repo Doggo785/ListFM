@@ -1,8 +1,8 @@
-"""Tests for POST /api/automations/preview error semantics.
+"""Tests for POST /api/automations/preview validation and error semantics.
 
-The preview endpoint must return proper HTTP error statuses instead of
-`{"error": ...}` with HTTP 200:
-- unknown source type -> 422 with generic detail
+The preview body is validated via AutomationCreate (source/period Literals,
+cron parseable by the scheduler, maxSize bounded 1-200 with explicit 0->50):
+- invalid source type, period, cron, maxSize, or missing name -> 422
 - upstream Last.fm failure -> 502 with generic detail (no str(e) leak)
 - success -> 200 with {tracks, total}
 """
@@ -37,18 +37,19 @@ async def _register_login_link(client: AsyncClient, email: str) -> None:
     assert link.status_code == 200
 
 
-def _preview_body(source_type: str) -> dict:
-    return {
-        "automation": {
-            "source": {"type": source_type, "period": "3m"},
-            "output": {"maxSize": 5},
-        }
+def _preview_body(source_type: str, **automation_overrides) -> dict:
+    automation = {
+        "name": "preview",
+        "source": {"type": source_type, "period": "3m"},
+        "output": {"maxSize": 5},
     }
+    automation.update(automation_overrides)
+    return {"automation": automation}
 
 
 @pytest.mark.asyncio
 async def test_preview_unknown_source_returns_422(client: AsyncClient):
-    """An unsupported source type must return 422, not 200 with an error body."""
+    """An unsupported source type must return 422 (schema validation)."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
@@ -57,7 +58,87 @@ async def test_preview_unknown_source_returns_422(client: AsyncClient):
             json=_preview_body("bogus_source"),
         )
         assert resp.status_code == 422
-        assert resp.json()["detail"] == "Unsupported source type"
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_invalid_period_returns_422(client: AsyncClient):
+    """An unsupported period must return 422 (schema validation)."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        body = _preview_body("top_tracks")
+        body["automation"]["source"]["period"] = "fortnight"
+        resp = await client.post("/api/automations/preview", json=body)
+        assert resp.status_code == 422
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_max_size_bounds_return_422(client: AsyncClient):
+    """maxSize is bounded to 1-200 (after the explicit 0 -> 50 mapping)."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        for bad in (-1, 201, 10000):
+            body = _preview_body("top_tracks")
+            body["automation"]["output"] = {"maxSize": bad}
+            resp = await client.post("/api/automations/preview", json=body)
+            assert resp.status_code == 422, f"maxSize={bad} should be rejected"
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_max_size_zero_means_default(client: AsyncClient):
+    """maxSize=0 explicitly maps to the default 50 instead of 0 tracks."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        tracks = [
+            {"artist": "Artist A", "title": "Song A"},
+            {"artist": "Artist B", "title": "Song B"},
+            {"artist": "Artist C", "title": "Song C"},
+        ]
+        body = _preview_body("top_tracks")
+        body["automation"]["output"] = {"maxSize": 0}
+        with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
+            "services.automation_runner.enrich_tracks", return_value=tracks
+        ):
+            resp = await client.post("/api/automations/preview", json=body)
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 3
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_invalid_cron_returns_422(client: AsyncClient):
+    """A cron the scheduler cannot parse must return 422."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        resp = await client.post(
+            "/api/automations/preview",
+            json=_preview_body("top_tracks", cron="not a cron"),
+        )
+        assert resp.status_code == 422
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_missing_name_returns_422(client: AsyncClient):
+    """The previewed draft is validated like a create: name is required."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        body = _preview_body("top_tracks")
+        del body["automation"]["name"]
+        resp = await client.post("/api/automations/preview", json=body)
+        assert resp.status_code == 422
     finally:
         await _cleanup_user(email=email)
 
@@ -122,6 +203,7 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
         ]
         body = {
             "automation": {
+                "name": "preview",
                 "source": {"type": "top_tracks", "period": "3m"},
                 "output": {"maxSize": 50},
                 "filterGroups": [

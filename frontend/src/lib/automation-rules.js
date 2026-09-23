@@ -173,7 +173,8 @@ export function sanitizeAutomation(raw) {
       ? raw.filterGroups
       : [createGroup()],
     output: {
-      maxSize: Math.max(1, parseInt(raw.output?.maxSize) || 50),
+      // Mirrors the backend bound (AutomationOutput: 1-200, 0 -> 50).
+      maxSize: Math.min(200, Math.max(1, parseInt(raw.output?.maxSize) || 50)),
     },
     enabled: raw.enabled !== false,
     createdAt: raw.createdAt || new Date().toISOString(),

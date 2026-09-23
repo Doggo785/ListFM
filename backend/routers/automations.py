@@ -1,7 +1,15 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
-from schemas import AutomationCreate, AutomationUpdate, AutomationRead
+from schemas import (
+    AutomationCreate,
+    AutomationUpdate,
+    AutomationRead,
+    PreviewRequest,
+    LASTFM_USERNAME_REGEX,
+)
 from models.user import User
 from routers.deps import get_current_user_lastfm_username, get_current_active_user
 from repositories.automations import (
@@ -17,24 +25,26 @@ router = APIRouter(prefix="/api", tags=["automations"])
 
 
 @router.post("/automations/preview")
-def preview_automation(
-    body: dict,
+async def preview_automation(
+    body: PreviewRequest,
     username: str = Depends(get_current_user_lastfm_username),
 ):
-    automation = body.get("automation", {})
-    source = automation.get("source", {})
-    source_type = source.get("type", "top_tracks")
-    period = source.get("period", "3m")
-    max_size = automation.get("output", {}).get("maxSize", 50)
-    filter_groups = automation.get("filterGroups") or automation.get("filter_groups") or []
+    if not LASTFM_USERNAME_REGEX.match(username):
+        raise HTTPException(status_code=422, detail="Invalid Last.fm username")
+    automation = body.automation
 
+    # The pipeline is synchronous (pylast + ThreadPoolExecutor): keep it off
+    # the event loop, like the scheduled sweep does.
+    loop = asyncio.get_running_loop()
     try:
-        result = run_automation_pipeline(
-            username=username,
-            source_type=source_type,
-            period=period,
-            filter_groups=filter_groups,
-            max_tracks=max_size,
+        result = await loop.run_in_executor(
+            None,
+            run_automation_pipeline,
+            username,
+            automation.source.type,
+            automation.source.period,
+            automation.filter_groups,
+            automation.output.maxSize,
         )
     except UnsupportedSourceTypeError:
         raise HTTPException(status_code=422, detail="Unsupported source type")
