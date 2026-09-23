@@ -1,4 +1,7 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// Same-origin by default: dev requests go through the Vite /api proxy,
+// so cookies never cross origins. Set VITE_API_URL only for builds that
+// are served from a different origin than the API.
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 let isRefreshing = false;
 let refreshPromise = null;
@@ -33,7 +36,7 @@ export async function request(path, options = {}) {
   } catch (err) {
     if (err instanceof TypeError && err.message === "Failed to fetch") {
       throw new Error(
-        "Unable to reach the server. Make sure the backend is running on port 8000."
+        "Unable to reach the server. Make sure the backend is running."
       );
     }
     throw err;
