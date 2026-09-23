@@ -13,6 +13,9 @@ class AutomationHistory(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     automation_id: Mapped[str] = mapped_column(String(36), ForeignKey("automations.id"), index=True)
+    generated_playlist_id: Mapped[Optional[str]] = mapped_column(
+        String(36), ForeignKey("generated_playlists.id"), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(20))  # running|completed|failed
     tracks_generated: Mapped[int] = mapped_column(Integer, default=0)
     tracks_before_filter: Mapped[int] = mapped_column(Integer, default=0)

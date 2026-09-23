@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
+from models.track import Track
 from schemas import GeneratedPlaylistCreate
 from repositories.tracks import get_or_create_track
 
@@ -73,6 +74,25 @@ async def create_generated_playlist(
     await db.flush()
     await db.refresh(playlist)
     return playlist
+
+
+async def get_playlist_tracks(
+    db: AsyncSession, playlist_id: str, user_id: str
+) -> list[dict] | None:
+    """Ordered track entries of a playlist, or None if missing/foreign."""
+    playlist = await get_generated_playlist(db, playlist_id, user_id)
+    if playlist is None:
+        return None
+    result = await db.execute(
+        select(Track.title, Track.artist, PlaylistTrack.position)
+        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .where(PlaylistTrack.playlist_id == playlist_id)
+        .order_by(PlaylistTrack.position)
+    )
+    return [
+        {"position": position, "title": title, "artist": artist}
+        for title, artist, position in result.all()
+    ]
 
 
 async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id: str) -> bool:

@@ -126,6 +126,23 @@ export async function deleteAutomation(id) {
   });
 }
 
+export async function getAutomationHistory(id) {
+  requireUsername();
+  return request(`/api/automations/${id}/history`);
+}
+
+export async function runAutomationNow(id) {
+  requireUsername();
+  return request(`/api/automations/${id}/run`, {
+    method: "POST",
+  });
+}
+
+export async function getGeneratedPlaylistTracks(playlistId) {
+  requireUsername();
+  return request(`/api/generated-playlists/${playlistId}/tracks`);
+}
+
 export async function getGeneratedPlaylists() {
   requireUsername();
   return request("/api/generated-playlists");
