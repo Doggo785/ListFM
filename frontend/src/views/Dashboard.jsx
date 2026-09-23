@@ -6,7 +6,7 @@ import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
 import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import CountUp from "../components/elements/CountUp";
-import TiltedCard from "../components/ui/PlaylistCard";
+import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
 import { getAutomations, getUserInfo, getRecentTracks } from "@/lib/api";
 import {
   SOURCE_TYPE_LABELS,
@@ -14,7 +14,7 @@ import {
   describeCron,
   isValidCron,
 } from "@/lib/automation-rules";
-import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
+import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
 import {
   getGreeting,
   getLastVisit,
@@ -23,22 +23,9 @@ import {
 import {
   IconHome,
   IconHeadphones,
-  IconPlus,
 } from "@tabler/icons-react";
 import { extractColors, pickRingColors } from "../lib/color-extract";
 import { fadeUp, stagger } from "../lib/animation";
-
-const CARD_DEFAULTS = {
-  containerHeight: "420px",
-  containerWidth: "300px",
-  imageHeight: "420px",
-  imageWidth: "300px",
-  rotateAmplitude: 6,
-  scaleOnHover: 1.04,
-  showMobileWarning: false,
-  showTooltip: false,
-  displayOverlayContent: true,
-};
 
 function StatBlock({ value, label, color, delay = 0 }) {
   return (
@@ -145,17 +132,10 @@ function Dashboard() {
 
   const automationCards = useMemo(() => {
     if (!username) return [];
-    return automations.map((auto) => {
-      const name = auto.name || "Untitled";
-      const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
-      return {
-        id: auto.id,
-        title: name,
-        image: getPlaylistImageSrc(name, auto.source?.type),
-        description: buildDescription(auto),
-        glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
-      };
-    });
+    return automations.map((auto) => ({
+      ...buildAutomationCardBase(auto),
+      description: buildDescription(auto),
+    }));
   }, [username, automations]);
 
   if (!username) {
@@ -304,20 +284,7 @@ function Dashboard() {
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => navigate("/playlists/new")}
-                className="shrink-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
-                aria-label="Create a new automated playlist"
-              >
-                <TiltedCard
-                  {...CARD_DEFAULTS}
-                  icon={IconPlus}
-                  altText="+"
-                  captionText="New playlist"
-                  countdownText=""
-                />
-              </button>
+              <NewPlaylistCard onClick={() => navigate("/playlists/new")} />
             </div>
           </motion.section>
 

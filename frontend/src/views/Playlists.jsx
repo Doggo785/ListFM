@@ -1,10 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { IconPlus } from "@tabler/icons-react";
 import { useAuth } from "../contexts/AuthContext";
 import Loader from "../components/elements/Loader";
 import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
-import TiltedCard from "../components/ui/PlaylistCard";
+import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
 import { useAutomations } from "@/hooks/useAutomations";
 import {
   SOURCE_TYPE_LABELS,
@@ -12,24 +11,8 @@ import {
   describeCron,
   isValidCron,
 } from "@/lib/automation-rules";
-import {
-  getPlaylistImageSrc,
-  GRADIENTS,
-  hashName,
-} from "@/components/ui/PlaylistLogo";
+import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
 import { fadeUp, stagger } from "@/lib/animation";
-
-const CARD_DEFAULTS = {
-  containerHeight: "420px",
-  containerWidth: "300px",
-  imageHeight: "420px",
-  imageWidth: "300px",
-  rotateAmplitude: 6,
-  scaleOnHover: 1.04,
-  showMobileWarning: false,
-  showTooltip: false,
-  displayOverlayContent: true,
-};
 
 function buildSourceLine(auto) {
   const source =
@@ -60,14 +43,9 @@ function buildCountdown(auto, count) {
 }
 
 function buildCard(auto, count) {
-  const name = auto.name || "Untitled";
-  const [color1] = GRADIENTS[hashName(name) % GRADIENTS.length];
   return {
-    id: auto.id,
-    title: name,
-    image: getPlaylistImageSrc(name, auto.source?.type),
+    ...buildAutomationCardBase(auto),
     countdown: buildCountdown(auto, count),
-    glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
   };
 }
 
@@ -185,20 +163,7 @@ function Playlists() {
                   </div>
                 ))}
 
-                <button
-                  type="button"
-                  onClick={() => navigate("/playlists/new")}
-                  className="shrink-0 rounded-[22px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#17AEFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#121212]"
-                  aria-label="Create a new automated playlist"
-                >
-                  <TiltedCard
-                    {...CARD_DEFAULTS}
-                    icon={IconPlus}
-                    altText="+"
-                    captionText="New playlist"
-                    countdownText=""
-                  />
-                </button>
+                <NewPlaylistCard onClick={() => navigate("/playlists/new")} />
               </div>
             </motion.div>
           )}
