@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from schemas import (
@@ -106,7 +107,21 @@ async def run_automation_now(
     automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
 ):
-    """Trigger one manual run now (same pipeline as the scheduled sweep)."""
+    """Trigger one manual run now (same pipeline as the scheduled sweep).
+
+    Single-flight per automation via a transaction-scoped advisory lock:
+    a second trigger while one runs gets an instant 409 instead of a
+    duplicate run (refreshing the page resets only the client-side guard).
+    The lock releases on commit/rollback/disconnect, so a crashed run can
+    never wedge the automation.
+    """
+    locked = (
+        await db.execute(
+            select(func.pg_try_advisory_xact_lock(func.hashtextextended(automation.id, 0)))
+        )
+    ).scalar()
+    if not locked:
+        raise HTTPException(status_code=409, detail="Automation already running")
     history = await run_automation(db, automation)
     try:
         await db.commit()

@@ -11,7 +11,7 @@ from unittest.mock import patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 import uuid
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
 from models.automation import Automation
@@ -442,6 +442,38 @@ async def test_manual_save_does_not_stamp_tracks_fetched(client: AsyncClient):
             ).scalar_one()
             assert row.listeners == 0
             assert row.last_fetched_at is None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_run_now_concurrent_returns_409_then_succeeds(client: AsyncClient):
+    """A trigger while the run lock is held gets 409; freed lock runs 200."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        async with _TestSessionLocal() as db:
+            # Simulate an in-flight run from elsewhere (same lock, other session).
+            await db.execute(select(func.pg_advisory_lock(func.hashtextextended(automation_id, 0))))
+            resp = await client.post(f"/api/automations/{automation_id}/run")
+            assert resp.status_code == 409
+            assert resp.json()["detail"] == "Automation already running"
+            # Session-level locks survive ROLLBACK and pool reuse: unlock now.
+            await db.execute(select(func.pg_advisory_unlock(func.hashtextextended(automation_id, 0))))
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            resp = await client.post(f"/api/automations/{automation_id}/run")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "completed"
     finally:
         await _cleanup_user_with_automations(client, email)
 
