@@ -1,6 +1,7 @@
+import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -128,8 +129,6 @@ async def upsert_last_played_at(
     verifying it). Only last_played_at moves forward (monotonic max).
     Caller is responsible for committing the session.
     """
-    from sqlalchemy import func
-
     excluded_last_played = insert(UserTrack).excluded.last_played_at
     stmt = (
         insert(UserTrack)
@@ -169,3 +168,83 @@ async def get_recent_user_tracks(
         {"title": title, "artist": artist, "album": album, "played_at": played_at}
         for title, artist, album, played_at in result.all()
     ]
+
+
+async def bulk_store_recent_plays(
+    db: AsyncSession,
+    user_id: str,
+    plays: list[tuple[str, str, datetime | None]],
+) -> None:
+    """Record recent plays in bulk: (title, artist, played_at) triples.
+
+    Same guarantees as upsert_last_played_at (never fabricates user stats
+    or refreshes enrich sync state; last_played_at moves monotonically),
+    but in a constant handful of round-trips: one track lookup, one insert
+    for missing tracks, one upsert for the plays. Caller commits.
+    """
+    merged: dict[tuple[str, str], datetime | None] = {}
+    for title, artist, played_at in plays:
+        key = (artist, title)
+        prev = merged.get(key, None)
+        if key not in merged or (
+            played_at is not None and (prev is None or played_at > prev)
+        ):
+            merged[key] = played_at
+    dated = {k: v for k, v in merged.items() if v is not None}
+    if not dated:
+        return
+
+    pairs = list(dated)
+    existing = await db.execute(
+        select(Track).where(tuple_(Track.artist, Track.title).in_(pairs))
+    )
+    by_key = {(t.artist, t.title): t for t in existing.scalars().all()}
+    missing = [p for p in pairs if p not in by_key]
+    if missing:
+        now = datetime.now(timezone.utc)
+        await db.execute(
+            insert(Track)
+            .values(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "title": title,
+                        "artist": artist,
+                        "last_fetched_at": None,
+                        "created_at": now,
+                    }
+                    for artist, title in missing
+                ]
+            )
+            .on_conflict_do_nothing(index_elements=["artist", "title"])
+        )
+        await db.flush()
+        existing = await db.execute(
+            select(Track).where(tuple_(Track.artist, Track.title).in_(pairs))
+        )
+        by_key = {(t.artist, t.title): t for t in existing.scalars().all()}
+
+    now = datetime.now(timezone.utc)
+    stmt = insert(UserTrack).values(
+        [
+            {
+                "user_id": user_id,
+                "track_id": by_key[key].id,
+                "last_played_at": played_at,
+                "created_at": now,
+            }
+            for key, played_at in dated.items()
+            if key in by_key
+        ]
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["user_id", "track_id"],
+        set_={
+            "last_played_at": func.greatest(
+                func.coalesce(UserTrack.last_played_at, EPOCH_FLOOR),
+                func.coalesce(stmt.excluded.last_played_at, EPOCH_FLOOR),
+            ),
+        },
+    )
+    await db.execute(stmt)
+    await db.flush()

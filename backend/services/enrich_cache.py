@@ -22,17 +22,19 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy import select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from repositories.albums import get_album_by_id, get_or_create_album
-from repositories.tags import (
-    get_album_tags,
-    get_artist_tags,
-    upsert_album_tag,
-    upsert_artist_tag,
-)
-from repositories.tracks import CACHE_TTL, get_or_create_track, get_track_by_artist_title
-from repositories.user_tracks import get_user_track, upsert_user_track
+from models.album import Album
+from models.artist_tag import ArtistTag
+from models.album_tag import AlbumTag
+from models.tag import Tag
+from models.track import Track
+from models.user_track import UserTrack
+from repositories.albums import get_or_create_album
+from repositories.tags import upsert_album_tag, upsert_artist_tag
+from repositories.tracks import CACHE_TTL, get_or_create_track
+from repositories.user_tracks import upsert_user_track
 from services.lastfm import enrich_tracks, epoch_to_datetime, get_lastfm_call_count
 
 logger = logging.getLogger(__name__)
@@ -42,40 +44,110 @@ def _fresh(ts) -> bool:
     return ts is not None and ts >= (datetime.now(timezone.utc) - CACHE_TTL)
 
 
-async def _read_cached_track(db: AsyncSession, *, user_id: str, track: dict) -> dict | None:
-    """Rebuild a fully enriched track from DB rows, or None on any miss/stale."""
-    artist = track.get("artist", "")
-    title = track.get("title", "")
-    row = await get_track_by_artist_title(db, artist, title)
-    if row is None or not _fresh(row.last_fetched_at):
-        return None
+async def _read_cached_tracks(
+    db: AsyncSession, *, user_id: str, tracks: list[dict]
+) -> list[dict | None]:
+    """Rebuild enriched tracks from DB rows, None per miss/stale track.
 
-    artist_tags = await get_artist_tags(db, artist)
+    Bulk variant of the per-track read: one query per table (tracks,
+    artist tags, albums, album tags, user rows) instead of N+1 round-trips.
+    Same all-or-nothing semantics per track.
+    """
+    if not tracks:
+        return []
+    pairs = list({(t.get("artist", ""), t.get("title", "")) for t in tracks})
 
-    album_title = None
-    if row.album_id:
-        album = await get_album_by_id(db, row.album_id)
-        if album is None:
-            return None
-        album_title = album.title
-        album_tags = await get_album_tags(db, row.album_id)
-    else:
-        album_tags = []
+    track_rows = (
+        await db.execute(
+            select(Track).where(tuple_(Track.artist, Track.title).in_(pairs))
+        )
+    ).scalars().all()
+    by_key = {(r.artist, r.title): r for r in track_rows}
 
-    user_row = await get_user_track(db, user_id, row.id)
-    if user_row is None or not _fresh(user_row.last_synced_at):
-        return None
+    artists = list({r.artist for r in track_rows})
+    artist_tags_rows = (
+        await db.execute(
+            select(ArtistTag.artist, Tag.name, ArtistTag.weight)
+            .join(Tag, Tag.id == ArtistTag.tag_id)
+            .where(ArtistTag.artist.in_(artists))
+        )
+    ).all() if artists else []
+    artist_tags_map: dict[str, list[dict]] = {}
+    for artist, name, weight in artist_tags_rows:
+        artist_tags_map.setdefault(artist, []).append({"name": name, "count": weight})
 
-    return {
-        **track,
-        "listeners": row.listeners,
-        "global_playcount": row.global_playcount,
-        "album": album_title,
-        "artist_tags": artist_tags,
-        "album_tags": album_tags,
-        "userplaycount": user_row.user_playcount,
-        "userloved": user_row.userloved,
-    }
+    album_ids = list({r.album_id for r in track_rows if r.album_id})
+    albums_map = (
+        {
+            r.id: r
+            for r in (
+                await db.execute(select(Album).where(Album.id.in_(album_ids)))
+            ).scalars().all()
+        }
+        if album_ids
+        else {}
+    )
+    album_tags_rows = (
+        await db.execute(
+            select(AlbumTag.album_id, Tag.name, AlbumTag.weight)
+            .join(Tag, Tag.id == AlbumTag.tag_id)
+            .where(AlbumTag.album_id.in_(album_ids))
+        )
+    ).all() if album_ids else []
+    album_tags_map: dict[str, list[dict]] = {}
+    for album_id, name, weight in album_tags_rows:
+        album_tags_map.setdefault(album_id, []).append({"name": name, "count": weight})
+
+    track_ids = [r.id for r in track_rows]
+    user_map = (
+        {
+            r.track_id: r
+            for r in (
+                await db.execute(
+                    select(UserTrack).where(
+                        UserTrack.user_id == user_id,
+                        UserTrack.track_id.in_(track_ids),
+                    )
+                )
+            ).scalars().all()
+        }
+        if track_ids
+        else {}
+    )
+
+    out = []
+    for track in tracks:
+        row = by_key.get((track.get("artist", ""), track.get("title", "")))
+        if row is None or not _fresh(row.last_fetched_at):
+            out.append(None)
+            continue
+        album_title = None
+        if row.album_id:
+            album = albums_map.get(row.album_id)
+            if album is None:
+                out.append(None)
+                continue
+            album_title = album.title
+            album_tags = album_tags_map.get(row.album_id, [])
+        else:
+            album_tags = []
+        user_row = user_map.get(row.id)
+        if user_row is None or not _fresh(user_row.last_synced_at):
+            out.append(None)
+            continue
+        out.append(
+            {
+                **track,
+                "listeners": row.listeners,
+                "global_playcount": row.global_playcount,
+                "album": album_title,
+                "artist_tags": artist_tags_map.get(row.artist, []),
+                "album_tags": album_tags,
+                "userplaycount": user_row.user_playcount,
+                "userloved": user_row.userloved,
+            }
+        )
+    return out
 
 
 async def _write_back(
@@ -113,9 +185,9 @@ async def _write_back(
             db,
             user_id,
             track.id,
-                user_playcount=info.get("userplaycount", 0) or 0,
-                userloved=bool(info.get("userloved", False)),
-                last_played_at=epoch_to_datetime(base.get("timestamp")),
+            user_playcount=info.get("userplaycount", 0) or 0,
+            userloved=bool(info.get("userloved", False)),
+            last_played_at=epoch_to_datetime(base.get("timestamp")),
         )
 
 
@@ -130,7 +202,7 @@ async def enrich_tracks_cached(
     """Enrich via cache, live-fetching only misses. Returns (tracks, stats)."""
     to_enrich = tracks[:max_enrich]
     tail = tracks[max_enrich:]
-    cached = [await _read_cached_track(db, user_id=user_id, track=t) for t in to_enrich]
+    cached = await _read_cached_tracks(db, user_id=user_id, tracks=to_enrich)
 
     miss_idx = [i for i, c in enumerate(cached) if c is None]
     stats = {"hits": len(to_enrich) - len(miss_idx), "misses": len(miss_idx), "lastfm_calls": 0}

@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.user import User
-from repositories.tracks import CACHE_TTL, get_or_create_track
-from repositories.user_tracks import get_recent_user_tracks, upsert_last_played_at
+from repositories.tracks import CACHE_TTL
+from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tracks
 from services.lastfm import (
     epoch_to_datetime,
     get_recent_tracks,
@@ -78,14 +78,15 @@ def _stored_recents_fresh(stored: list[dict]) -> bool:
 
 
 async def _store_recent_tracks(db: AsyncSession, user_id: str, tracks: list[dict]) -> None:
-    """Record recent plays without fabricating user stats or sync state."""
-    for track in tracks:
-        row = await get_or_create_track(
-            db, track["title"], track["artist"], mark_fetched=False
-        )
-        played_at = epoch_to_datetime(track.get("timestamp"))
-        if played_at is not None:
-            await upsert_last_played_at(db, user_id, row.id, played_at)
+    """Record recent plays in bulk without fabricating user stats or sync state."""
+    await bulk_store_recent_plays(
+        db,
+        user_id,
+        [
+            (track["title"], track["artist"], epoch_to_datetime(track.get("timestamp")))
+            for track in tracks
+        ],
+    )
 
 
 @router.get("/top-tags")
