@@ -83,24 +83,13 @@ function Playlists() {
           animate="show"
           className="space-y-8"
         >
-          <motion.header
-            variants={fadeUp}
-            className="flex items-center justify-between gap-4"
-          >
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-                Playlists
-              </h1>
-              <p className="text-neutral-500 text-sm mt-2">
-                Your automated playlist generations
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/playlists/new")}
-              className="shrink-0 px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
-            >
-              New playlist
-            </button>
+          <motion.header variants={fadeUp}>
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+              Playlists
+            </h1>
+            <p className="text-neutral-500 text-sm mt-2">
+              Your automated playlist generations
+            </p>
           </motion.header>
 
           {error && (
