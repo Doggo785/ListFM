@@ -26,7 +26,8 @@ async def test_register_success(client: AsyncClient):
         data = resp.json()
         assert data["token_type"] == "bearer"
         assert "access_token" in data
-        assert "refresh_token" in data
+        # Cookies only: the refresh token must not leak into the body.
+        assert "refresh_token" not in data
         assert "expires_in" in data
         assert "password_hash" not in data
         assert "password" not in data

@@ -27,7 +27,8 @@ async def test_login_success(client: AsyncClient):
         data = resp.json()
         assert data["token_type"] == "bearer"
         assert "access_token" in data
-        assert "refresh_token" in data
+        # Cookies only: the refresh token must not leak into the body.
+        assert "refresh_token" not in data
         assert "expires_in" in data
     finally:
         await _cleanup_user(email=email)

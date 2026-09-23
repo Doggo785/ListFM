@@ -95,8 +95,9 @@ class OAuthCompleteEmailRequest(EmailValidatorMixin, BaseModel):
 
 
 class TokenResponse(BaseModel):
+    # Cookies only: the refresh token is never exposed in the body, only as
+    # an httpOnly cookie. The frontend ignores this body (session via /me).
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     expires_in: int
 

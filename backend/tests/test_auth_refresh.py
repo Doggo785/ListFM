@@ -27,7 +27,8 @@ async def test_refresh_success(client: AsyncClient):
         assert resp.status_code == 200
         data = resp.json()
         assert "access_token" in data
-        assert "refresh_token" in data
+        # Cookies only: the refresh token must not leak into the body.
+        assert "refresh_token" not in data
         assert data["token_type"] == "bearer"
     finally:
         await _cleanup_user(email=email)
@@ -68,7 +69,8 @@ async def test_refresh_token_rotation_revokes_old(client: AsyncClient):
 
         resp = await client.post("/api/auth/refresh")
         assert resp.status_code == 200
-        new_refresh = resp.json()["refresh_token"]
+        new_refresh = client.cookies.get("refresh_token")
+        assert new_refresh is not None
         assert old_refresh != new_refresh
 
         old_hash = hashlib.sha256(old_refresh.encode()).hexdigest()

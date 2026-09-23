@@ -43,14 +43,10 @@ from services.rate_limit import (
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-def _build_token_response(
-    access_token: str,
-    refresh_token: str,
-) -> TokenResponse:
+def _build_token_response(access_token: str) -> TokenResponse:
     settings = get_settings()
     return TokenResponse(
         access_token=access_token,
-        refresh_token=refresh_token,
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
     )
@@ -63,12 +59,12 @@ async def _establish_session(
     response: Response,
     *,
     error_detail: str,
-) -> tuple[str, str]:
+) -> str:
     """Create tokens, revoke stale refresh tokens, persist the new one, and set cookies.
 
     Shared by register() and login(). Commits the session; on failure rolls back
-    and raises a 500 with the caller-provided detail. Returns the tokens so the
-    caller can build the TokenResponse body.
+    and raises a 500 with the caller-provided detail. Returns the access token
+    for the response body — the refresh token lives in its httpOnly cookie only.
     """
     access_token = create_access_token(user.id)
     refresh_token = create_refresh_token(user.id)
@@ -85,7 +81,7 @@ async def _establish_session(
 
     set_auth_cookies(response, access_token, refresh_token)
 
-    return access_token, refresh_token
+    return access_token
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
@@ -111,11 +107,11 @@ async def register(
     password_hash = hash_password(body.password)
     user = await create_user(db, user_data, password_hash)
 
-    access_token, refresh_token = await _establish_session(
+    access_token = await _establish_session(
         db, user, request, response, error_detail="Failed to create account"
     )
 
-    return _build_token_response(access_token, refresh_token)
+    return _build_token_response(access_token)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -135,11 +131,11 @@ async def login(
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    access_token, refresh_token = await _establish_session(
+    access_token = await _establish_session(
         db, user, request, response, error_detail="Failed to log in"
     )
 
-    return _build_token_response(access_token, refresh_token)
+    return _build_token_response(access_token)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -200,7 +196,7 @@ async def refresh(
 
     set_auth_cookies(response, new_access_token, new_refresh_token)
 
-    return _build_token_response(new_access_token, new_refresh_token)
+    return _build_token_response(new_access_token)
 
 
 @router.post("/logout")
