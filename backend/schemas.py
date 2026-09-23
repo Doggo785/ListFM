@@ -318,6 +318,14 @@ class PlaylistTrackRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PlaylistTrackItem(BaseModel):
+    """Flat ordered track entry for playlist detail views."""
+
+    position: int
+    title: str
+    artist: str
+
+
 class AutomationHistoryRead(BaseModel):
     id: str
     automation_id: str

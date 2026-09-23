@@ -16,6 +16,7 @@ import {
   IconEye,
   IconMusic,
   IconFilter,
+  IconHistory,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import BorderGlow from "@/components/ui/BorderGlow";
@@ -24,6 +25,9 @@ import FilterBuilder from "@/components/builder/FilterBuilder";
 import CronEditor from "@/components/builder/CronEditor";
 import {
   previewAutomation,
+  getAutomationHistory,
+  runAutomationNow,
+  getGeneratedPlaylistTracks,
   updateAutomation,
   deleteAutomation,
 } from "@/lib/api";
@@ -125,6 +129,15 @@ export default function PlaylistDetail() {
   const [saveError, setSaveError] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
 
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState(null);
+  const [runningNow, setRunningNow] = useState(false);
+  const [runError, setRunError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [entryTracks, setEntryTracks] = useState({});
+  const [tracksLoadingId, setTracksLoadingId] = useState(null);
+
   useEffect(() => {
     document.title = automation?.name ? `${automation.name} - ListFM` : "Playlist - ListFM";
   }, [automation?.name]);
@@ -205,6 +218,69 @@ export default function PlaylistDetail() {
       setDeleting(false);
     }
   };
+
+  const loadHistory = useCallback(async () => {
+    if (!id) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      setHistory(await getAutomationHistory(id));
+    } catch (err) {
+      setHistoryError(err.message || "Failed to load run history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  const handleRunNow = async () => {
+    if (runningNow) return;
+    setRunningNow(true);
+    setRunError(null);
+    try {
+      await runAutomationNow(id);
+      await loadHistory();
+    } catch (err) {
+      setRunError(err.message || "Failed to run automation");
+    } finally {
+      setRunningNow(false);
+    }
+  };
+
+  const toggleEntry = async (entry) => {
+    if (expandedId === entry.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(entry.id);
+    if (entry.generated_playlist_id && !entryTracks[entry.id]) {
+      setTracksLoadingId(entry.id);
+      try {
+        const tracks = await getGeneratedPlaylistTracks(entry.generated_playlist_id);
+        setEntryTracks((prev) => ({ ...prev, [entry.id]: tracks }));
+      } catch {
+        setEntryTracks((prev) => ({ ...prev, [entry.id]: [] }));
+      } finally {
+        setTracksLoadingId(null);
+      }
+    }
+  };
+
+  const formatRunDate = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  };
+
+  const statusDot = (status) =>
+    status === "completed"
+      ? "bg-green-500"
+      : status === "failed"
+        ? "bg-red-500"
+        : "bg-yellow-500 animate-pulse";
 
   const loadPreview = async () => {
     if (!username?.trim()) return;
@@ -421,6 +497,126 @@ export default function PlaylistDetail() {
                 availableTags={availableTags}
                 disabledFields={automation.source?.type !== "recent_tracks" ? ["timestamp"] : []}
               />
+            </SectionCard>
+
+            <SectionCard title="Run history" icon={IconHistory} delay={0.5}>
+              <div className="flex items-center gap-3">
+                <Button
+                  size="default"
+                  onClick={handleRunNow}
+                  disabled={runningNow}
+                  className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
+                >
+                  {runningNow ? (
+                    <IconRefresh size={16} className="animate-spin mr-1.5" />
+                  ) : (
+                    <IconPlayerPlay size={16} className="mr-1.5" />
+                  )}
+                  {runningNow ? "Running..." : "Run now"}
+                </Button>
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  Trigger this automation immediately. The run is recorded below with its frozen track list.
+                </p>
+              </div>
+
+              {runError && (
+                <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center">
+                  <p className="text-sm text-red-400">{runError}</p>
+                </div>
+              )}
+
+              {historyLoading && (
+                <p className="text-sm text-neutral-500">Loading run history...</p>
+              )}
+
+              {historyError && (
+                <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center">
+                  <p className="text-sm text-red-400">{historyError}</p>
+                </div>
+              )}
+
+              {!historyLoading && !historyError && history.length === 0 && (
+                <p className="text-sm text-neutral-500">
+                  No runs yet. Use Run now or wait for the schedule.
+                </p>
+              )}
+
+              <div className="space-y-2">
+                {history.map((entry) => {
+                  const expanded = expandedId === entry.id;
+                  const tracks = entryTracks[entry.id];
+                  return (
+                    <div
+                      key={entry.id}
+                      className="rounded-xl border border-neutral-800 bg-[#141414] overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleEntry(entry)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                      >
+                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${statusDot(entry.status)}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-white font-medium truncate">
+                            {entry.status} · {formatRunDate(entry.started_at)}
+                          </div>
+                          <div className="text-xs text-neutral-500 tabular-nums">
+                            {entry.tracks_after_filter} of {entry.tracks_before_filter} tracks kept
+                            {entry.generated_playlist_id ? " · click for track list" : ""}
+                          </div>
+                          {entry.status === "failed" && entry.error_message && (
+                            <div className="text-xs text-red-400 truncate mt-0.5">
+                              {entry.error_message}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                      {expanded && (
+                        <div className="px-4 pb-4 pt-1 border-t border-neutral-800/60">
+                          {entry.completed_at && (
+                            <p className="text-xs text-neutral-500 mt-2">
+                              Finished {formatRunDate(entry.completed_at)}
+                            </p>
+                          )}
+                          {entry.status === "failed" && entry.error_message && (
+                            <p className="text-xs text-red-400 mt-2 break-words">
+                              {entry.error_message}
+                            </p>
+                          )}
+                          {tracksLoadingId === entry.id && (
+                            <p className="text-xs text-neutral-500 mt-2">Loading tracks...</p>
+                          )}
+                          {tracks && tracks.length > 0 && (
+                            <ol className="mt-2 space-y-0.5">
+                              {tracks.map((t) => (
+                                <li
+                                  key={`${t.position}-${t.artist}-${t.title}`}
+                                  className="flex items-baseline gap-3 text-sm"
+                                >
+                                  <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 tabular-nums">
+                                    {t.position + 1}
+                                  </span>
+                                  <span className="text-white/90 truncate">{t.title}</span>
+                                  <span className="text-xs text-neutral-500 truncate italic">
+                                    {t.artist}
+                                  </span>
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                          {tracks && tracks.length === 0 && tracksLoadingId !== entry.id && (
+                            <p className="text-xs text-neutral-500 mt-2">
+                              {entry.generated_playlist_id
+                                ? "No tracks stored for this run."
+                                : "No playlist stored for this run."}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </SectionCard>
           </div>
 

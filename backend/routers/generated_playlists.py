@@ -3,12 +3,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from schemas import GeneratedPlaylistCreate, GeneratedPlaylistRead
+from schemas import GeneratedPlaylistCreate, GeneratedPlaylistRead, PlaylistTrackItem
 from models.user import User
 from routers.deps import get_current_user_lastfm_username, get_current_active_user
 from repositories.generated_playlists import (
     get_generated_playlists,
     get_generated_playlist,
+    get_playlist_tracks,
     create_generated_playlist,
     delete_generated_playlist,
 )
@@ -36,6 +37,22 @@ async def get_single_generated_playlist(
     if playlist is None:
         raise HTTPException(status_code=404, detail="Generated playlist not found")
     return playlist
+
+
+@router.get(
+    "/generated-playlists/{playlist_id}/tracks",
+    response_model=list[PlaylistTrackItem],
+)
+async def get_single_generated_playlist_tracks(
+    playlist_id: str,
+    username: str = Depends(get_current_user_lastfm_username),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tracks = await get_playlist_tracks(db, playlist_id, current_user.id)
+    if tracks is None:
+        raise HTTPException(status_code=404, detail="Generated playlist not found")
+    return tracks
 
 
 @router.post("/generated-playlists", response_model=GeneratedPlaylistRead, status_code=201)
