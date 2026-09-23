@@ -331,6 +331,84 @@ async def test_run_now_404_unknown_or_foreign(client: AsyncClient):
         await _cleanup_user(email=other_email)
 
 
+@pytest.mark.asyncio
+async def test_playlist_tracks_endpoint_returns_ordered_tracks(client: AsyncClient):
+    """GET /generated-playlists/{id}/tracks returns the run's frozen tracks."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        tracks = [
+            {"artist": "Artist A", "title": "Song A"},
+            {"artist": "Artist B", "title": "Song B"},
+        ]
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            run_resp = await client.post(f"/api/automations/{automation_id}/run")
+        assert run_resp.status_code == 200
+        playlist_id = run_resp.json()["generated_playlist_id"]
+
+        resp = await client.get(f"/api/generated-playlists/{playlist_id}/tracks")
+        assert resp.status_code == 200
+        entries = resp.json()
+        assert [(e["title"], e["artist"]) for e in entries] == [
+            ("Song A", "Artist A"),
+            ("Song B", "Artist B"),
+        ]
+        assert [e["position"] for e in entries] == [0, 1]
+
+        resp = await client.get("/api/generated-playlists/00000000-0000-0000-0000-000000000000/tracks")
+        assert resp.status_code == 404
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
+    """Another user's playlist tracks are 404 (no existence leak)."""
+    email = _unique_email()
+    other_email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            run_resp = await client.post(f"/api/automations/{automation_id}/run")
+        playlist_id = run_resp.json()["generated_playlist_id"]
+
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as fresh:
+            reg = await fresh.post(
+                "/api/auth/register",
+                json={"email": other_email, "password": "StrongP@ss1!"},
+            )
+            assert reg.status_code == 201
+            mock_info = {"username": "other_user", "image": None}
+            with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
+                link = await fresh.post(
+                    "/api/auth/link-lastfm",
+                    json={"username": "other_user"},
+                )
+            assert link.status_code == 200
+            resp = await fresh.get(f"/api/generated-playlists/{playlist_id}/tracks")
+            assert resp.status_code == 404
+    finally:
+        await _cleanup_user_with_automations(client, email)
+        await _cleanup_user(email=other_email)
+
+
 def test_scheduler_disabled_when_flag_false():
     """ENABLE_SCHEDULER=false (the default) must not create a scheduler."""
     from backend.main import create_scheduler
