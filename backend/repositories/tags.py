@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.artist_tag import ArtistTag
 from models.tag import Tag
 from models.track_tag import TrackTag
 from models.album_tag import AlbumTag
@@ -120,3 +121,47 @@ async def get_album_tags(db: AsyncSession, album_id: str) -> list[dict]:
         .where(AlbumTag.album_id == album_id)
     )
     return [{"name": name, "count": at.weight} for at, name in result.all()]
+
+
+async def get_artist_tags(db: AsyncSession, artist: str) -> list[dict]:
+    """Get all tags for an artist with normalized names."""
+    result = await db.execute(
+        select(ArtistTag, Tag.name)
+        .join(Tag)
+        .where(ArtistTag.artist == artist)
+    )
+    return [{"name": name, "count": at.weight} for at, name in result.all()]
+
+
+async def upsert_artist_tag(
+    db: AsyncSession,
+    artist: str,
+    tag_name: str,
+    weight: int,
+) -> ArtistTag:
+    """Upsert an artist-tag association.
+
+    Caller is responsible for committing the session.
+    """
+    tag = await get_or_create_tag(db, tag_name)
+
+    stmt = (
+        insert(ArtistTag)
+        .values(
+            artist=artist,
+            tag_id=tag.id,
+            weight=weight,
+            fetched_at=datetime.now(timezone.utc),
+        )
+        .on_conflict_do_update(
+            index_elements=["artist", "tag_id"],
+            set_={
+                "weight": weight,
+                "fetched_at": datetime.now(timezone.utc),
+            },
+        )
+        .returning(ArtistTag)
+    )
+    result = await db.execute(stmt)
+    await db.flush()
+    return result.scalar_one()

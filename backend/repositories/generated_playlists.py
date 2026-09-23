@@ -37,13 +37,19 @@ async def get_generated_playlist(db: AsyncSession, playlist_id: str, user_id: st
 
 
 async def create_generated_playlist(
-    db: AsyncSession, user_id: str, lastfm_username: str, data: GeneratedPlaylistCreate
+    db: AsyncSession,
+    user_id: str,
+    lastfm_username: str,
+    data: GeneratedPlaylistCreate,
+    mark_fetched: bool = True,
 ) -> GeneratedPlaylist:
     """Create a new generated playlist record.
 
     Caller is responsible for committing the session. All track lookups
     and playlist_track inserts happen within the same uncommitted transaction,
-    ensuring atomicity.
+    ensuring atomicity. Pass mark_fetched=False when the tracks were not
+    just live-fetched (persist-from-run, manual save), so the rows are not
+    stamped as freshly enriched.
     """
     now = datetime.now(timezone.utc)
     playlist = GeneratedPlaylist(
@@ -62,7 +68,8 @@ async def create_generated_playlist(
 
     for i, track_data in enumerate(data.tracks):
         track = await get_or_create_track(
-            db, title=track_data.title, artist=track_data.artist
+            db, title=track_data.title, artist=track_data.artist,
+            mark_fetched=mark_fetched,
         )
         playlist_track = PlaylistTrack(
             playlist_id=playlist.id,

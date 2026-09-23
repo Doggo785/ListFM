@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import threading
+import time
 from contextlib import nullcontext
+from datetime import datetime, timezone
 
 import pylast
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -15,6 +17,49 @@ PERIOD_MAP = {
     "12m": pylast.PERIOD_12MONTHS,
     "overall": pylast.PERIOD_OVERALL,
 }
+
+# Outbound Last.fm etiquette: ~1s between calls, process-wide (the enrich
+# ThreadPool shares one gate). Patch to 0 in tests to skip the sleeps.
+LASTFM_MIN_INTERVAL = 1.0
+_throttle_lock = threading.Lock()
+_last_call_monotonic = 0.0
+_lastfm_call_count = 0
+
+
+def _throttled_call() -> None:
+    """Space outbound Last.fm calls apart; count every gated call.
+
+    Must wrap each network-touching block (not just each track): the pool
+    runs 5 threads and without a shared gate they fire concurrently.
+    """
+    global _last_call_monotonic, _lastfm_call_count
+    with _throttle_lock:
+        now = time.monotonic()
+        wait = LASTFM_MIN_INTERVAL - (now - _last_call_monotonic)
+        if wait > 0:
+            time.sleep(wait)
+            now = time.monotonic()
+        _last_call_monotonic = now
+        _lastfm_call_count += 1
+
+
+def reset_lastfm_call_count() -> None:
+    global _lastfm_call_count
+    with _throttle_lock:
+        _lastfm_call_count = 0
+
+
+def get_lastfm_call_count() -> int:
+    with _throttle_lock:
+        return _lastfm_call_count
+
+
+def epoch_to_datetime(ts) -> datetime | None:
+    """Last.fm epoch seconds (or None) to aware datetime, forgiving."""
+    try:
+        return datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts is not None else None
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
 
 
 def get_user_info(username: str) -> dict:
@@ -142,6 +187,7 @@ def get_track_full_info(
         "userplaycount": 0,
         "userloved": False,
         "artist_tags": [],
+        "album": None,
         "album_tags": [],
     }
     try:
@@ -150,21 +196,25 @@ def get_track_full_info(
         return result
 
     try:
+        _throttled_call()
         result["listeners"] = track.get_listener_count()
     except Exception:
         pass
 
     try:
+        _throttled_call()
         result["global_playcount"] = track.get_playcount()
     except Exception:
         pass
 
     try:
+        _throttled_call()
         result["userplaycount"] = track.get_userplaycount() or 0
     except Exception:
         pass
 
     try:
+        _throttled_call()
         result["userloved"] = bool(track.get_userloved())
     except Exception:
         pass
@@ -180,6 +230,7 @@ def get_track_full_info(
             if artist_key in artist_cache:
                 result["artist_tags"] = artist_cache[artist_key]
             else:
+                _throttled_call()
                 artist_obj = network.get_artist(artist)
                 raw_tags = [
                     {"name": t.item.name, "count": int(t.weight)}
@@ -192,15 +243,18 @@ def get_track_full_info(
         pass
 
     try:
+        _throttled_call()
         album = track.get_album()
         if album and album.title:
             album_name = album.title
+            result["album"] = album_name
             album_key = f"{artist.strip().lower()}|{album_name.strip().lower()}"
             with cache_guard:
                 if album_key in album_cache:
                     result["album_tags"] = album_cache[album_key]
                 else:
                     try:
+                        _throttled_call()
                         album_obj = network.get_album(artist, album_name)
                         raw_tags = [
                             {"name": t.item.name, "count": int(t.weight)}

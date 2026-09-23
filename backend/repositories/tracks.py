@@ -29,10 +29,14 @@ async def get_or_create_track(
     listeners: int = 0,
     global_playcount: int = 0,
     image_url: str | None = None,
+    mark_fetched: bool = True,
 ) -> Track:
     """Get an existing track or create a new one.
 
     Uses SELECT FOR UPDATE to prevent race conditions on concurrent inserts.
+    With mark_fetched=False the row is returned/created without stamping
+    last_fetched_at, so the enrich cache still treats it as unfetched
+    (used by paths that only record identity, like recent plays).
     Caller is responsible for committing the session.
     """
     now = datetime.now(timezone.utc)
@@ -47,7 +51,9 @@ async def get_or_create_track(
 
     if existing:
         # Update only if stale
-        if existing.last_fetched_at is None or existing.last_fetched_at < (now - CACHE_TTL):
+        if mark_fetched and (
+            existing.last_fetched_at is None or existing.last_fetched_at < (now - CACHE_TTL)
+        ):
             existing.listeners = listeners
             existing.global_playcount = global_playcount
             existing.image_url = image_url or existing.image_url
@@ -63,7 +69,7 @@ async def get_or_create_track(
         listeners=listeners,
         global_playcount=global_playcount,
         image_url=image_url,
-        last_fetched_at=now,
+        last_fetched_at=now if mark_fetched else None,
         created_at=now,
     )
     db.add(track)

@@ -6,6 +6,7 @@ from models.album import Album
 from models.tag import Tag
 from models.track_tag import TrackTag
 from models.album_tag import AlbumTag
+from models.artist_tag import ArtistTag
 from models.user_track import UserTrack
 from models.automation import Automation
 from models.generated_playlist import GeneratedPlaylist
@@ -21,6 +22,7 @@ __all__ = [
     "Tag",
     "TrackTag",
     "AlbumTag",
+    "ArtistTag",
     "UserTrack",
     "Automation",
     "GeneratedPlaylist",

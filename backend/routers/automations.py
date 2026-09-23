@@ -1,6 +1,3 @@
-import asyncio
-import functools
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
@@ -28,7 +25,7 @@ from repositories.automations import (
 )
 from services.automation_runner import (
     run_automation,
-    run_automation_pipeline,
+    run_automation_pipeline_cached,
     UnsupportedSourceTypeError,
 )
 
@@ -39,32 +36,38 @@ router = APIRouter(prefix="/api", tags=["automations"])
 async def preview_automation(
     body: PreviewRequest,
     username: str = Depends(get_current_user_lastfm_username),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     if not LASTFM_USERNAME_REGEX.match(username):
         raise HTTPException(status_code=422, detail="Invalid Last.fm username")
     automation = body.automation
 
-    # The pipeline is synchronous (pylast + ThreadPoolExecutor): keep it off
-    # the event loop, like the scheduled sweep does. functools.partial carries
-    # keyword arguments through run_in_executor (which only forwards *args),
-    # so a future parameter reorder in the pipeline cannot silently misbind.
-    loop = asyncio.get_running_loop()
-    pipeline = functools.partial(
-        run_automation_pipeline,
-        username=username,
-        source_type=automation.source.type,
-        period=automation.source.period,
-        filter_groups=automation.filter_groups,
-        max_tracks=automation.output.maxSize,
-    )
+    # Cache-first pipeline: repeated previews of the same tracks hit the DB
+    # instead of Last.fm. Cache writes commit below (a broken cache layer
+    # fails the preview loudly instead of degrading silently).
     try:
-        result = await loop.run_in_executor(None, pipeline)
+        result = await run_automation_pipeline_cached(
+            db,
+            user_id=current_user.id,
+            username=username,
+            source_type=automation.source.type,
+            period=automation.source.period,
+            filter_groups=automation.filter_groups,
+            max_tracks=automation.output.maxSize,
+        )
     except UnsupportedSourceTypeError:
         raise HTTPException(status_code=422, detail="Unsupported source type")
     except HTTPException:
         raise
     except Exception:
         raise HTTPException(status_code=502, detail="Unable to fetch tracks from Last.fm")
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save preview cache")
 
     return result
 

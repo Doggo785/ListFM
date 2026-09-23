@@ -24,6 +24,7 @@ from services.rate_limit import (
 from models.auth_provider import AuthProvider
 from models.refresh_token import RefreshToken
 from models.user import User
+from models.user_track import UserTrack
 
 # Dedicated throwaway database — NEVER point tests at the production/dev "listfm"
 # database: the _cleanup_db fixture deletes every row before/after each test.
@@ -132,6 +133,7 @@ async def _cleanup_user(email: str | None = None, user_id: str | None = None) ->
             return
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == uid))
         await db.execute(delete(AuthProvider).where(AuthProvider.user_id == uid))
+        await db.execute(delete(UserTrack).where(UserTrack.user_id == uid))
         await db.execute(delete(User).where(User.id == uid))
         await db.commit()
 

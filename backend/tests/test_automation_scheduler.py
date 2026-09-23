@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+import uuid
 from sqlalchemy import delete, select
 
 from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
@@ -17,6 +18,7 @@ from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
+from models.track import Track
 from services.automation_runner import run_due_automations
 
 
@@ -98,7 +100,7 @@ async def test_scheduler_tick_runs_due_automation(client: AsyncClient):
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
 
@@ -157,7 +159,7 @@ async def test_scheduler_run_persists_playlist_and_links_history(client: AsyncCl
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
 
@@ -228,7 +230,7 @@ async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -290,7 +292,7 @@ async def test_run_now_triggers_manual_run(client: AsyncClient):
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             resp = await client.post(f"/api/automations/{automation_id}/run")
         assert resp.status_code == 200
@@ -347,7 +349,7 @@ async def test_playlist_tracks_endpoint_returns_ordered_tracks(client: AsyncClie
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             run_resp = await client.post(f"/api/automations/{automation_id}/run")
         assert run_resp.status_code == 200
@@ -382,7 +384,7 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
         ), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             run_resp = await client.post(f"/api/automations/{automation_id}/run")
         playlist_id = run_resp.json()["generated_playlist_id"]
@@ -407,6 +409,41 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
     finally:
         await _cleanup_user_with_automations(client, email)
         await _cleanup_user(email=other_email)
+
+
+@pytest.mark.asyncio
+async def test_manual_save_does_not_stamp_tracks_fetched(client: AsyncClient):
+    """Manual playlist save records identity only, never a fetch stamp."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+        suffix = uuid.uuid4().hex[:8]
+        resp = await client.post(
+            "/api/generated-playlists",
+            json={
+                "automation_id": automation_id,
+                "source_type": "top_tracks",
+                "source_period": "3m",
+                "tracks": [{"title": f"Saved Song {suffix}", "artist": f"Saved Artist {suffix}"}],
+                "track_count": 1,
+            },
+        )
+        assert resp.status_code == 201
+        async with _TestSessionLocal() as db:
+            row = (
+                await db.execute(
+                    select(Track).where(
+                        Track.artist == f"Saved Artist {suffix}",
+                        Track.title == f"Saved Song {suffix}",
+                    )
+                )
+            ).scalar_one()
+            assert row.listeners == 0
+            assert row.last_fetched_at is None
+    finally:
+        await _cleanup_user_with_automations(client, email)
 
 
 def test_scheduler_disabled_when_flag_false():
