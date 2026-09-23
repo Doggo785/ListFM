@@ -15,6 +15,8 @@ from sqlalchemy import delete, select
 from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
 from models.automation import Automation
 from models.automation_history import AutomationHistory
+from models.generated_playlist import GeneratedPlaylist
+from models.playlist_track import PlaylistTrack
 from services.automation_runner import run_due_automations
 
 
@@ -63,6 +65,20 @@ async def _cleanup_user_with_automations(client: AsyncClient, email: str) -> Non
             await db.execute(
                 delete(AutomationHistory).where(AutomationHistory.automation_id.in_(automation_ids))
             )
+            playlist_ids = (
+                await db.execute(
+                    select(GeneratedPlaylist.id).where(
+                        GeneratedPlaylist.automation_id.in_(automation_ids)
+                    )
+                )
+            ).scalars().all()
+            if playlist_ids:
+                await db.execute(
+                    delete(PlaylistTrack).where(PlaylistTrack.playlist_id.in_(playlist_ids))
+                )
+                await db.execute(
+                    delete(GeneratedPlaylist).where(GeneratedPlaylist.id.in_(playlist_ids))
+                )
         await db.execute(delete(Automation).where(Automation.user_id == user_id))
         await db.commit()
     await _cleanup_user(email=email)
@@ -120,6 +136,80 @@ async def test_scheduler_skip_not_due(client: AsyncClient):
                 await db.execute(select(Automation).where(Automation.id == automation_id))
             ).scalar_one()
             assert automation.last_run is None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_run_persists_playlist_and_links_history(client: AsyncClient):
+    """A completed run persists a GeneratedPlaylist (+ tracks) linked from history."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        tracks = [
+            {"artist": "Artist A", "title": "Song A"},
+            {"artist": "Artist B", "title": "Song B"},
+        ]
+        with patch("services.automation_runner.is_due", return_value=True), patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        async with _TestSessionLocal() as db:
+            history = (await db.execute(select(AutomationHistory))).scalars().all()
+            assert len(history) == 1
+            assert history[0].status == "completed"
+            assert history[0].generated_playlist_id is not None
+
+            playlist = (
+                await db.execute(
+                    select(GeneratedPlaylist).where(
+                        GeneratedPlaylist.id == history[0].generated_playlist_id
+                    )
+                )
+            ).scalar_one()
+            assert playlist.automation_id == automation_id
+            assert playlist.track_count == 2
+
+            links = (
+                await db.execute(
+                    select(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+                )
+            ).scalars().all()
+            assert len(links) == 2
+            assert sorted(t.position for t in links) == [0, 1]
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_scheduler_failed_run_persists_no_playlist(client: AsyncClient):
+    """A failed run records history with no linked playlist."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+
+        with patch("services.automation_runner.is_due", return_value=True), patch(
+            "services.automation_runner.get_top_tracks",
+            side_effect=Exception("upstream down"),
+        ):
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        async with _TestSessionLocal() as db:
+            history = (await db.execute(select(AutomationHistory))).scalars().all()
+            assert len(history) == 1
+            assert history[0].status == "failed"
+            assert history[0].generated_playlist_id is None
+            playlists = (await db.execute(select(GeneratedPlaylist))).scalars().all()
+            assert playlists == []
     finally:
         await _cleanup_user_with_automations(client, email)
 

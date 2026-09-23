@@ -321,6 +321,7 @@ class PlaylistTrackRead(BaseModel):
 class AutomationHistoryRead(BaseModel):
     id: str
     automation_id: str
+    generated_playlist_id: Optional[str] = None
     status: str
     tracks_generated: int
     tracks_before_filter: int

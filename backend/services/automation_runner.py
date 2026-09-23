@@ -17,7 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import async_session
 from models.automation import Automation
+from models.generated_playlist import GeneratedPlaylist
 from repositories.automation_history import create_automation_history
+from repositories.generated_playlists import create_generated_playlist
+from schemas import GeneratedPlaylistCreate, Track
 from services.filter_engine import apply_filters
 from services.lastfm import (
     get_top_tracks,
@@ -139,8 +142,10 @@ async def _mark_failure(db: AsyncSession, history, exc: Exception) -> None:
 async def run_automation(db: AsyncSession, automation: Automation) -> None:
     """Run one automation's pipeline and record history + last_run.
 
-    The synchronous pipeline (pylast + ThreadPoolExecutor) runs in the default
-    executor so the event loop is never blocked.
+    On success the produced tracks are persisted as a GeneratedPlaylist
+    linked from the history row, so every run stays openable with its exact
+    track snapshot. The synchronous pipeline (pylast + ThreadPoolExecutor)
+    runs in the default executor so the event loop is never blocked.
     """
     started_at = datetime.now(timezone.utc)
     history = await create_automation_history(
@@ -166,7 +171,33 @@ async def run_automation(db: AsyncSession, automation: Automation) -> None:
         await _mark_failure(db, history, exc)
         return
 
+    playlist = await _persist_result_playlist(db, automation, result)
+    history.generated_playlist_id = playlist.id
     await _mark_success(db, history, result, automation)
+
+
+async def _persist_result_playlist(
+    db: AsyncSession, automation: Automation, result: dict
+) -> GeneratedPlaylist:
+    """Persist a pipeline result as the automation's generated playlist."""
+    tracks = [
+        Track(title=t["title"], artist=t["artist"]) for t in result["tracks"]
+    ]
+    return await create_generated_playlist(
+        db,
+        automation.user_id,
+        automation.lastfm_username,
+        GeneratedPlaylistCreate(
+            automation_id=automation.id,
+            name=automation.name,
+            description=automation.description,
+            source_type=automation.source_type,
+            source_period=automation.source_period,
+            tracks=tracks,
+            track_count=len(tracks),
+            filter_groups=_filter_groups_to_json(automation.filter_groups),
+        ),
+    )
 
 
 async def run_due_automations(session_factory=async_session) -> None:
