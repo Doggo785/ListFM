@@ -276,6 +276,61 @@ async def test_history_endpoint_404_unknown_or_foreign(client: AsyncClient):
         await _cleanup_user(email=other_email)
 
 
+@pytest.mark.asyncio
+async def test_run_now_triggers_manual_run(client: AsyncClient):
+    """POST /automations/{id}/run executes the pipeline and returns history."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        ):
+            resp = await client.post(f"/api/automations/{automation_id}/run")
+        assert resp.status_code == 200
+        entry = resp.json()
+        assert entry["automation_id"] == automation_id
+        assert entry["status"] == "completed"
+        assert entry["tracks_generated"] == 1
+        assert entry["generated_playlist_id"] is not None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_run_now_404_unknown_or_foreign(client: AsyncClient):
+    """Run-now on an unknown id — or another user's automation — is 404."""
+    email = _unique_email()
+    other_email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        resp = await client.post("/api/automations/00000000-0000-0000-0000-000000000000/run")
+        assert resp.status_code == 404
+
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as fresh:
+            reg = await fresh.post(
+                "/api/auth/register",
+                json={"email": other_email, "password": "StrongP@ss1!"},
+            )
+            assert reg.status_code == 201
+            resp = await fresh.post(f"/api/automations/{automation_id}/run")
+            assert resp.status_code == 404
+    finally:
+        await _cleanup_user_with_automations(client, email)
+        await _cleanup_user(email=other_email)
+
+
 def test_scheduler_disabled_when_flag_false():
     """ENABLE_SCHEDULER=false (the default) must not create a scheduler."""
     from backend.main import create_scheduler

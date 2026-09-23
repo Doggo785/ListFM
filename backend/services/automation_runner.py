@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import async_session
 from models.automation import Automation
+from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from repositories.automation_history import create_automation_history
 from repositories.generated_playlists import create_generated_playlist
@@ -139,13 +140,14 @@ async def _mark_failure(db: AsyncSession, history, exc: Exception) -> None:
     await db.flush()
 
 
-async def run_automation(db: AsyncSession, automation: Automation) -> None:
+async def run_automation(db: AsyncSession, automation: Automation) -> AutomationHistory:
     """Run one automation's pipeline and record history + last_run.
 
     On success the produced tracks are persisted as a GeneratedPlaylist
     linked from the history row, so every run stays openable with its exact
     track snapshot. The synchronous pipeline (pylast + ThreadPoolExecutor)
     runs in the default executor so the event loop is never blocked.
+    Returns the history row (uncommitted — the caller commits).
     """
     started_at = datetime.now(timezone.utc)
     history = await create_automation_history(
@@ -169,11 +171,12 @@ async def run_automation(db: AsyncSession, automation: Automation) -> None:
         )
     except Exception as exc:  # noqa: BLE001 - record any pipeline failure
         await _mark_failure(db, history, exc)
-        return
+        return history
 
     playlist = await _persist_result_playlist(db, automation, result)
     history.generated_playlist_id = playlist.id
     await _mark_success(db, history, result, automation)
+    return history
 
 
 async def _persist_result_playlist(
