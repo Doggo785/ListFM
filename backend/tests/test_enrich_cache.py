@@ -14,10 +14,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import select, update
 
-from models.artist_tag import ArtistTag
 from models.track import Track
 from models.user import User
-from repositories.tags import get_fresh_artist_tags, upsert_artist_tag
+from repositories.tags import get_artist_tags, upsert_artist_tag
 from repositories.user_tracks import get_user_track
 from services import lastfm
 from services.automation_runner import run_automation_pipeline_cached
@@ -77,30 +76,46 @@ async def test_call_counter_counts_gated_calls():
 
 
 @pytest.mark.asyncio
-async def test_artist_tags_roundtrip_when_fresh():
-    """Upserted artist tags read back with weights while fresh."""
+async def test_artist_tags_roundtrip():
+    """Upserted artist tags read back with weights."""
     async with _TestSessionLocal() as db:
         await upsert_artist_tag(db, "Some Artist", "rock", 90)
         await upsert_artist_tag(db, "Some Artist", "indie", 40)
         await db.commit()
-        tags = await get_fresh_artist_tags(db, "Some Artist")
-    assert tags is not None
+        tags = await get_artist_tags(db, "Some Artist")
     assert {t["name"]: t["count"] for t in tags} == {"rock": 90, "indie": 40}
 
 
 @pytest.mark.asyncio
-async def test_artist_tags_missing_or_stale_return_none():
-    """Unknown artists and stale rows read as a cache miss (None)."""
+async def test_stale_track_row_forces_refetch():
+    """A track row older than the TTL refetches live even with tags stored."""
+    user_id = await _make_user_id()
+    suffix = uuid.uuid4().hex[:8]
+    tracks = [{"artist": f"Stale Artist {suffix}", "title": f"Stale Song {suffix}"}]
+    live = [{**tracks[0], **_live_info()}]
     async with _TestSessionLocal() as db:
-        assert await get_fresh_artist_tags(db, "Nobody Ever") is None
-        await upsert_artist_tag(db, "Stale Artist", "rock", 80)
-        await db.execute(
-            update(ArtistTag)
-            .where(ArtistTag.artist == "Stale Artist")
-            .values(fetched_at=datetime.now(timezone.utc) - timedelta(hours=25))
-        )
-        await db.commit()
-        assert await get_fresh_artist_tags(db, "Stale Artist") is None
+        with patch(
+            "services.enrich_cache.enrich_tracks", return_value=live
+        ) as mock_enrich:
+            await enrich_tracks_cached(
+                db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+            )
+            assert mock_enrich.call_count == 1
+            await db.execute(
+                update(Track)
+                .where(
+                    Track.artist == tracks[0]["artist"],
+                    Track.title == tracks[0]["title"],
+                )
+                .values(last_fetched_at=datetime.now(timezone.utc) - timedelta(hours=25))
+            )
+            await db.commit()
+            out, stats = await enrich_tracks_cached(
+                db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+            )
+            assert mock_enrich.call_count == 2
+    assert stats["misses"] == 1
+    assert out[0]["listeners"] == 10
 
 
 class _FakeTags:

@@ -6,9 +6,12 @@ the async bridge. The cache is per-user: every read and write is keyed by
 carry identical userplaycount/userloved values.
 
 - read path (all async): track core (TTL via ``last_fetched_at``), album
-  title, artist tags and album tags (TTL via per-row ``fetched_at``),
-  per-user data (TTL via ``last_synced_at``). All-or-nothing per track:
-  anything missing or stale triggers a full live refetch of that track.
+  title, artist tags and album tags, per-user data (TTL via
+  ``last_synced_at``). All-or-nothing per track: anything missing or stale
+  triggers a full live refetch of that track. The track stamp gates the
+  whole snapshot — write-back always stores core and tags atomically, so a
+  fresh track implies freshly fetched tags (including legitimately empty
+  tag lists, which have no rows to timestamp).
 - miss path: the existing sync ``enrich_tracks`` runs in an executor (with
   the global ~1s throttle gate inside), then results are written back.
 
@@ -23,8 +26,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from repositories.albums import get_album_by_id, get_or_create_album
 from repositories.tags import (
-    get_fresh_album_tags,
-    get_fresh_artist_tags,
+    get_album_tags,
+    get_artist_tags,
     upsert_album_tag,
     upsert_artist_tag,
 )
@@ -54,9 +57,7 @@ async def _read_cached_track(db: AsyncSession, *, user_id: str, track: dict) -> 
     if row is None or not _fresh(row.last_fetched_at):
         return None
 
-    artist_tags = await get_fresh_artist_tags(db, artist)
-    if artist_tags is None:
-        return None
+    artist_tags = await get_artist_tags(db, artist)
 
     album_title = None
     if row.album_id:
@@ -64,9 +65,7 @@ async def _read_cached_track(db: AsyncSession, *, user_id: str, track: dict) -> 
         if album is None:
             return None
         album_title = album.title
-        album_tags = await get_fresh_album_tags(db, row.album_id)
-        if album_tags is None:
-            return None
+        album_tags = await get_album_tags(db, row.album_id)
     else:
         album_tags = []
 

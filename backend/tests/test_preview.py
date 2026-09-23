@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+import uuid
 
 from .conftest import _cleanup_user, _unique_email
 
@@ -105,7 +106,7 @@ async def test_preview_max_size_zero_means_default(client: AsyncClient):
         body = _preview_body("top_tracks")
         body["automation"]["output"] = {"maxSize": 0}
         with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
-            "services.automation_runner.enrich_tracks", return_value=tracks
+            "services.enrich_cache.enrich_tracks", return_value=tracks
         ):
             resp = await client.post("/api/automations/preview", json=body)
         assert resp.status_code == 200
@@ -166,6 +167,67 @@ async def test_preview_upstream_failure_returns_502(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_preview_second_identical_run_hits_cache(client: AsyncClient):
+    """An identical preview right after the first serves from cache (no live)."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        suffix = uuid.uuid4().hex[:8]
+        tracks = [
+            {"artist": f"Preview Artist {suffix}", "title": f"Preview Song {suffix}"}
+        ]
+        body = {
+            "automation": {
+                "name": "preview",
+                "source": {"type": "top_tracks", "period": "3m"},
+                "output": {"maxSize": 5},
+            }
+        }
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.enrich_cache.enrich_tracks", return_value=tracks
+        ) as mock_enrich:
+            first = await client.post("/api/automations/preview", json=body)
+            assert first.status_code == 200
+            assert first.json()["cache_misses"] == 1
+            second = await client.post("/api/automations/preview", json=body)
+            assert second.status_code == 200
+            assert mock_enrich.call_count == 1
+        data = second.json()
+        assert data["cache_hits"] == 1
+        assert data["cache_misses"] == 0
+        assert data["lastfm_calls"] == 0
+        # Same tracks back; the warm path carries the full enriched shape
+        # (counters defaulted) that the bare mock dicts lack.
+        assert [(t["artist"], t["title"]) for t in data["tracks"]] == [
+            (tracks[0]["artist"], tracks[0]["title"])
+        ]
+        assert data["tracks"][0]["listeners"] == 0
+        assert data["tracks"][0]["artist_tags"] == []
+    finally:
+        await _cleanup_user(email=email)
+    """An upstream Last.fm failure must return 502 with a generic detail."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        with patch(
+            "services.automation_runner.get_top_tracks",
+            side_effect=Exception("secret internal traceback"),
+        ):
+            resp = await client.post(
+                "/api/automations/preview",
+                json=_preview_body("top_tracks"),
+            )
+        assert resp.status_code == 502
+        detail = resp.json()["detail"]
+        assert detail == "Unable to fetch tracks from Last.fm"
+        assert "secret internal traceback" not in detail
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
 async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
     """A successful preview returns 200 with {tracks, total}."""
     email = _unique_email()
@@ -176,7 +238,7 @@ async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
             {"artist": "Artist B", "title": "Song B"},
         ]
         with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
-            "services.automation_runner.enrich_tracks", return_value=tracks
+            "services.enrich_cache.enrich_tracks", return_value=tracks
         ):
             resp = await client.post(
                 "/api/automations/preview",
@@ -227,7 +289,7 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
             }
         }
         with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
-            "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
         ):
             resp = await client.post(
                 "/api/automations/preview",

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -9,7 +9,6 @@ from models.artist_tag import ArtistTag
 from models.tag import Tag
 from models.track_tag import TrackTag
 from models.album_tag import AlbumTag
-from repositories.tracks import CACHE_TTL
 
 
 async def get_tag_by_name(db: AsyncSession, name: str) -> Tag | None:
@@ -124,6 +123,16 @@ async def get_album_tags(db: AsyncSession, album_id: str) -> list[dict]:
     return [{"name": name, "count": at.weight} for at, name in result.all()]
 
 
+async def get_artist_tags(db: AsyncSession, artist: str) -> list[dict]:
+    """Get all tags for an artist with normalized names."""
+    result = await db.execute(
+        select(ArtistTag, Tag.name)
+        .join(Tag)
+        .where(ArtistTag.artist == artist)
+    )
+    return [{"name": name, "count": at.weight} for at, name in result.all()]
+
+
 async def upsert_artist_tag(
     db: AsyncSession,
     artist: str,
@@ -156,43 +165,3 @@ async def upsert_artist_tag(
     result = await db.execute(stmt)
     await db.flush()
     return result.scalar_one()
-
-
-def _fresh_or_none(rows: list, max_age: timedelta) -> list | None:
-    """Return rows as fresh, or None when missing or any row is stale."""
-    if not rows:
-        return None
-    oldest = min(r.fetched_at for r in rows)
-    if oldest is None or oldest < (datetime.now(timezone.utc) - max_age):
-        return None
-    return rows
-
-
-async def get_fresh_artist_tags(
-    db: AsyncSession, artist: str, max_age: timedelta = CACHE_TTL
-) -> list[dict] | None:
-    """Artist tags when every row is fresher than max_age, else None (refetch)."""
-    result = await db.execute(
-        select(ArtistTag, Tag.name)
-        .join(Tag)
-        .where(ArtistTag.artist == artist)
-    )
-    rows = result.all()
-    if _fresh_or_none([at for at, _ in rows], max_age) is None:
-        return None
-    return [{"name": name, "count": at.weight} for at, name in rows]
-
-
-async def get_fresh_album_tags(
-    db: AsyncSession, album_id: str, max_age: timedelta = CACHE_TTL
-) -> list[dict] | None:
-    """Album tags when every row is fresher than max_age, else None (refetch)."""
-    result = await db.execute(
-        select(AlbumTag, Tag.name)
-        .join(Tag)
-        .where(AlbumTag.album_id == album_id)
-    )
-    rows = result.all()
-    if _fresh_or_none([at for at, _ in rows], max_age) is None:
-        return None
-    return [{"name": name, "count": at.weight} for at, name in rows]
