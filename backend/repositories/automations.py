@@ -47,7 +47,7 @@ async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str
         source_period=data.source.period,
         cron=data.cron,
         filter_groups=data.filter_groups,
-        output_max_size=data.output.get("maxSize", 50),
+        output_max_size=data.output.maxSize,
         enabled=data.enabled,
         created_at=now,
         updated_at=now,

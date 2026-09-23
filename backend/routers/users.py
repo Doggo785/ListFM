@@ -1,7 +1,14 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
-from services.lastfm import get_recent_tracks, get_top_tags, get_top_tracks, get_loved_tracks, get_user_info
+from fastapi import APIRouter, Depends, HTTPException, Query
+from services.lastfm import (
+    get_recent_tracks,
+    get_top_tags,
+    get_top_tracks,
+    get_top_artists_tracks,
+    get_loved_tracks,
+    get_user_info,
+)
 from schemas import RecentTracksResponse, Track, UserInfo
 from routers.deps import get_current_user_lastfm_username
 
@@ -23,7 +30,10 @@ def user_info(username: str = Depends(get_current_user_lastfm_username)):
 
 
 @router.get("/recent-tracks", response_model=RecentTracksResponse)
-def user_recent_tracks(limit: int = 5, username: str = Depends(get_current_user_lastfm_username)):
+def user_recent_tracks(
+    limit: int = Query(default=5, ge=1, le=200),
+    username: str = Depends(get_current_user_lastfm_username),
+):
     try:
         tracks = get_recent_tracks(username, limit=limit)
         return RecentTracksResponse(tracks=[Track(**t) for t in tracks])
@@ -42,7 +52,11 @@ def user_top_tags(username: str = Depends(get_current_user_lastfm_username)):
 
 
 @router.get("/top-tracks")
-def user_top_tracks(period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
+def user_top_tracks(
+    period: str = "3m",
+    limit: int = Query(default=50, ge=1, le=200),
+    username: str = Depends(get_current_user_lastfm_username),
+):
     try:
         return {"tracks": get_top_tracks(username, period, limit)}
     except Exception as e:
@@ -51,7 +65,10 @@ def user_top_tracks(period: str = "3m", limit: int = 50, username: str = Depends
 
 
 @router.get("/loved-tracks")
-def user_loved_tracks(limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
+def user_loved_tracks(
+    limit: int = Query(default=50, ge=1, le=200),
+    username: str = Depends(get_current_user_lastfm_username),
+):
     try:
         return {"tracks": get_loved_tracks(username, limit)}
     except Exception as e:
@@ -60,7 +77,12 @@ def user_loved_tracks(limit: int = 50, username: str = Depends(get_current_user_
 
 
 @router.get("/source-tracks")
-def user_source_tracks(source: str = "top_tracks", period: str = "3m", limit: int = 50, username: str = Depends(get_current_user_lastfm_username)):
+def user_source_tracks(
+    source: str = "top_tracks",
+    period: str = "3m",
+    limit: int = Query(default=50, ge=1, le=200),
+    username: str = Depends(get_current_user_lastfm_username),
+):
     try:
         match source:
             case "top_tracks":
@@ -69,6 +91,8 @@ def user_source_tracks(source: str = "top_tracks", period: str = "3m", limit: in
                 tracks = get_recent_tracks(username, limit)
             case "loved_tracks":
                 tracks = get_loved_tracks(username, limit)
+            case "top_artists":
+                tracks = get_top_artists_tracks(username, period, limit)
             case _:
                 raise HTTPException(status_code=400, detail=f"Unknown source: {source}")
         return {"tracks": tracks}
