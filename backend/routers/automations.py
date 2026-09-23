@@ -13,11 +13,15 @@ from schemas import (
     LASTFM_USERNAME_REGEX,
 )
 from repositories.automation_history import get_automation_history
+from models.automation import Automation
 from models.user import User
-from routers.deps import get_current_user_lastfm_username, get_current_active_user
+from routers.deps import (
+    get_current_user_lastfm_username,
+    get_current_active_user,
+    get_owned_automation,
+)
 from repositories.automations import (
     get_automations,
-    get_automation,
     create_automation,
     update_automation,
     delete_automation,
@@ -76,13 +80,8 @@ async def list_automations(
 
 @router.get("/automations/{automation_id}", response_model=AutomationRead)
 async def get_single_automation(
-    automation_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
+    automation: Automation = Depends(get_owned_automation),
 ):
-    automation = await get_automation(db, automation_id, current_user.id)
-    if automation is None:
-        raise HTTPException(status_code=404, detail="Automation not found")
     return automation
 
 
@@ -91,28 +90,20 @@ async def get_single_automation(
     response_model=list[AutomationHistoryRead],
 )
 async def get_automation_history_entries(
-    automation_id: str,
-    current_user: User = Depends(get_current_active_user),
+    automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
 ):
-    automation = await get_automation(db, automation_id, current_user.id)
-    if automation is None:
-        raise HTTPException(status_code=404, detail="Automation not found")
-    return await get_automation_history(db, automation_id)
+    return await get_automation_history(db, automation.id)
 
 
 @router.post(
     "/automations/{automation_id}/run", response_model=AutomationHistoryRead
 )
 async def run_automation_now(
-    automation_id: str,
-    current_user: User = Depends(get_current_active_user),
+    automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
 ):
     """Trigger one manual run now (same pipeline as the scheduled sweep)."""
-    automation = await get_automation(db, automation_id, current_user.id)
-    if automation is None:
-        raise HTTPException(status_code=404, detail="Automation not found")
     history = await run_automation(db, automation)
     try:
         await db.commit()
