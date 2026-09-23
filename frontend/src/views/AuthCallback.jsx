@@ -8,7 +8,7 @@ import { request } from "@/lib/api";
 function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isLastfmLinked } = useAuth();
+  const { isAuthenticated, isLastfmLinked, loading } = useAuth();
   const [error, setError] = useState(null);
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -19,6 +19,7 @@ function AuthCallback() {
   }, []);
 
   useEffect(() => {
+    if (loading) return;
     const err = searchParams.get("error");
     const needsEmailParam = searchParams.get("needs_email");
 
@@ -32,8 +33,15 @@ function AuthCallback() {
       return;
     }
 
-    setError("Invalid authentication response. Please try again.");
-  }, [searchParams]);
+    // No params: the backend 302-handles OAuth success straight to
+    // /dashboard or /link-lastfm, so this page only sees direct visits
+    // (or an already-handled login). Route by session, never fake-error.
+    if (!isAuthenticated) {
+      navigate("/login", { replace: true });
+      return;
+    }
+    navigate(isLastfmLinked ? "/dashboard" : "/link-lastfm", { replace: true });
+  }, [searchParams, loading, isAuthenticated, isLastfmLinked, navigate]);
 
   const handleEmailSubmit = async (e) => {
     e.preventDefault();

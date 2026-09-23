@@ -18,7 +18,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api/auth': {
+      // Proxy the whole API so dev is same-origin: no CORS/cookie split
+      // between the Vite server and the backend. OAuth login links
+      // (window.location.href = "/api/auth/...") flow through here too.
+      '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
