@@ -115,9 +115,10 @@ async def run_automation_now(
     it never rewrites another chain's season label, and it supersedes any
     pending auto-retry of an older chain (only the latest row retries).
 
-    Single-flight per automation via a transaction-scoped advisory lock:
-    a second trigger while one runs gets an instant 409 instead of a
-    duplicate run (refreshing the page resets only the client-side guard).
+    Single-flight per automation via a transaction-scoped advisory lock
+    shared with the sweep: a second trigger while one runs gets an instant
+    409 instead of a duplicate run (refreshing the page resets only the
+    client-side guard).
     The lock releases on commit/rollback/disconnect, so a crashed run can
     never wedge the automation.
     """

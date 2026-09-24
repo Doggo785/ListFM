@@ -346,19 +346,47 @@ async def get_retryable_failures(
     ]
 
 
+async def _try_run_lock(db: AsyncSession, automation_id: str) -> bool:
+    """Non-blocking per-automation lock shared with POST /run.
+
+    Whoever holds it runs; the other side skips (409 for manual triggers,
+    skip + log for the sweep). Transaction-scoped: released on
+    commit/rollback/disconnect, so a crashed run never wedges the chain.
+    """
+    return bool(
+        (
+            await db.execute(
+                select(
+                    func.pg_try_advisory_xact_lock(
+                        func.hashtextextended(automation_id, 0)
+                    )
+                )
+            )
+        ).scalar()
+    )
+
+
 async def run_due_automations(session_factory=async_session) -> None:
     """Sweep all enabled automations and run those that are due.
 
     Re-reads automations from the DB every cycle, so create/update/delete are
     picked up automatically with no resync code. Phase 2 retries failed runs
     whose backoff expired, keeping the chain's original ``scheduled_for``.
-    ``session_factory`` is injectable for tests.
+    Every run takes the shared advisory lock first: a manual trigger
+    in flight wins, the sweep skips instead of doubling it (and vice versa
+    via the endpoint's 409). ``session_factory`` is injectable for tests.
     """
     async with session_factory() as db:
         now = datetime.now(timezone.utc)
         automations = await get_enabled_automations(db)
         for automation in automations:
             if not is_due(automation, now):
+                continue
+            if not await _try_run_lock(db, automation.id):
+                logger.info(
+                    "sweep skipping automation %s: run already in flight",
+                    automation.id,
+                )
                 continue
             await run_automation(db, automation, scheduled_for=now)
         retryable = await get_retryable_failures(db, now)
@@ -369,6 +397,16 @@ async def run_due_automations(session_factory=async_session) -> None:
             for failed in retryable:
                 automation = by_id.get(failed.automation_id)
                 if automation is None:
+                    logger.info(
+                        "sweep skipping retry for %s: automation gone or disabled",
+                        failed.automation_id,
+                    )
+                    continue
+                if not await _try_run_lock(db, automation.id):
+                    logger.info(
+                        "sweep skipping retry for %s: run already in flight",
+                        automation.id,
+                    )
                     continue
                 logger.info(
                     "retrying automation %s (attempt %d, scheduled for %s)",

@@ -671,6 +671,44 @@ async def test_retry_skips_disabled_automation(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_sweep_skips_when_lock_held(client: AsyncClient):
+    """Sweep shares the run lock: held lock means no due run and no retry."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        origin = datetime.now(timezone.utc) - timedelta(minutes=6)
+        await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
+
+        async with _TestSessionLocal() as db:
+            # Simulate a manual run in flight from elsewhere.
+            await db.execute(
+                select(func.pg_advisory_lock(func.hashtextextended(automation_id, 0)))
+            )
+            tracks = [{"artist": "Artist A", "title": "Song A"}]
+            with patch(
+                "services.automation_runner.is_due", return_value=True
+            ), patch(
+                "services.automation_runner.get_top_tracks", return_value=tracks
+            ), patch(
+                "services.enrich_cache.enrich_tracks",
+                side_effect=lambda u, t, max_enrich=50: t,
+            ):
+                await run_due_automations(session_factory=_TestSessionLocal)
+            await db.execute(
+                select(func.pg_advisory_unlock(func.hashtextextended(automation_id, 0)))
+            )
+
+        # Only the seeded failure: neither phase 1 nor the retry fired.
+        assert len(await _history_rows(automation_id)) == 1
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
 async def test_run_now_starts_fresh_chain(client: AsyncClient):
     """POST /run records attempt 1 with a fresh scheduled_for."""
     email = _unique_email()
