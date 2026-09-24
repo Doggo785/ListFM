@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "motion/react";
+import { IconAlertCircle } from "@tabler/icons-react";
 import Grainient from "../components/ui/Grainient";
 import { useAuth } from "../contexts/AuthContext";
 import { request } from "@/lib/api";
@@ -105,7 +106,7 @@ function AuthCallback() {
       >
         <Link
           to="/"
-          className="inline-block text-3xl font-black text-[#ff530b] hover:opacity-80 transition-opacity"
+          className="inline-block rounded-full border border-white/10 bg-black/50 px-5 py-2 text-3xl font-black text-[#ff530b] backdrop-blur-md transition-opacity hover:opacity-80"
         >
           ListFM
         </Link>
@@ -169,15 +170,25 @@ function AuthCallback() {
             </form>
           </div>
         ) : error ? (
-          <>
-            <p className="text-red-400 text-sm">{error}</p>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mx-auto w-full max-w-sm rounded-2xl border border-neutral-800 bg-[#1a1a1a]/90 p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+          >
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10">
+              <IconAlertCircle size={24} className="text-red-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-white">Sign-in failed</h2>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
+              {error}
+            </p>
             <Link
               to="/login"
-              className="inline-block text-sm text-[#17AEFF] hover:text-[#17AEFF]/80 transition-colors font-medium"
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff530b] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#ff530b]/90"
             >
               Back to Sign In
             </Link>
-          </>
+          </motion.div>
         ) : (
           <div className="flex items-center justify-center gap-3 text-neutral-400 text-sm">
             <span className="h-4 w-4 rounded-full border-2 border-[#ff530b] border-t-transparent animate-spin" />

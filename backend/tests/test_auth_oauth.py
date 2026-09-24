@@ -457,24 +457,51 @@ async def test_google_callback_new_user_verified_email_persisted(client: AsyncCl
 
 @pytest.mark.asyncio
 async def test_google_callback_missing_code(client: AsyncClient):
-    """Google callback without code returns 400."""
-    resp = await client.get("/api/auth/google/callback")
-    assert resp.status_code == 400
-    assert resp.json()["detail"] == "Missing authorization code"
+    """Google callback without code redirects to the frontend error page."""
+    resp = await client.get("/api/auth/google/callback", follow_redirects=False)
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert "/auth/callback?error=missing_code" in location
+    assert "error_description=" in location
 
 
 @pytest.mark.asyncio
 async def test_google_callback_invalid_state(client: AsyncClient):
-    """Google callback with wrong state returns 403."""
+    """Google callback with wrong state redirects and clears the cookie."""
     resp = await client.get(
         "/api/auth/google/callback?code=xxx&state=wrong",
         cookies={"oauth_state": "expected_state"},
+        follow_redirects=False,
     )
-    assert resp.status_code == 403
-    assert "Invalid or expired OAuth state" in resp.json()["detail"]
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert "/auth/callback?error=invalid_state" in location
     set_cookie = resp.headers.get("set-cookie", "")
     assert "oauth_state=" in set_cookie
     assert "Max-Age=0" in set_cookie
+
+
+@pytest.mark.asyncio
+async def test_google_callback_profile_failure_redirects(client: AsyncClient):
+    """A failing provider profile fetch redirects, never raw JSON."""
+    with (
+        patch.object(
+            GoogleOAuth2,
+            "get_access_token",
+            return_value={"access_token": "fake_token"},
+        ),
+        patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
+    ):
+        mock_resp = _MockGoogleResponse(500, {})
+        mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
+        resp = await client.get(
+            "/api/auth/google/callback?code=fakecode&state=fakestate",
+            cookies={"oauth_state": "fakestate"},
+            follow_redirects=False,
+        )
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert "/auth/callback?error=profile_failed" in location
 
 
 @pytest.mark.asyncio
