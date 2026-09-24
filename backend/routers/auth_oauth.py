@@ -74,6 +74,51 @@ def _oauth_error_redirect(settings: Settings, error: str, description: str) -> R
     return resp
 
 
+def _check_oauth_callback_params(
+    code: str | None,
+    state: str | None,
+    oauth_state: str | None,
+    settings: Settings,
+) -> RedirectResponse | None:
+    """Shared callback preamble: missing code / bad state -> error redirect."""
+    if code is None:
+        return _oauth_error_redirect(
+            settings,
+            "missing_code",
+            "Missing authorization code. Please try signing in again.",
+        )
+    if not state or state != oauth_state:
+        return _oauth_error_redirect(
+            settings,
+            "invalid_state",
+            "Your sign-in session expired. Please try again.",
+        )
+    return None
+
+
+async def _exchange_oauth_code(
+    client: GoogleOAuth2 | DiscordOAuth2,
+    code: str,
+    redirect_uri: str,
+    settings: Settings,
+) -> tuple[dict | None, RedirectResponse | None]:
+    """Exchange a callback code; (token, None) or (None, error redirect)."""
+    try:
+        return await client.get_access_token(code, redirect_uri), None
+    except GetAccessTokenError:
+        return None, _oauth_error_redirect(
+            settings,
+            "exchange_failed",
+            "Could not complete sign-in with the provider. Please try again.",
+        )
+    except (httpx.HTTPError, asyncio.TimeoutError):
+        return None, _oauth_error_redirect(
+            settings,
+            "provider_unavailable",
+            "The sign-in provider is unavailable. Please try again later.",
+        )
+
+
 def _google_client() -> GoogleOAuth2:
     settings = get_settings()
     return GoogleOAuth2(
@@ -221,37 +266,16 @@ async def google_callback(
 ):
     rate_limit(request, oauth_login_limiter)
     settings = get_settings()
-    if code is None:
-        return _oauth_error_redirect(
-            settings,
-            "missing_code",
-            "Missing authorization code. Please try signing in again.",
-        )
-
-    if not state or state != oauth_state:
-        return _oauth_error_redirect(
-            settings,
-            "invalid_state",
-            "Your sign-in session expired. Please try again.",
-        )
+    if (
+        err := _check_oauth_callback_params(code, state, oauth_state, settings)
+    ) is not None:
+        return err
 
     client = _google_client()
     redirect_uri = _redirect_uri("google", settings)
-
-    try:
-        token = await client.get_access_token(code, redirect_uri)
-    except GetAccessTokenError:
-        return _oauth_error_redirect(
-            settings,
-            "exchange_failed",
-            "Could not complete sign-in with the provider. Please try again.",
-        )
-    except (httpx.HTTPError, asyncio.TimeoutError):
-        return _oauth_error_redirect(
-            settings,
-            "provider_unavailable",
-            "The sign-in provider is unavailable. Please try again later.",
-        )
+    token, err = await _exchange_oauth_code(client, code, redirect_uri, settings)
+    if err is not None:
+        return err
 
     access_token = token["access_token"]
     try:
@@ -311,37 +335,16 @@ async def discord_callback(
 ):
     rate_limit(request, oauth_login_limiter)
     settings = get_settings()
-    if code is None:
-        return _oauth_error_redirect(
-            settings,
-            "missing_code",
-            "Missing authorization code. Please try signing in again.",
-        )
-
-    if not state or state != oauth_state:
-        return _oauth_error_redirect(
-            settings,
-            "invalid_state",
-            "Your sign-in session expired. Please try again.",
-        )
+    if (
+        err := _check_oauth_callback_params(code, state, oauth_state, settings)
+    ) is not None:
+        return err
 
     client = _discord_client()
     redirect_uri = _redirect_uri("discord", settings)
-
-    try:
-        token = await client.get_access_token(code, redirect_uri)
-    except GetAccessTokenError:
-        return _oauth_error_redirect(
-            settings,
-            "exchange_failed",
-            "Could not complete sign-in with the provider. Please try again.",
-        )
-    except (httpx.HTTPError, asyncio.TimeoutError):
-        return _oauth_error_redirect(
-            settings,
-            "provider_unavailable",
-            "The sign-in provider is unavailable. Please try again later.",
-        )
+    token, err = await _exchange_oauth_code(client, code, redirect_uri, settings)
+    if err is not None:
+        return err
 
     access_token = token["access_token"]
     try:
