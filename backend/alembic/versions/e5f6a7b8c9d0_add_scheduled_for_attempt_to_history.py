@@ -40,7 +40,7 @@ def upgrade() -> None:
     op.alter_column('automation_history', 'scheduled_for', nullable=False)
     op.create_index(
         'idx_ah_retry_eligible', 'automation_history',
-        ['automation_id', 'status', 'attempt'],
+        ['status', 'attempt', 'automation_id'],
     )
 
 

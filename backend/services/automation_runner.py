@@ -16,15 +16,16 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from database import async_session
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from repositories.automation_history import create_automation_history
-from repositories.automations import get_automation_by_id
+from repositories.automations import get_automations_by_ids
 from repositories.generated_playlists import create_generated_playlist
 from schemas import GeneratedPlaylistCreate, Track
 from services.enrich_cache import enrich_tracks_cached
@@ -294,41 +295,54 @@ async def get_retryable_failures(
 ) -> list[AutomationHistory]:
     """Failed rows whose backoff expired and that are still the chain head.
 
-    Only the latest row per automation qualifies (across all statuses): a
-    newer manual run or cron tick supersedes the old chain instead of
-    doubling it. Attempt MAX_ATTEMPT rows are terminal and never returned.
+    The chain head (latest row per automation, across all statuses) is
+    resolved in the database with ROW_NUMBER(): a newer manual run or cron
+    tick supersedes the old chain instead of doubling it. Attempt
+    MAX_ATTEMPT rows are terminal and never returned.
     """
     now = now or datetime.now(timezone.utc)
-    failed = (
-        await db.execute(
-            select(AutomationHistory).where(
-                AutomationHistory.status == "failed",
-                AutomationHistory.attempt < MAX_ATTEMPT,
-            )
+    # Automations owning at least one non-terminal failure (served by the
+    # (status, attempt) index); only their chains get ranked below.
+    candidates = (
+        select(AutomationHistory.automation_id)
+        .where(
+            AutomationHistory.status == "failed",
+            AutomationHistory.attempt < MAX_ATTEMPT,
         )
-    ).scalars().all()
-    if not failed:
-        return []
-    automation_ids = list({row.automation_id for row in failed})
-    ordered = (
-        await db.execute(
-            select(AutomationHistory)
-            .where(AutomationHistory.automation_id.in_(automation_ids))
-            .order_by(
-                AutomationHistory.automation_id,
-                AutomationHistory.started_at.desc(),
-                AutomationHistory.id.desc(),
+        .distinct()
+        .scalar_subquery()
+    )
+    # Rank every row of those chains newest-first; rn == 1 is the chain
+    # head regardless of status, so a newer completed/manual run buries
+    # the old failure instead of being retried on top of it.
+    ranked = (
+        select(
+            AutomationHistory,
+            func.row_number()
+            .over(
+                partition_by=AutomationHistory.automation_id,
+                order_by=(
+                    AutomationHistory.started_at.desc(),
+                    AutomationHistory.id.desc(),
+                ),
             )
+            .label("rn"),
         )
-    ).scalars().all()
-    head: dict[str, AutomationHistory] = {}
-    for row in ordered:
-        head.setdefault(row.automation_id, row)
+        .where(AutomationHistory.automation_id.in_(candidates))
+        .subquery()
+    )
+    head = aliased(AutomationHistory, ranked)
+    result = await db.execute(
+        select(head).where(
+            ranked.c.rn == 1,
+            head.status == "failed",
+            head.attempt < MAX_ATTEMPT,
+        )
+    )
     return [
         row
-        for row in failed
-        if head[row.automation_id].id == row.id
-        and row.scheduled_for + RETRY_DELAYS[row.attempt] <= now
+        for row in result.scalars().all()
+        if row.scheduled_for + RETRY_DELAYS[row.attempt] <= now
     ]
 
 
@@ -347,20 +361,25 @@ async def run_due_automations(session_factory=async_session) -> None:
             if not is_due(automation, now):
                 continue
             await run_automation(db, automation, scheduled_for=now)
-        for failed in await get_retryable_failures(db, now):
-            automation = await get_automation_by_id(db, failed.automation_id)
-            if automation is None or not automation.enabled:
-                continue
-            logger.info(
-                "retrying automation %s (attempt %d, scheduled for %s)",
-                automation.id,
-                failed.attempt + 1,
-                failed.scheduled_for.isoformat(),
+        retryable = await get_retryable_failures(db, now)
+        if retryable:
+            by_id = await get_automations_by_ids(
+                db, [failed.automation_id for failed in retryable]
             )
-            await run_automation(
-                db,
-                automation,
-                scheduled_for=failed.scheduled_for,
-                attempt=failed.attempt + 1,
-            )
+            for failed in retryable:
+                automation = by_id.get(failed.automation_id)
+                if automation is None:
+                    continue
+                logger.info(
+                    "retrying automation %s (attempt %d, scheduled for %s)",
+                    automation.id,
+                    failed.attempt + 1,
+                    failed.scheduled_for.isoformat(),
+                )
+                await run_automation(
+                    db,
+                    automation,
+                    scheduled_for=failed.scheduled_for,
+                    attempt=failed.attempt + 1,
+                )
         await db.commit()
