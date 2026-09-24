@@ -1,9 +1,8 @@
 from datetime import datetime
 
-from sqlalchemy import String, Integer, DateTime, ForeignKey, func
-from sqlalchemy.orm import Mapped, mapped_column
-
 from database import Base
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class ArtistTag(Base):

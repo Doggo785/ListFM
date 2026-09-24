@@ -2,27 +2,25 @@
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pylast
 import pytest
+from config import Settings
 from httpx import ASGITransport, AsyncClient
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
-
-from sqlalchemy import select
-
 from models.auth_provider import AuthProvider
 from models.refresh_token import RefreshToken
 from models.user import User
+from sqlalchemy import select
 
-from config import Settings
 from .conftest import (
-    _TestSessionLocal,
     _cleanup_user,
     _get_user_id_from_cookies,
     _register_and_login,
+    _TestSessionLocal,
     _unique_email,
 )
 
@@ -298,7 +296,7 @@ async def test_discord_callback_returning_user_no_email_from_discord(client: Asy
                 user_id=user_id,
                 provider="discord",
                 provider_user_id="discord_returning_123",
-                linked_at=datetime.now(timezone.utc),
+                linked_at=datetime.now(UTC),
             )
             db.add(provider)
             await db.commit()

@@ -1,25 +1,24 @@
 import asyncio
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlencode
 
 import httpx
 import pylast
+from config import Settings, get_settings
+from database import get_db
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from config import Settings, get_settings
-from database import get_db
 from models.auth_provider import AuthProvider
 from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
+)
+from repositories.refresh_tokens import (
     revoke_all_user_refresh_tokens,
 )
 from repositories.users import (
@@ -40,6 +39,8 @@ from services.rate_limit import (
     oauth_login_limiter,
     rate_limit,
 )
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 
@@ -111,7 +112,7 @@ async def _exchange_oauth_code(
             "exchange_failed",
             "Could not complete sign-in with the provider. Please try again.",
         )
-    except (httpx.HTTPError, asyncio.TimeoutError):
+    except (TimeoutError, httpx.HTTPError):
         return None, _oauth_error_redirect(
             settings,
             "provider_unavailable",
@@ -292,7 +293,7 @@ async def oauth_callback(
     access_token = token["access_token"]
     try:
         provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, provider)
-    except (HTTPException, httpx.HTTPError, asyncio.TimeoutError):
+    except (TimeoutError, HTTPException, httpx.HTTPError):
         # Any profile-fetch failure (including _extract_oauth_profile's own
         # generic 502) redirects like every other callback failure: the user
         # must never strand on raw JSON.
@@ -366,7 +367,7 @@ async def link_lastfm(
         await db.delete(existing_provider)
         await db.flush()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     auth_provider = AuthProvider(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
@@ -411,7 +412,7 @@ async def complete_oauth_email(
 
     current_user.email = body.email
     current_user.email_verified = False
-    current_user.updated_at = datetime.now(timezone.utc)
+    current_user.updated_at = datetime.now(UTC)
     await db.flush()
 
     try:

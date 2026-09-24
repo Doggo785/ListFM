@@ -1,11 +1,10 @@
 import uuid
-from datetime import datetime, timezone
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from models.automation import Automation
 from schemas import AutomationCreate, AutomationUpdate
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_automations(db: AsyncSession, user_id: str) -> list[Automation]:
@@ -56,7 +55,7 @@ async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str
 
     Caller is responsible for committing the session.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     automation = Automation(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -101,7 +100,7 @@ async def update_automation(
     for field, value in update_data.items():
         setattr(automation, field, value)
 
-    automation.updated_at = datetime.now(timezone.utc)
+    automation.updated_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(automation)
     return automation
@@ -115,6 +114,6 @@ async def delete_automation(db: AsyncSession, automation_id: str, user_id: str) 
     automation = await get_automation(db, automation_id, user_id)
     if automation is None:
         return False
-    automation.deleted_at = datetime.now(timezone.utc)
+    automation.deleted_at = datetime.now(UTC)
     await db.flush()
     return True

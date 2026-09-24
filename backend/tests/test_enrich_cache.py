@@ -7,13 +7,11 @@ listfm_test database (autouse truncate in conftest).
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, update
-
 from models.track import Track
 from models.user import User
 from repositories.tags import get_artist_tags, upsert_artist_tag
@@ -27,8 +25,9 @@ from services.lastfm import (
     get_track_full_info,
     reset_lastfm_call_count,
 )
+from sqlalchemy import select, update
 
-from .conftest import _TestSessionLocal, _cleanup_user, _unique_email
+from .conftest import _cleanup_user, _TestSessionLocal, _unique_email
 
 
 def _live_info(**over):
@@ -107,7 +106,7 @@ async def test_stale_track_row_forces_refetch():
                     Track.artist == tracks[0]["artist"],
                     Track.title == tracks[0]["title"],
                 )
-                .values(last_fetched_at=datetime.now(timezone.utc) - timedelta(hours=25))
+                .values(last_fetched_at=datetime.now(UTC) - timedelta(hours=25))
             )
             await db.commit()
             out, stats = await enrich_tracks_cached(

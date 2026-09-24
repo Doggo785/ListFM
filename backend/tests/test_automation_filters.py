@@ -15,15 +15,15 @@ from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from models.automation import Automation
 from sqlalchemy import delete
 
 from .conftest import (
-    _TestSessionLocal,
     _cleanup_user,
     _get_user_id_from_cookies,
+    _TestSessionLocal,
     _unique_email,
 )
-from models.automation import Automation
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:

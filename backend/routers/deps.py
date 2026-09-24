@@ -1,14 +1,13 @@
-from fastapi import Cookie, Depends, HTTPException, Response
 import jwt
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from config import get_settings
 from database import get_db
+from fastapi import Cookie, Depends, HTTPException, Response
 from models.automation import Automation
 from models.user import User
 from repositories.automations import get_automation
 from repositories.users import get_lastfm_provider, get_user_by_id
 from services.auth import decode_token
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_current_user(

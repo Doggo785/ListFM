@@ -1,9 +1,9 @@
+from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 

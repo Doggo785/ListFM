@@ -1,20 +1,25 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 import jwt
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from config import get_settings
 from database import get_db
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
+)
+from repositories.refresh_tokens import (
     get_refresh_token_by_hash,
     revoke_all_user_refresh_tokens,
     revoke_refresh_token_family,
 )
 from repositories.users import create_user, get_lastfm_provider, get_user_by_email
+from routers.deps import (
+    clear_auth_cookies,
+    get_current_active_user,
+    set_auth_cookies,
+)
 from schemas import TokenResponse, UserCreate, UserLogin
 from services.auth import (
     create_access_token,
@@ -24,21 +29,17 @@ from services.auth import (
     hash_refresh_token,
     verify_password,
 )
-from routers.deps import (
-    clear_auth_cookies,
-    get_current_active_user,
-    set_auth_cookies,
-)
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
+    login_limiter,
     rate_limit,
     rate_limit_by_key,
     rate_limit_email_key,
-    login_limiter,
-    register_limiter,
-    register_email_limiter,
     refresh_limiter,
+    register_email_limiter,
+    register_limiter,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -171,7 +172,7 @@ async def refresh(
             raise HTTPException(status_code=500, detail="Failed to refresh token")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    if stored_token.expires_at < datetime.now(timezone.utc):
+    if stored_token.expires_at < datetime.now(UTC):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     family = stored_token.family

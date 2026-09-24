@@ -1,14 +1,13 @@
 import uuid
-from datetime import datetime, timezone
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from models.track import Track
-from schemas import GeneratedPlaylistCreate
 from repositories.tracks import get_or_create_track
+from schemas import GeneratedPlaylistCreate
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_generated_playlists(db: AsyncSession, user_id: str) -> list[GeneratedPlaylist]:
@@ -51,7 +50,7 @@ async def create_generated_playlist(
     just live-fetched (persist-from-run, manual save), so the rows are not
     stamped as freshly enriched.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     playlist = GeneratedPlaylist(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -110,6 +109,6 @@ async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id:
     playlist = await get_generated_playlist(db, playlist_id, user_id)
     if playlist is None:
         return False
-    playlist.deleted_at = datetime.now(timezone.utc)
+    playlist.deleted_at = datetime.now(UTC)
     await db.flush()
     return True
