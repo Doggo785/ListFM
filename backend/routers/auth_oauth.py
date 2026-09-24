@@ -256,30 +256,38 @@ async def google_login(request: Request):
     return resp
 
 
-@router.get("/google/callback")
-async def google_callback(
+@router.get("/google/callback", operation_id="google_callback")
+@router.get("/discord/callback", operation_id="discord_callback")
+async def oauth_callback(
     request: Request,
     code: str | None = None,
     state: str | None = None,
     oauth_state: str | None = Cookie(None),
     db: AsyncSession = Depends(get_db),
 ):
+    """Shared OAuth callback for Google and Discord.
+
+    One handler for both routes (the matched path decides the provider),
+    so the param check, code exchange and profile fetch exist exactly once.
+    Only the user-creation tail differs per provider.
+    """
     rate_limit(request, oauth_login_limiter)
     settings = get_settings()
+    provider = "google" if request.url.path.endswith("/google/callback") else "discord"
     if (
         err := _check_oauth_callback_params(code, state, oauth_state, settings)
     ) is not None:
         return err
 
-    client = _google_client()
-    redirect_uri = _redirect_uri("google", settings)
+    client = _google_client() if provider == "google" else _discord_client()
+    redirect_uri = _redirect_uri(provider, settings)
     token, err = await _exchange_oauth_code(client, code, redirect_uri, settings)
     if err is not None:
         return err
 
     access_token = token["access_token"]
     try:
-        provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "google")
+        provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, provider)
     except (HTTPException, httpx.HTTPError, asyncio.TimeoutError):
         # Any profile-fetch failure (including _extract_oauth_profile's own
         # generic 502) redirects like every other callback failure: the user
@@ -290,10 +298,25 @@ async def google_callback(
             "Could not retrieve your provider profile. Please try again.",
         )
 
-    display_name = profile.get("name") or email
+    if provider == "google":
+        display_name = profile.get("name") or email
+        user, is_new = await get_or_create_user_from_google(
+            db, provider_user_id=provider_id, email=email, display_name=display_name, email_verified=email_verified
+        )
+        return await _finalize_oauth_login(db, request, user, is_new, settings)
 
-    user, is_new = await get_or_create_user_from_google(
-        db, provider_user_id=provider_id, email=email, display_name=display_name, email_verified=email_verified
+    username = profile.get("username") or email
+
+    if not email:
+        user, is_new = await get_or_create_user_from_discord(
+            db, provider_user_id=provider_id, email=None, display_name=username, email_verified=False
+        )
+        if user.email is not None:
+            return await _finalize_oauth_login(db, request, user, is_new=False, settings=settings)
+        return await _finalize_oauth_login(db, request, user, is_new=is_new, settings=settings, needs_email=True)
+
+    user, is_new = await get_or_create_user_from_discord(
+        db, provider_user_id=provider_id, email=email, display_name=username, email_verified=email_verified
     )
 
     return await _finalize_oauth_login(db, request, user, is_new, settings)
@@ -323,55 +346,6 @@ async def discord_login(request: Request):
         max_age=OAUTH_STATE_MAX_AGE,
     )
     return resp
-
-
-@router.get("/discord/callback")
-async def discord_callback(
-    request: Request,
-    code: str | None = None,
-    state: str | None = None,
-    oauth_state: str | None = Cookie(None),
-    db: AsyncSession = Depends(get_db),
-):
-    rate_limit(request, oauth_login_limiter)
-    settings = get_settings()
-    if (
-        err := _check_oauth_callback_params(code, state, oauth_state, settings)
-    ) is not None:
-        return err
-
-    client = _discord_client()
-    redirect_uri = _redirect_uri("discord", settings)
-    token, err = await _exchange_oauth_code(client, code, redirect_uri, settings)
-    if err is not None:
-        return err
-
-    access_token = token["access_token"]
-    try:
-        provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "discord")
-    except (HTTPException, httpx.HTTPError, asyncio.TimeoutError):
-        # Same as google_callback: no raw JSON ever reaches the browser.
-        return _oauth_error_redirect(
-            settings,
-            "profile_failed",
-            "Could not retrieve your provider profile. Please try again.",
-        )
-
-    username = profile.get("username") or email
-
-    if not email:
-        user, is_new = await get_or_create_user_from_discord(
-            db, provider_user_id=provider_id, email=None, display_name=username, email_verified=False
-        )
-        if user.email is not None:
-            return await _finalize_oauth_login(db, request, user, is_new=False, settings=settings)
-        return await _finalize_oauth_login(db, request, user, is_new=is_new, settings=settings, needs_email=True)
-
-    user, is_new = await get_or_create_user_from_discord(
-        db, provider_user_id=provider_id, email=email, display_name=username, email_verified=email_verified
-    )
-
-    return await _finalize_oauth_login(db, request, user, is_new, settings)
 
 
 @router.post("/link-lastfm", response_model=LinkLastfmResponse)
