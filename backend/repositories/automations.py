@@ -31,6 +31,26 @@ async def get_automation(db: AsyncSession, automation_id: str, user_id: str) -> 
     return result.scalar_one_or_none()
 
 
+async def get_automations_by_ids(
+    db: AsyncSession, automation_ids: list[str]
+) -> dict[str, Automation]:
+    """Batch-fetch live automations by ID, keyed by ID.
+
+    System processes (sweep retry phase): only non-deleted, enabled rows.
+    One query for the whole set instead of a lookup per row.
+    """
+    if not automation_ids:
+        return {}
+    result = await db.execute(
+        select(Automation).where(
+            Automation.id.in_(automation_ids),
+            Automation.deleted_at.is_(None),
+            Automation.enabled.is_(True),
+        )
+    )
+    return {row.id: row for row in result.scalars().all()}
+
+
 async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str, data: AutomationCreate) -> Automation:
     """Create a new automation for a user.
 

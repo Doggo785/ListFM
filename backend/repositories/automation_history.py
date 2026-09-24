@@ -24,6 +24,8 @@ async def create_automation_history(
     error_message: str | None = None,
     filter_groups_used: list | None = None,
     generated_playlist_id: str | None = None,
+    scheduled_for: datetime | None = None,
+    attempt: int = 1,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
 ) -> AutomationHistory:
@@ -41,6 +43,8 @@ async def create_automation_history(
         error_message=error_message,
         filter_groups_used=filter_groups_used,
         generated_playlist_id=generated_playlist_id,
+        scheduled_for=scheduled_for or datetime.now(timezone.utc),
+        attempt=attempt,
         started_at=started_at or datetime.now(timezone.utc),
         completed_at=completed_at,
     )

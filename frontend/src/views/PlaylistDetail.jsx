@@ -283,6 +283,16 @@ export default function PlaylistDetail() {
     return secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`;
   };
 
+  const MAX_ATTEMPT = 4;
+
+  const scheduledDiffers = (entry) => {
+    const a = new Date(entry.scheduled_for || entry.started_at).getTime();
+    const b = new Date(entry.started_at).getTime();
+    return (
+      !Number.isNaN(a) && !Number.isNaN(b) && Math.abs(b - a) > 60 * 1000
+    );
+  };
+
   const statusDot = (status) =>
     status === "completed"
       ? "bg-green-500"
@@ -566,11 +576,15 @@ export default function PlaylistDetail() {
                         <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${statusDot(entry.status)}`} />
                         <div className="min-w-0 flex-1">
                           <div className="text-sm text-white font-medium truncate">
-                            {entry.status} · {formatRunDate(entry.started_at)}
+                            {entry.status} · {formatRunDate(entry.scheduled_for || entry.started_at)}
+                            {(entry.attempt || 1) > 1 && ` · attempt ${entry.attempt}/${MAX_ATTEMPT}`}
                           </div>
                           <div className="text-xs text-neutral-500 tabular-nums">
                             {entry.tracks_after_filter} of {entry.tracks_before_filter} tracks kept
                             {entry.generated_playlist_id ? " · click for track list" : ""}
+                            {entry.status === "failed" &&
+                              (entry.attempt || 1) < MAX_ATTEMPT &&
+                              " · automatic retry scheduled"}
                           </div>
                           {entry.status === "failed" && entry.error_message && (
                             <div className="text-xs text-red-400 truncate mt-0.5">
@@ -578,9 +592,28 @@ export default function PlaylistDetail() {
                             </div>
                           )}
                         </div>
+                        {entry.status === "failed" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRunNow();
+                            }}
+                            disabled={runningNow}
+                            className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[#ff530b] hover:text-[#ff530b] transition-colors disabled:opacity-40"
+                          >
+                            {runningNow ? "Running..." : "Re-run"}
+                          </button>
+                        )}
                       </button>
                       {expanded && (
                         <div className="px-4 pb-4 pt-1 border-t border-neutral-800/60">
+                          {scheduledDiffers(entry) && (
+                            <p className="text-xs text-neutral-500 mt-2">
+                              Scheduled {formatRunDate(entry.scheduled_for)} · started{" "}
+                              {formatRunDate(entry.started_at)}
+                            </p>
+                          )}
                           {entry.completed_at && (() => {
                             const duration = formatRunDuration(entry.started_at, entry.completed_at);
                             return (
@@ -595,6 +628,12 @@ export default function PlaylistDetail() {
                               {entry.error_message}
                             </p>
                           )}
+                          {entry.status === "failed" &&
+                            (entry.attempt || 1) >= MAX_ATTEMPT && (
+                              <p className="text-xs text-neutral-500 mt-2">
+                                No more automatic retries — use Re-run for a fresh attempt.
+                              </p>
+                            )}
                           {tracksLoadingId === entry.id && (
                             <p className="text-xs text-neutral-500 mt-2">Loading tracks...</p>
                           )}
