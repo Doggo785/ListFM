@@ -482,6 +482,29 @@ async def test_google_callback_invalid_state(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_google_callback_profile_failure_redirects(client: AsyncClient):
+    """A failing provider profile fetch redirects, never raw JSON."""
+    with (
+        patch.object(
+            GoogleOAuth2,
+            "get_access_token",
+            return_value={"access_token": "fake_token"},
+        ),
+        patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
+    ):
+        mock_resp = _MockGoogleResponse(500, {})
+        mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
+        resp = await client.get(
+            "/api/auth/google/callback?code=fakecode&state=fakestate",
+            cookies={"oauth_state": "fakestate"},
+            follow_redirects=False,
+        )
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert "/auth/callback?error=profile_failed" in location
+
+
+@pytest.mark.asyncio
 async def test_complete_email_success(client: AsyncClient):
     """POST /api/auth/oauth/complete-email updates user email."""
     email = _unique_email()

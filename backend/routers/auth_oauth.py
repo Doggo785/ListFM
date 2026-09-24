@@ -256,9 +256,10 @@ async def google_callback(
     access_token = token["access_token"]
     try:
         provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "google")
-    except HTTPException:
-        raise
-    except (httpx.HTTPError, asyncio.TimeoutError):
+    except (HTTPException, httpx.HTTPError, asyncio.TimeoutError):
+        # Any profile-fetch failure (including _extract_oauth_profile's own
+        # generic 502) redirects like every other callback failure: the user
+        # must never strand on raw JSON.
         return _oauth_error_redirect(
             settings,
             "profile_failed",
@@ -345,9 +346,8 @@ async def discord_callback(
     access_token = token["access_token"]
     try:
         provider_id, email, email_verified, profile = await _extract_oauth_profile(client, access_token, "discord")
-    except HTTPException:
-        raise
-    except (httpx.HTTPError, asyncio.TimeoutError):
+    except (HTTPException, httpx.HTTPError, asyncio.TimeoutError):
+        # Same as google_callback: no raw JSON ever reaches the browser.
         return _oauth_error_redirect(
             settings,
             "profile_failed",
