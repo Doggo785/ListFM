@@ -1,0 +1,10 @@
+# Ruff — backend Python (plan de correction conventions Git/GitHub, Phase 3).
+# Les règles sont celles de ruff, figées par le pin ruff==0.16.8 dans
+# backend/requirements.txt (pas de select explicite : le pin verrouille le jeu).
+
+target-version = "py312"
+
+[lint]
+# B008 : fonction call dans un défaut d'argument = l'idiome FastAPI
+# (Depends(), Security()) sur chaque endpoint. Exclu volontairement.
+ignore = ["B008"]
