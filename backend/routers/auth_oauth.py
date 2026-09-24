@@ -230,17 +230,16 @@ async def _finalize_oauth_login(
     return resp
 
 
-@router.get("/google/login")
-async def google_login(request: Request):
+async def _start_oauth_login(request: Request, provider: str) -> RedirectResponse:
+    """Shared login entry: provider auth URL plus the state cookie."""
     rate_limit(request, oauth_login_limiter)
-    check_oauth_configured("google")
+    check_oauth_configured(provider)
     settings = get_settings()
     state = secrets.token_urlsafe(32)
 
-    client = _google_client()
-    redirect_uri = _redirect_uri("google", settings)
+    client = _google_client() if provider == "google" else _discord_client()
     authorization_url = await client.get_authorization_url(
-        redirect_uri=redirect_uri,
+        redirect_uri=_redirect_uri(provider, settings),
         state=state,
     )
 
@@ -254,6 +253,11 @@ async def google_login(request: Request):
         max_age=OAUTH_STATE_MAX_AGE,
     )
     return resp
+
+
+@router.get("/google/login")
+async def google_login(request: Request):
+    return await _start_oauth_login(request, "google")
 
 
 @router.get("/google/callback", operation_id="google_callback")
@@ -324,28 +328,7 @@ async def oauth_callback(
 
 @router.get("/discord/login")
 async def discord_login(request: Request):
-    rate_limit(request, oauth_login_limiter)
-    check_oauth_configured("discord")
-    settings = get_settings()
-    state = secrets.token_urlsafe(32)
-
-    client = _discord_client()
-    redirect_uri = _redirect_uri("discord", settings)
-    authorization_url = await client.get_authorization_url(
-        redirect_uri=redirect_uri,
-        state=state,
-    )
-
-    resp = RedirectResponse(url=authorization_url, status_code=302)
-    resp.set_cookie(
-        key=OAUTH_STATE_COOKIE,
-        value=state,
-        httponly=True,
-        samesite="lax",
-        secure=settings.cookie_secure,
-        max_age=OAUTH_STATE_MAX_AGE,
-    )
-    return resp
+    return await _start_oauth_login(request, "discord")
 
 
 @router.post("/link-lastfm", response_model=LinkLastfmResponse)
