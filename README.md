@@ -2,225 +2,136 @@
 
 ![ListFM Banner](.github/assets/ListFM_readme_banner.webp)
 
-Powered by Last.fm -- built with React & FastAPI.
+Project in active development. No hosted instance yet. Work happens on the `dev` branch. This note goes away at v0.1.0.
+
+Your Last.fm history already knows your taste. ListFM turns it into playlists, automatically.
+
+I built it because I kept replaying the same 30 tracks while years of scrobbles sat unused.
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite)](https://vitejs.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](./LICENSE)
+[![CI](https://github.com/Doggo785/ListFM/actions/workflows/ci.yml/badge.svg)](https://github.com/Doggo785/ListFM/actions/workflows/ci.yml)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/909947922e244fbc93096cc528ab05d4)](https://app.codacy.com/gh/Doggo785/ListFM/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+
+[How it works](#how-it-works) | [Features](#features) | [Quickstart](#quickstart) | [Local dev](#local-dev) | [Stack](#stack) | [License](#license)
 
 </div>
 
----
+<!--
+Live demo CTA goes here once a hosted instance exists.
+Planned text: "Try it via the hosted instance" + link.
+-->
 
-## ✨ Features
+## How it works
 
-<div align="center">
+1. Link your Last.fm account. Sign up with email and password, or use Google or Discord OAuth when configured.
+2. Create an automation. Pick a source (top tracks, recent plays, loved tracks, top artists), a period, filter rules, and a schedule. Leave the schedule empty for manual runs.
+3. Let the sweep run it on schedule, or press Run now.
+4. Each run writes a generated playlist in the app. Tracks and tags are frozen at generation time, so the list stays as it was.
+5. Check run history for dates, counts before and after filtering, duration, and errors. Failed runs retry up to 4 times with backoff. You can also re-run by hand.
 
-| | Feature |
-|---|---|
-| 🎧 | **Last.fm Integration** — Import your listening history, top tracks, loved tracks, and genre tags |
-| 📊 | **Smart Dashboard** — Visualize your stats: tracks played, unique artists, albums, and top artist |
-| 🔄 | **Automated Playlists** — Create playlists from top tracks, recent plays, loved tracks, or top artists |
-| 🔐 | **Authentication** — JWT-based auth with httpOnly cookies, refresh token rotation, and protected routes |
-| 🎨 | **Beautiful UI** — Animated gradients, tilted cards, smooth page transitions, and WebGL effects |
-| ⏱️ | **Flexible Periods** — Filter by 7 days, 1 month, 3 months, 6 months, 12 months, or overall |
+## Features
 
-</div>
+- Automations with full CRUD, preview before save, and recurring schedules.
+- Four sources: top tracks, recent plays, loved tracks, top artists.
+- Periods from 7 days to 12 months, plus overall.
+- Filter rules (filter groups): track limit, period, tags and genres, value caps, exclusions.
+- Run history with bounded auto-retry and manual re-run.
+- Generated playlists with an openable detail view and frozen snapshots.
+- Dashboard with recent tracks and listening stats: unique artists, albums, top artist. The dashboard shows the last 50 recent tracks.
+- Auth with email and password plus optional Google and Discord OAuth. JWT access and refresh tokens live in httpOnly cookies, with refresh rotation and revoke-all on login.
+- Last.fm responses are cached in the database for 24 hours, so repeat views skip extra API calls.
 
----
+## Quickstart
 
-## 🛠️ Tech Stack
+Prereqs:
 
-<div align="center">
-
-### Backend
-
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?style=for-the-badge&logo=fastapi)
-![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=for-the-badge&logo=pydantic)
-
-### Frontend
-
-![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)
-![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss)
-![Radix UI](https://img.shields.io/badge/Radix_UI-1.4-161618?style=for-the-badge)
-
-</div>
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18+
+- Node 18+
 - Python 3.11+
-- A [Last.fm API account](https://www.last.fm/api/account/create) (free)
+- Docker (for Postgres)
+- A Last.fm API account (free, at https://www.last.fm/api/account/create)
 
-### Installation
+Steps:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/ListFM.git
+# 1. Clone the repo
+git clone https://github.com/Doggo785/ListFM.git
 cd ListFM
 
-# 2. Set up environment variables
+# 2. Set env vars
 cp .env.example .env
-# Edit .env with your Last.fm API credentials
+# Fill in your Last.fm keys in .env
 
-# 3. Set up backend
+# 3. Set up the backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
 
-# 4. Set up frontend
-cd frontend
-npm install
+# 4. Set up the frontend
+cd frontend && npm install && cd ..
+
+# 5. Start Postgres on port 5433 (first run creates the container)
+docker run -d --name listfm-db -p 5433:5433 \
+  -e POSTGRES_USER=listfm -e POSTGRES_PASSWORD=listfm \
+  -e POSTGRES_DB=listfm postgres:16
+# Later runs: docker start listfm-db
+
+# 6. Run migrations
+cd backend && alembic upgrade head && cd ..
 ```
 
-### Development
+Local Postgres runs on port 5433. CI uses the standard 5432.
 
-> Local dev uses Docker Postgres on port `5433` (CI uses the standard `5432`).
+### Env vars
 
-Open **two terminals** from the project root:
+| Variable | Required | Default |
+|---|---|---|
+| `LASTFM_API_KEY` | Yes | - |
+| `LASTFM_API_SECRET` | Yes | - |
+| `DATABASE_URL` | Yes | `postgresql+asyncpg://listfm:listfm@localhost:5433/listfm` |
+| `JWT_SECRET` | Yes, min 32 chars | - |
+| `COOKIE_SECURE` | No, set `true` in production | `false` |
+| `ENABLE_SCHEDULER` | No | `false` |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
+| `DISCORD_OAUTH_CLIENT_ID` / `DISCORD_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
+| `OAUTH_REDIRECT_BASE` | No | `http://localhost:8000` |
+| `FRONTEND_URL` | No | `http://localhost:5173` |
+
+Google and Discord OAuth are optional. The login buttons only show when the matching client ID and secret are set.
+
+## Local dev
+
+`./dev.sh` starts the backend and the frontend in one step. Or use two terminals from the repo root:
 
 ```bash
-# Terminal 1 — Backend
+# Terminal 1, backend
 source .venv/bin/activate
 uvicorn backend.main:app --reload --port 8000
 ```
 
 ```bash
-# Terminal 2 — Frontend
+# Terminal 2, frontend
 cd frontend
 npm run dev
 ```
 
-<div align="center">
+Backend: http://localhost:8000. Frontend: http://localhost:5173. Interactive OpenAPI docs served by FastAPI at http://localhost:8000/docs (Swagger UI). The API resolves the user from the auth JWT, so there is no `{username}` path prefix; endpoints that read Last.fm data need a linked Last.fm account.
 
-**Backend** → `http://localhost:8000` | **Frontend** → `http://localhost:5173`
+```bash
+# Backend tests
+pytest backend/tests/ -q
 
-</div>
-
----
-
-## 📡 API Reference
-
-### Public
-
-| Method | Endpoint | Description |
-|:---:|---|---|
-| `GET` | `/api/health` | Health check |
-
-### Protected (requires auth + linked Last.fm account)
-
-| Method | Endpoint | Description |
-|:---:|---|---|
-| `GET` | `/api/info` | User info (avatar, profile) |
-| `GET` | `/api/recent-tracks` | Recently played tracks |
-| `GET` | `/api/top-tags` | Top genre tags |
-| `GET` | `/api/top-tracks` | Top tracks by period |
-| `GET` | `/api/loved-tracks` | Loved / favorited tracks |
-| `GET` | `/api/source-tracks` | Flexible source endpoint |
-| `POST` | `/api/automations/preview` | Preview automation results |
-
-### Authentication
-
-| Method | Endpoint | Description |
-|:---:|---|---|
-| `POST` | `/api/auth/register` | Create a new account |
-| `POST` | `/api/auth/login` | Sign in |
-| `POST` | `/api/auth/refresh` | Refresh access token |
-| `POST` | `/api/auth/logout` | Sign out |
-| `GET` | `/api/auth/me` | Get current user info |
-| `GET` | `/api/auth/google/login` | Login with Google OAuth |
-| `GET` | `/api/auth/google/callback` | Google OAuth callback |
-| `GET` | `/api/auth/discord/login` | Login with Discord OAuth |
-| `GET` | `/api/auth/discord/callback` | Discord OAuth callback |
-| `POST` | `/api/auth/link-lastfm` | Link Last.fm account after OAuth |
-| `POST` | `/api/auth/oauth/complete-email` | Set email for Discord users without one |
-
-### Protected (requires auth)
-
-| Method | Endpoint | Description |
-|:---:|---|---|
-| `GET` | `/api/automations` | List automations |
-| `POST` | `/api/automations` | Create automation |
-| `PATCH` | `/api/automations/{id}` | Update automation |
-| `DELETE` | `/api/automations/{id}` | Delete automation |
-| `GET` | `/api/generated-playlists` | List generated playlists |
-| `POST` | `/api/generated-playlists` | Save generated playlist |
-| `DELETE` | `/api/generated-playlists/{id}` | Delete generated playlist |
-
-> The user is resolved from the authenticated JWT, so there is no `{username}` path prefix. Endpoints that consume Last.fm data require a linked Last.fm account (see `POST /api/auth/link-lastfm`).
-
----
-
-## 📁 Project Structure
-
-```
-ListFM/
-├── backend/
-│   ├── main.py              # FastAPI app entry
-│   ├── config.py            # Settings and API keys
-│   ├── schemas.py           # Pydantic models
-│   ├── routers/
-│   │   ├── auth.py          # Authentication endpoints
-│   │   ├── users.py         # User endpoints
-│   │   ├── automations.py   # Automation endpoints
-│   │   └── generated_playlists.py
-│   ├── services/
-│   │   ├── auth.py          # JWT and password hashing
-│   │   ├── lastfm.py        # Last.fm API wrapper
-│   │   └── rate_limit.py    # Rate limiting
-│   └── tests/               # Backend test suite
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx          # Routes and layout
-│   │   ├── views/           # Search, Dashboard, Auth pages
-│   │   ├── components/      # UI components
-│   │   ├── contexts/        # React contexts (Auth)
-│   │   └── lib/             # Utilities
-│   └── package.json
-│
-├── .env.example             # Environment variable template
-└── README.md
+# Frontend lint (from frontend/)
+npm run lint
 ```
 
----
+## Stack
 
-## 🔐 Environment Variables
+Backend: Python 3.11+, FastAPI, Pydantic v2, PostgreSQL with asyncpg, Alembic for migrations. Frontend: React 19, Vite 8, Tailwind CSS 4, Radix UI, ESLint. CI runs on GitHub Actions (backend tests plus frontend build).
 
-| Variable | Description | Required |
-|---|---|:---:|
-| `LASTFM_API_KEY` | Last.fm API key | ✅ |
-| `LASTFM_API_SECRET` | Last.fm API secret | ✅ |
-| `DATABASE_URL` | PostgreSQL connection string | ✅ |
-| `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | ✅ |
-| `COOKIE_SECURE` | Set to `true` for HTTPS deployments | |
-| `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client ID (for "Sign in with Google") | |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth client secret | |
-| `DISCORD_OAUTH_CLIENT_ID` | Discord OAuth client ID (for "Sign in with Discord") | |
-| `DISCORD_OAUTH_CLIENT_SECRET` | Discord OAuth client secret | |
-| `OAUTH_REDIRECT_BASE` | Base URL the OAuth callback redirects back to (e.g. `http://localhost:8000`) | |
-| `FRONTEND_URL` | Frontend origin used for post-login redirects (e.g. `http://localhost:5173`) | |
+## License
 
-Get your Last.fm keys at **[last.fm/api/account/create](https://www.last.fm/api/account/create)**. Google and Discord OAuth are optional — the login buttons only appear when the matching client ID/secret are configured.
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.
-
----
-
-<div align="center">
-
-**Built with ❤️ by [Doggo](https://github.com/doggo) - React, FastAPI & Last.fm**
-
-</div>
+MIT. See [LICENSE](./LICENSE).
