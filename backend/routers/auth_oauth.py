@@ -2,11 +2,12 @@ import asyncio
 import secrets
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 import httpx
 import pylast
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
@@ -58,6 +59,19 @@ def _clear_oauth_state_cookie(response: Response) -> None:
         secure=settings.cookie_secure,
         path="/",
     )
+
+
+def _oauth_error_redirect(settings: Settings, error: str, description: str) -> RedirectResponse:
+    """Send a failed callback to the frontend error page, never raw JSON.
+
+    The provider redirects top-level to the backend host, so a JSON error
+    would strand the user on an unreadable page. The frontend AuthCallback
+    already renders ?error= / ?error_description=.
+    """
+    url = f"{settings.frontend_url}/auth/callback?{urlencode({'error': error, 'error_description': description})}"
+    resp = RedirectResponse(url=url, status_code=302)
+    _clear_oauth_state_cookie(resp)
+    return resp
 
 
 def _google_client() -> GoogleOAuth2:
@@ -206,30 +220,38 @@ async def google_callback(
     db: AsyncSession = Depends(get_db),
 ):
     rate_limit(request, oauth_login_limiter)
+    settings = get_settings()
     if code is None:
-        resp = JSONResponse(status_code=400, content={"detail": "Missing authorization code"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "missing_code",
+            "Missing authorization code. Please try signing in again.",
+        )
 
     if not state or state != oauth_state:
-        resp = JSONResponse(status_code=403, content={"detail": "Invalid or expired OAuth state"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "invalid_state",
+            "Your sign-in session expired. Please try again.",
+        )
 
     client = _google_client()
-    settings = get_settings()
     redirect_uri = _redirect_uri("google", settings)
 
     try:
         token = await client.get_access_token(code, redirect_uri)
     except GetAccessTokenError:
-        resp = JSONResponse(status_code=400, content={"detail": "Failed to exchange authorization code"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "exchange_failed",
+            "Could not complete sign-in with the provider. Please try again.",
+        )
     except (httpx.HTTPError, asyncio.TimeoutError):
-        resp = JSONResponse(status_code=502, content={"detail": "OAuth provider unavailable"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "provider_unavailable",
+            "The sign-in provider is unavailable. Please try again later.",
+        )
 
     access_token = token["access_token"]
     try:
@@ -237,7 +259,11 @@ async def google_callback(
     except HTTPException:
         raise
     except (httpx.HTTPError, asyncio.TimeoutError):
-        raise HTTPException(status_code=502, detail="Failed to fetch Google profile")
+        return _oauth_error_redirect(
+            settings,
+            "profile_failed",
+            "Could not retrieve your provider profile. Please try again.",
+        )
 
     display_name = profile.get("name") or email
 
@@ -283,30 +309,38 @@ async def discord_callback(
     db: AsyncSession = Depends(get_db),
 ):
     rate_limit(request, oauth_login_limiter)
+    settings = get_settings()
     if code is None:
-        resp = JSONResponse(status_code=400, content={"detail": "Missing authorization code"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "missing_code",
+            "Missing authorization code. Please try signing in again.",
+        )
 
     if not state or state != oauth_state:
-        resp = JSONResponse(status_code=403, content={"detail": "Invalid or expired OAuth state"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "invalid_state",
+            "Your sign-in session expired. Please try again.",
+        )
 
     client = _discord_client()
-    settings = get_settings()
     redirect_uri = _redirect_uri("discord", settings)
 
     try:
         token = await client.get_access_token(code, redirect_uri)
     except GetAccessTokenError:
-        resp = JSONResponse(status_code=400, content={"detail": "Failed to exchange authorization code"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "exchange_failed",
+            "Could not complete sign-in with the provider. Please try again.",
+        )
     except (httpx.HTTPError, asyncio.TimeoutError):
-        resp = JSONResponse(status_code=502, content={"detail": "OAuth provider unavailable"})
-        _clear_oauth_state_cookie(resp)
-        return resp
+        return _oauth_error_redirect(
+            settings,
+            "provider_unavailable",
+            "The sign-in provider is unavailable. Please try again later.",
+        )
 
     access_token = token["access_token"]
     try:
@@ -314,7 +348,11 @@ async def discord_callback(
     except HTTPException:
         raise
     except (httpx.HTTPError, asyncio.TimeoutError):
-        raise HTTPException(status_code=502, detail="Failed to fetch Discord profile")
+        return _oauth_error_redirect(
+            settings,
+            "profile_failed",
+            "Could not retrieve your provider profile. Please try again.",
+        )
 
     username = profile.get("username") or email
 
