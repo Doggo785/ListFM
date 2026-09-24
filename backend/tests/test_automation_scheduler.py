@@ -4,8 +4,11 @@ Covers:
 - a due automation produces exactly one automation_history row and sets last_run
 - a not-due automation is skipped (no history row, no last_run)
 - ENABLE_SCHEDULER=false (default) means no scheduler is created
+- bounded retries: failed runs retry with the original scheduled_for
+  (5min -> 20min -> 1h), then stay failed; newer chains supersede old ones
 """
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -19,7 +22,8 @@ from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from models.track import Track
-from services.automation_runner import run_due_automations
+from repositories.automation_history import create_automation_history
+from services.automation_runner import MAX_ATTEMPT, run_due_automations
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
@@ -485,3 +489,207 @@ def test_scheduler_disabled_when_flag_false():
     with patch("backend.main.settings") as mock_settings:
         mock_settings.enable_scheduler = False
         assert create_scheduler() is None
+
+
+async def _insert_failed_run(
+    automation_id: str,
+    *,
+    attempt: int,
+    scheduled_for: datetime,
+    started_at: datetime | None = None,
+) -> str:
+    """Insert a committed failed history row (simulates a past failed run)."""
+    async with _TestSessionLocal() as db:
+        row = await create_automation_history(
+            db,
+            automation_id=automation_id,
+            status="failed",
+            error_message="Last.fm exploded",
+            scheduled_for=scheduled_for,
+            attempt=attempt,
+            started_at=started_at or scheduled_for,
+            completed_at=(started_at or scheduled_for) + timedelta(seconds=10),
+        )
+        await db.commit()
+        return row.id
+
+
+async def _history_rows(automation_id: str) -> list[AutomationHistory]:
+    async with _TestSessionLocal() as db:
+        result = await db.execute(
+            select(AutomationHistory)
+            .where(AutomationHistory.automation_id == automation_id)
+            .order_by(AutomationHistory.attempt)
+        )
+        return list(result.scalars().all())
+
+
+def _sweep_patches(tracks: list[dict]):
+    """is_due off (phase 1 never fires); live source + enrich mocked."""
+    return (
+        patch("services.automation_runner.is_due", return_value=False),
+        patch("services.automation_runner.get_top_tracks", return_value=tracks),
+        patch(
+            "services.enrich_cache.enrich_tracks",
+            side_effect=lambda u, t, max_enrich=50: t,
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_retry_reruns_failed_with_original_scheduled_for(client: AsyncClient):
+    """An eligible failure retries as attempt+1 with the same scheduled_for."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        origin = datetime.now(timezone.utc) - timedelta(minutes=6)
+        await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        p1, p2, p3 = _sweep_patches(tracks)
+        with p1, p2, p3:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        rows = await _history_rows(automation_id)
+        assert len(rows) == 2
+        retry = rows[1]
+        assert retry.attempt == 2
+        assert retry.scheduled_for == origin
+        assert retry.status == "completed"
+        assert retry.generated_playlist_id is not None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_retry_waits_for_backoff(client: AsyncClient):
+    """A failure younger than its backoff delay is not retried."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        origin = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        p1, p2, p3 = _sweep_patches(tracks)
+        with p1, p2, p3:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        assert len(await _history_rows(automation_id)) == 1
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_retry_stops_after_max_attempt(client: AsyncClient):
+    """An attempt-MAX failure is terminal: no further retry, ever."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        origin = datetime.now(timezone.utc) - timedelta(hours=2)
+        await _insert_failed_run(
+            automation_id, attempt=MAX_ATTEMPT, scheduled_for=origin
+        )
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        p1, p2, p3 = _sweep_patches(tracks)
+        with p1, p2, p3:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        assert len(await _history_rows(automation_id)) == 1
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_newer_chain_supersedes_old_failure(client: AsyncClient):
+    """A newer run (manual or cron) buries the old chain: no double retry."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        old_origin = datetime.now(timezone.utc) - timedelta(hours=2)
+        await _insert_failed_run(automation_id, attempt=1, scheduled_for=old_origin)
+        # A newer completed run supersedes the old failed chain.
+        async with _TestSessionLocal() as db:
+            await create_automation_history(
+                db,
+                automation_id=automation_id,
+                status="completed",
+                tracks_generated=1,
+                scheduled_for=datetime.now(timezone.utc) - timedelta(minutes=30),
+                attempt=1,
+            )
+            await db.commit()
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        p1, p2, p3 = _sweep_patches(tracks)
+        with p1, p2, p3:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        assert len(await _history_rows(automation_id)) == 2
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_retry_skips_disabled_automation(client: AsyncClient):
+    """An eligible failure of a disabled automation is left alone."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+        patched = await client.patch(
+            f"/api/automations/{automation_id}", json={"enabled": False}
+        )
+        assert patched.status_code == 200
+
+        origin = datetime.now(timezone.utc) - timedelta(minutes=6)
+        await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        p1, p2, p3 = _sweep_patches(tracks)
+        with p1, p2, p3:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        assert len(await _history_rows(automation_id)) == 1
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_run_now_starts_fresh_chain(client: AsyncClient):
+    """POST /run records attempt 1 with a fresh scheduled_for."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with patch(
+            "services.automation_runner.get_top_tracks", return_value=tracks
+        ), patch(
+            "services.enrich_cache.enrich_tracks",
+            side_effect=lambda u, t, max_enrich=50: t,
+        ):
+            resp = await client.post(f"/api/automations/{automation_id}/run")
+        assert resp.status_code == 200
+        entry = resp.json()
+        assert entry["attempt"] == 1
+        assert entry["scheduled_for"] is not None
+    finally:
+        await _cleanup_user_with_automations(client, email)

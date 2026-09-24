@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -109,6 +111,10 @@ async def run_automation_now(
 ):
     """Trigger one manual run now (same pipeline as the scheduled sweep).
 
+    A manual trigger starts a fresh chain (scheduled_for = now, attempt = 1):
+    it never rewrites another chain's season label, and it supersedes any
+    pending auto-retry of an older chain (only the latest row retries).
+
     Single-flight per automation via a transaction-scoped advisory lock:
     a second trigger while one runs gets an instant 409 instead of a
     duplicate run (refreshing the page resets only the client-side guard).
@@ -122,7 +128,9 @@ async def run_automation_now(
     ).scalar()
     if not locked:
         raise HTTPException(status_code=409, detail="Automation already running")
-    history = await run_automation(db, automation)
+    history = await run_automation(
+        db, automation, scheduled_for=datetime.now(timezone.utc), attempt=1
+    )
     try:
         await db.commit()
     except Exception:

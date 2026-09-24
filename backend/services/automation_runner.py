@@ -13,7 +13,7 @@ in the default executor, never on the event loop.
 import asyncio
 import functools
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import select
@@ -24,6 +24,7 @@ from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from repositories.automation_history import create_automation_history
+from repositories.automations import get_automation_by_id
 from repositories.generated_playlists import create_generated_playlist
 from schemas import GeneratedPlaylistCreate, Track
 from services.enrich_cache import enrich_tracks_cached
@@ -40,6 +41,15 @@ from services.lastfm import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_TRACK_LIMIT = 50
+
+# Backoff after failed attempt N before retry attempt N+1 runs.
+# Attempt MAX_ATTEMPT is terminal: no further retry, failed stays visible.
+RETRY_DELAYS = {
+    1: timedelta(minutes=5),
+    2: timedelta(minutes=20),
+    3: timedelta(hours=1),
+}
+MAX_ATTEMPT = 4
 
 
 class UnsupportedSourceTypeError(ValueError):
@@ -200,8 +210,19 @@ async def _mark_failure(db: AsyncSession, history, exc: Exception) -> None:
     await db.flush()
 
 
-async def run_automation(db: AsyncSession, automation: Automation) -> AutomationHistory:
+async def run_automation(
+    db: AsyncSession,
+    automation: Automation,
+    *,
+    scheduled_for: datetime | None = None,
+    attempt: int = 1,
+) -> AutomationHistory:
     """Run one automation's pipeline and record history + last_run.
+
+    ``scheduled_for`` is when the run was decided (tick time for the sweep,
+    now for a manual trigger); ``started_at`` stamps the actual pipeline
+    start. Retries reuse the chain's original ``scheduled_for`` with
+    ``attempt`` + 1, so a late manual retry never rewrites the season label.
 
     On success the produced tracks are persisted as a GeneratedPlaylist
     linked from the history row, so every run stays openable with its exact
@@ -209,12 +230,15 @@ async def run_automation(db: AsyncSession, automation: Automation) -> Automation
     runs in the default executor so the event loop is never blocked.
     Returns the history row (uncommitted — the caller commits).
     """
+    scheduled_for = scheduled_for or datetime.now(timezone.utc)
     started_at = datetime.now(timezone.utc)
     history = await create_automation_history(
         db,
         automation_id=automation.id,
         status="running",
         filter_groups_used=_filter_groups_to_json(automation.filter_groups),
+        scheduled_for=scheduled_for,
+        attempt=attempt,
         started_at=started_at,
     )
 
@@ -265,17 +289,78 @@ async def _persist_result_playlist(
     )
 
 
+async def get_retryable_failures(
+    db: AsyncSession, now: datetime | None = None
+) -> list[AutomationHistory]:
+    """Failed rows whose backoff expired and that are still the chain head.
+
+    Only the latest row per automation qualifies (across all statuses): a
+    newer manual run or cron tick supersedes the old chain instead of
+    doubling it. Attempt MAX_ATTEMPT rows are terminal and never returned.
+    """
+    now = now or datetime.now(timezone.utc)
+    failed = (
+        await db.execute(
+            select(AutomationHistory).where(
+                AutomationHistory.status == "failed",
+                AutomationHistory.attempt < MAX_ATTEMPT,
+            )
+        )
+    ).scalars().all()
+    if not failed:
+        return []
+    automation_ids = list({row.automation_id for row in failed})
+    ordered = (
+        await db.execute(
+            select(AutomationHistory)
+            .where(AutomationHistory.automation_id.in_(automation_ids))
+            .order_by(
+                AutomationHistory.automation_id,
+                AutomationHistory.started_at.desc(),
+                AutomationHistory.id.desc(),
+            )
+        )
+    ).scalars().all()
+    head: dict[str, AutomationHistory] = {}
+    for row in ordered:
+        head.setdefault(row.automation_id, row)
+    return [
+        row
+        for row in failed
+        if head[row.automation_id].id == row.id
+        and row.scheduled_for + RETRY_DELAYS[row.attempt] <= now
+    ]
+
+
 async def run_due_automations(session_factory=async_session) -> None:
     """Sweep all enabled automations and run those that are due.
 
     Re-reads automations from the DB every cycle, so create/update/delete are
-    picked up automatically with no resync code. ``session_factory`` is
-    injectable for tests.
+    picked up automatically with no resync code. Phase 2 retries failed runs
+    whose backoff expired, keeping the chain's original ``scheduled_for``.
+    ``session_factory`` is injectable for tests.
     """
     async with session_factory() as db:
+        now = datetime.now(timezone.utc)
         automations = await get_enabled_automations(db)
         for automation in automations:
-            if not is_due(automation):
+            if not is_due(automation, now):
                 continue
-            await run_automation(db, automation)
+            await run_automation(db, automation, scheduled_for=now)
+        for failed in await get_retryable_failures(db, now):
+            automation = await get_automation_by_id(db, failed.automation_id)
+            if automation is None or not automation.enabled:
+                continue
+            logger.info(
+                "retrying automation %s (attempt %d, scheduled for %s)",
+                automation.id,
+                failed.attempt + 1,
+                failed.scheduled_for.isoformat(),
+            )
+            await run_automation(
+                db,
+                automation,
+                scheduled_for=failed.scheduled_for,
+                attempt=failed.attempt + 1,
+            )
         await db.commit()

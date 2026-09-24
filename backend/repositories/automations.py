@@ -31,6 +31,20 @@ async def get_automation(db: AsyncSession, automation_id: str, user_id: str) -> 
     return result.scalar_one_or_none()
 
 
+async def get_automation_by_id(db: AsyncSession, automation_id: str) -> Automation | None:
+    """Get a single automation by ID, unscoped (system processes like the sweep).
+
+    Returns None when missing or soft-deleted; callers check ``enabled``.
+    """
+    result = await db.execute(
+        select(Automation).where(
+            Automation.id == automation_id,
+            Automation.deleted_at.is_(None),
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str, data: AutomationCreate) -> Automation:
     """Create a new automation for a user.
 
