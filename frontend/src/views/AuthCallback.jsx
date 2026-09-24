@@ -106,7 +106,7 @@ function AuthCallback() {
       >
         <Link
           to="/"
-          className="inline-block text-3xl font-black text-[#ff530b] hover:opacity-80 transition-opacity"
+          className="inline-block rounded-full border border-white/10 bg-black/50 px-5 py-2 text-3xl font-black text-[#ff530b] backdrop-blur-md transition-opacity hover:opacity-80"
         >
           ListFM
         </Link>
