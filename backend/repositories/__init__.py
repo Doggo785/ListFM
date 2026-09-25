@@ -44,6 +44,7 @@ from repositories.user_tracks import (
 from repositories.users import (
     create_user,
     delete_user,
+    get_lastfm_provider,
     get_user_by_email,
     get_user_by_id,
     get_user_by_lastfm_username,
