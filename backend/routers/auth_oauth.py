@@ -350,7 +350,7 @@ async def link_lastfm(
     except pylast.WSError:
         # pylast.WSError means the username does not exist on Last.fm.
         raise HTTPException(status_code=400, detail="Invalid Last.fm username")
-    except Exception:
+    except Exception:  # noqa: BLE001 -- deliberate: see comment below
         # Anything else is a genuine upstream failure (outage, network) — do
         # not mislead the user into thinking their username is wrong, and do
         # not leak internal exception text.

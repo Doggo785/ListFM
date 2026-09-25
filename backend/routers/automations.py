@@ -30,6 +30,7 @@ from services.automation_runner import (
     run_automation_pipeline_cached,
 )
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api", tags=["automations"])
@@ -63,12 +64,12 @@ async def preview_automation(
         raise HTTPException(status_code=422, detail="Unsupported source type")
     except HTTPException:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001 -- any upstream failure becomes a clean 502
         raise HTTPException(status_code=502, detail="Unable to fetch tracks from Last.fm")
 
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save preview cache")
 
@@ -134,7 +135,7 @@ async def run_automation_now(
     )
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to run automation")
     return history
@@ -150,7 +151,7 @@ async def create_new_automation(
     automation = await create_automation(db, current_user.id, username, data)
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save automation")
     return automation
@@ -168,7 +169,7 @@ async def update_existing_automation(
         raise HTTPException(status_code=404, detail="Automation not found")
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save automation")
     return automation
@@ -185,6 +186,6 @@ async def delete_existing_automation(
         raise HTTPException(status_code=404, detail="Automation not found")
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete automation")

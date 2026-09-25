@@ -18,6 +18,7 @@ from services.lastfm import (
     get_top_tracks,
     get_user_info,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ def user_info(username: str = Depends(get_current_user_lastfm_username)):
     try:
         info = get_user_info(username)
         return UserInfo(**info)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
@@ -56,7 +57,7 @@ async def user_recent_tracks(
         await _store_recent_tracks(db, current_user.id, tracks)
         try:
             await db.commit()
-        except Exception:
+        except SQLAlchemyError:
             # The dashboard must never break on a cache persist failure:
             # degrade to live data and log loudly.
             await db.rollback()
@@ -64,7 +65,7 @@ async def user_recent_tracks(
         return RecentTracksResponse(tracks=[Track(**t) for t in tracks])
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
@@ -93,7 +94,7 @@ async def _store_recent_tracks(db: AsyncSession, user_id: str, tracks: list[dict
 def user_top_tags(username: str = Depends(get_current_user_lastfm_username)):
     try:
         return {"tags": get_top_tags(username)}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
@@ -106,7 +107,7 @@ def user_top_tracks(
 ):
     try:
         return {"tracks": get_top_tracks(username, period, limit)}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
@@ -118,7 +119,7 @@ def user_loved_tracks(
 ):
     try:
         return {"tracks": get_loved_tracks(username, limit)}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
@@ -145,6 +146,6 @@ def user_source_tracks(
         return {"tracks": tracks}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)

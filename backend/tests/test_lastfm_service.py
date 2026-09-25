@@ -47,9 +47,11 @@ class _FakeNetwork:
 def test_get_user_info_propagates_wserror_for_nonexistent_user():
     """Given a user whose get_playcount() raises WSError, get_user_info must propagate it."""
     network = _FakeNetwork(_FakeUser(playcount=_MISSING_USER))
-    with patch("services.lastfm.get_network", return_value=network):
-        with pytest.raises(pylast.WSError):
-            get_user_info("ghost_user_999")
+    with (
+        patch("services.lastfm.get_network", return_value=network),
+        pytest.raises(pylast.WSError),
+    ):
+        get_user_info("ghost_user_999")
 
 
 def test_get_user_info_returns_populated_dict_for_existing_user():
