@@ -53,6 +53,18 @@ jobs:
           source .venv/bin/activate
           python -m pytest backend/tests/ -v
 
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff==0.16.8
+      - name: Ruff check
+        run: ruff check backend
+
   frontend-build:
     runs-on: ubuntu-latest
     steps:

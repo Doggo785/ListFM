@@ -23,7 +23,7 @@ def _validate_cron(v: str) -> str:
         return v
     try:
         CronTrigger.from_crontab(v, timezone=UTC)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- any parse failure becomes ValueError for pydantic
         raise ValueError(f"Invalid cron expression: {e}")
     return v
 

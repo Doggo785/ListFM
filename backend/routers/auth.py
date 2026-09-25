@@ -37,6 +37,7 @@ from services.rate_limit import (
     register_email_limiter,
     register_limiter,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -73,7 +74,7 @@ async def _establish_session(
 
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail=error_detail)
 
@@ -165,7 +166,7 @@ async def refresh(
         await revoke_refresh_token_family(db, stored_token.family)
         try:
             await db.commit()
-        except Exception:
+        except SQLAlchemyError:
             await db.rollback()
             raise HTTPException(status_code=500, detail="Failed to refresh token")
         raise HTTPException(status_code=401, detail="Invalid or expired token")
@@ -186,7 +187,7 @@ async def refresh(
 
     try:
         await db.commit()
-    except Exception:
+    except SQLAlchemyError:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to refresh token")
 
@@ -210,7 +211,7 @@ async def logout(
 
         try:
             await db.commit()
-        except Exception:
+        except SQLAlchemyError:
             await db.rollback()
             raise HTTPException(status_code=500, detail="Failed to log out")
 

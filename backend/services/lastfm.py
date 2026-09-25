@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -8,6 +9,8 @@ from datetime import UTC, datetime
 
 import pylast
 from config import get_settings
+
+logger = logging.getLogger(__name__)
 
 PERIOD_MAP = {
     "7d": pylast.PERIOD_7DAYS,
@@ -70,7 +73,7 @@ def get_user_info(username: str) -> dict:
     user.get_playcount()
     try:
         image_url = user.get_image(size=pylast.SIZE_LARGE)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- profile image is optional: degrade to None
         image_url = None
     return {
         "username": username,
@@ -141,6 +144,7 @@ def get_top_artists_tracks(username: str, period: str = "3m", limit: int = 50) -
                     "playcount": t.weight,
                 })
         except Exception:
+            logger.debug("get_top_tracks: skipping artist after error", exc_info=True)
             continue
         if len(tracks) >= limit:
             break
@@ -192,32 +196,32 @@ def get_track_full_info(
     }
     try:
         track = pylast.Track(artist, title, network, username=username)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- unconstructable track: return the empty result
         return result
 
     try:
         _throttled_call()
         result["listeners"] = track.get_listener_count()
     except Exception:
-        pass
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     try:
         _throttled_call()
         result["global_playcount"] = track.get_playcount()
     except Exception:
-        pass
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     try:
         _throttled_call()
         result["userplaycount"] = track.get_userplaycount() or 0
     except Exception:
-        pass
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     try:
         _throttled_call()
         result["userloved"] = bool(track.get_userloved())
     except Exception:
-        pass
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     caches = tag_caches if tag_caches is not None else {}
     artist_cache = caches.setdefault("artist", {})
@@ -240,7 +244,7 @@ def get_track_full_info(
                 result["artist_tags"] = _normalize_tags(raw_tags)
                 artist_cache[artist_key] = result["artist_tags"]
     except Exception:
-        pass
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     try:
         _throttled_call()
@@ -262,11 +266,11 @@ def get_track_full_info(
                             if int(t.weight) > 0
                         ]
                         result["album_tags"] = _normalize_tags(raw_tags)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 -- one bad album keeps the rest
                         result["album_tags"] = []
                     album_cache[album_key] = result["album_tags"]
     except Exception:
-        pass
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     return result
 
@@ -292,7 +296,7 @@ def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> li
             idx = future_to_idx[future]
             try:
                 enriched_order[idx] = future.result()
-            except Exception:
+            except Exception:  # noqa: BLE001 -- failed enrichment falls back to the raw track
                 enriched_order[idx] = to_enrich[idx]
 
     return [r for r in enriched_order if r is not None] + tail
