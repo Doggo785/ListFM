@@ -17,8 +17,6 @@ from models.auth_provider import AuthProvider
 from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
-)
-from repositories.refresh_tokens import (
     revoke_all_user_refresh_tokens,
 )
 from repositories.users import (

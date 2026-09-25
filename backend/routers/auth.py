@@ -8,8 +8,6 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
-)
-from repositories.refresh_tokens import (
     get_refresh_token_by_hash,
     revoke_all_user_refresh_tokens,
     revoke_refresh_token_family,

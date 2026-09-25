@@ -1,10 +1,23 @@
-# Ruff — backend Python (plan de correction conventions Git/GitHub, Phase 3).
-# Les règles sont celles de ruff, figées par le pin ruff==0.16.8 dans
-# backend/requirements.txt (pas de select explicite : le pin verrouille le jeu).
+# Ruff — backend Python (Phase 3 of the Git/GitHub conventions plan).
+#
+# No explicit `select` on purpose: ruff 0.16.8 enables a curated per-rule
+# default set (BLE001, S110, SIM117, UP/I/B subsets are all in it, while
+# S101 on test asserts and E712 stay out). Spelling it out would mean
+# listing ~300 rule codes, and family prefixes would over-include (selecting
+# "S" alone re-flags every assert in backend/tests). The ruff==0.16.8 pin in
+# backend/requirements.txt freezes the default set instead: a rule-set change
+# can only happen together with a version bump, which CI makes visible.
+# The CI gate lands only after the manual triage of the 38 remaining
+# findings (plan Phase 3), so dev stays green in the meantime.
 
 target-version = "py312"
 
 [lint]
-# B008 : fonction call dans un défaut d'argument = l'idiome FastAPI
-# (Depends(), Security()) sur chaque endpoint. Exclu volontairement.
+# B008: a function call in an argument default is the FastAPI idiom
+# (Depends(), Security()) on every endpoint. Excluded on purpose.
 ignore = ["B008"]
+
+[lint.isort]
+# Keep aliased imports (create_refresh_token as store_refresh_token) in the
+# same block as their siblings instead of splitting them into a second one.
+combine-as-imports = true

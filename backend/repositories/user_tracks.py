@@ -194,7 +194,7 @@ async def bulk_store_recent_plays(
     merged: dict[tuple[str, str], datetime | None] = {}
     for title, artist, played_at in plays:
         key = (artist, title)
-        prev = merged.get(key, None)
+        prev = merged.get(key)
         if key not in merged or (
             played_at is not None and (prev is None or played_at > prev)
         ):
