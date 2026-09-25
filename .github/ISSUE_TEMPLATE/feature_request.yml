@@ -1,0 +1,31 @@
+name: "Feature request"
+description: "Suggest a change to ListFM playlists or sync"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: "Describe the need first, then the fix you have in mind."
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem"
+      description: "What hurts in the current flow."
+      placeholder: "I rebuild the same filter set each week by hand."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Proposed solution"
+      description: "What you want added or changed."
+      placeholder: "Save filter sets as named presets."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives considered"
+      description: "Other options you tried or ruled out."
+      placeholder: "Manual copy, outside script."
+    validations:
+      required: false

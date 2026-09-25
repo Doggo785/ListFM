@@ -1,0 +1,42 @@
+name: "Bug report"
+description: "Report a broken behavior in ListFM"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Fill this out so the bug can be reproduced from a fresh clone."
+  - type: textarea
+    id: happened
+    attributes:
+      label: "What happened"
+      description: "What you saw versus what you expected."
+      placeholder: "Sync stalls after the first page of scrobbles."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      description: "Ordered steps that trigger the bug."
+      placeholder: "1. Log in\n2. Open automations\n3. Run sync"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Area"
+      description: "Where the bug shows up."
+      options:
+        - Backend
+        - Frontend
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs and errors"
+      description: "Paste server or browser output."
+      render: shell
+    validations:
+      required: false
