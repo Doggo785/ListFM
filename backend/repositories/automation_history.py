@@ -5,12 +5,11 @@ this module only inserts rows. No read API or UI yet (write-only phase).
 """
 
 import uuid
-from datetime import datetime, timezone
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from models.automation_history import AutomationHistory
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def create_automation_history(
@@ -43,9 +42,9 @@ async def create_automation_history(
         error_message=error_message,
         filter_groups_used=filter_groups_used,
         generated_playlist_id=generated_playlist_id,
-        scheduled_for=scheduled_for or datetime.now(timezone.utc),
+        scheduled_for=scheduled_for or datetime.now(UTC),
         attempt=attempt,
-        started_at=started_at or datetime.now(timezone.utc),
+        started_at=started_at or datetime.now(UTC),
         completed_at=completed_at,
     )
     db.add(history)

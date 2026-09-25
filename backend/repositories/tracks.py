@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime, timedelta
 
 from models.track import Track
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 CACHE_TTL = timedelta(hours=24)
 
@@ -39,7 +38,7 @@ async def get_or_create_track(
     (used by paths that only record identity, like recent plays).
     Caller is responsible for committing the session.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Lock the row if it exists to prevent concurrent duplicate inserts
     result = await db.execute(

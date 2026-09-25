@@ -1,17 +1,17 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from models.user import User
 from sqlalchemy import select
 
 from .conftest import (
-    _TestSessionLocal,
     _cleanup_user,
     _get_user_id_from_cookies,
     _make_expired_token,
+    _TestSessionLocal,
     _unique_email,
 )
-from models.user import User
 
 
 @pytest.mark.asyncio
@@ -89,7 +89,7 @@ async def test_protected_deleted_user(client: AsyncClient):
             result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalar_one_or_none()
             assert user is not None
-            user.deleted_at = datetime.now(timezone.utc)
+            user.deleted_at = datetime.now(UTC)
             await db.commit()
 
         resp = await client.get("/api/auth/me")

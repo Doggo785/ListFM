@@ -1,14 +1,13 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from models.album_tag import AlbumTag
 from models.artist_tag import ArtistTag
 from models.tag import Tag
 from models.track_tag import TrackTag
-from models.album_tag import AlbumTag
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_tag_by_name(db: AsyncSession, name: str) -> Tag | None:
@@ -23,7 +22,7 @@ async def get_or_create_tag(db: AsyncSession, name: str) -> Tag:
     """
     stmt = (
         insert(Tag)
-        .values(id=str(uuid.uuid4()), name=name, created_at=datetime.now(timezone.utc))
+        .values(id=str(uuid.uuid4()), name=name, created_at=datetime.now(UTC))
         .on_conflict_do_update(
             index_elements=["name"],
             set_={"name": name},  # no-op update to return existing row
@@ -53,13 +52,13 @@ async def upsert_track_tag(
             track_id=track_id,
             tag_id=tag.id,
             weight=weight,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
         )
         .on_conflict_do_update(
             index_elements=["track_id", "tag_id"],
             set_={
                 "weight": weight,
-                "fetched_at": datetime.now(timezone.utc),
+                "fetched_at": datetime.now(UTC),
             },
         )
         .returning(TrackTag)
@@ -87,13 +86,13 @@ async def upsert_album_tag(
             album_id=album_id,
             tag_id=tag.id,
             weight=weight,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
         )
         .on_conflict_do_update(
             index_elements=["album_id", "tag_id"],
             set_={
                 "weight": weight,
-                "fetched_at": datetime.now(timezone.utc),
+                "fetched_at": datetime.now(UTC),
             },
         )
         .returning(AlbumTag)
@@ -151,13 +150,13 @@ async def upsert_artist_tag(
             artist=artist,
             tag_id=tag.id,
             weight=weight,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
         )
         .on_conflict_do_update(
             index_elements=["artist", "tag_id"],
             set_={
                 "weight": weight,
-                "fetched_at": datetime.now(timezone.utc),
+                "fetched_at": datetime.now(UTC),
             },
         )
         .returning(ArtistTag)

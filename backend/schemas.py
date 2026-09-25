@@ -1,11 +1,10 @@
 import re
-from datetime import datetime, timezone
-from typing import Literal, Optional
+from datetime import UTC, datetime
+from typing import Literal
 
 from apscheduler.triggers.cron import CronTrigger
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 from filter_types import FilterGroups
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 LASTFM_USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
@@ -23,7 +22,7 @@ def _validate_cron(v: str) -> str:
     if not v:
         return v
     try:
-        CronTrigger.from_crontab(v, timezone=timezone.utc)
+        CronTrigger.from_crontab(v, timezone=UTC)
     except Exception as e:
         raise ValueError(f"Invalid cron expression: {e}")
     return v
@@ -59,7 +58,7 @@ class PasswordValidatorMixin:
 class UserCreate(EmailValidatorMixin, PasswordValidatorMixin, BaseModel):
     email: str
     password: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
 
 
 class UserLogin(EmailValidatorMixin, PasswordValidatorMixin, BaseModel):
@@ -68,9 +67,9 @@ class UserLogin(EmailValidatorMixin, PasswordValidatorMixin, BaseModel):
 
 
 class UserUpdate(PasswordValidatorMixin, BaseModel):
-    email: Optional[str] = None
-    password: Optional[str] = None
-    display_name: Optional[str] = None
+    email: str | None = None
+    password: str | None = None
+    display_name: str | None = None
 
 
 class LinkLastfmRequest(BaseModel):
@@ -108,18 +107,18 @@ class TokenResponse(BaseModel):
 class Track(BaseModel):
     title: str
     artist: str
-    album: Optional[str] = None
+    album: str | None = None
 
 
 class TrackRead(BaseModel):
     id: str
     title: str
     artist: str
-    album_id: Optional[str] = None
+    album_id: str | None = None
     listeners: int
     global_playcount: int
-    image_url: Optional[str] = None
-    last_fetched_at: Optional[datetime] = None
+    image_url: str | None = None
+    last_fetched_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -129,7 +128,7 @@ class AlbumRead(BaseModel):
     id: str
     title: str
     artist: str
-    last_fetched_at: Optional[datetime] = None
+    last_fetched_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -163,8 +162,8 @@ class UserTrackRead(BaseModel):
     track: TrackRead
     user_playcount: int
     userloved: bool
-    last_played_at: Optional[datetime] = None
-    last_synced_at: Optional[datetime] = None
+    last_played_at: datetime | None = None
+    last_synced_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -223,19 +222,19 @@ class PreviewRequest(BaseModel):
 
 
 class AutomationUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    source: Optional[AutomationSource] = None
-    cron: Optional[str] = Field(default=None, max_length=100)
-    filter_groups: Optional[FilterGroups] = Field(default=None, alias="filterGroups")
-    output: Optional[AutomationOutput] = None
-    enabled: Optional[bool] = None
+    name: str | None = None
+    description: str | None = None
+    source: AutomationSource | None = None
+    cron: str | None = Field(default=None, max_length=100)
+    filter_groups: FilterGroups | None = Field(default=None, alias="filterGroups")
+    output: AutomationOutput | None = None
+    enabled: bool | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
     @field_validator("cron")
     @classmethod
-    def validate_cron(cls, v: Optional[str]) -> Optional[str]:
+    def validate_cron(cls, v: str | None) -> str | None:
         return _validate_cron(v) if v is not None else v
 
 
@@ -244,15 +243,15 @@ class AutomationRead(BaseModel):
     user_id: str
     lastfm_username: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     source: AutomationSource
-    cron: Optional[str] = None
+    cron: str | None = None
     filter_groups: FilterGroups = Field(alias="filterGroups")
     output: dict
     enabled: bool
     created_at: datetime
     updated_at: datetime
-    last_run: Optional[datetime] = None
+    last_run: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -280,25 +279,25 @@ class AutomationRead(BaseModel):
 
 
 class GeneratedPlaylistCreate(BaseModel):
-    automation_id: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
+    automation_id: str | None = None
+    name: str | None = None
+    description: str | None = None
     source_type: Literal["top_tracks", "recent_tracks", "loved_tracks", "top_artists"]
     source_period: Literal["7d", "1m", "3m", "6m", "12m", "overall"]
     tracks: list[Track]
     track_count: int
-    filter_groups: Optional[list[dict]] = None
+    filter_groups: list[dict] | None = None
 
 
 class GeneratedPlaylistRead(BaseModel):
     id: str
     user_id: str
-    automation_id: Optional[str] = None
+    automation_id: str | None = None
     lastfm_username: str
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
     track_count: int
-    filter_groups: Optional[list[dict]] = None
+    filter_groups: list[dict] | None = None
     generated_at: datetime
     created_at: datetime
 
@@ -329,23 +328,23 @@ class PlaylistTrackItem(BaseModel):
 class AutomationHistoryRead(BaseModel):
     id: str
     automation_id: str
-    generated_playlist_id: Optional[str] = None
+    generated_playlist_id: str | None = None
     status: str
     attempt: int = 1
     scheduled_for: datetime
     tracks_generated: int
     tracks_before_filter: int
     tracks_after_filter: int
-    error_message: Optional[str] = None
-    filter_groups_used: Optional[list[dict]] = None
+    error_message: str | None = None
+    filter_groups_used: list[dict] | None = None
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class SyncStatus(BaseModel):
-    last_synced_at: Optional[datetime] = None
+    last_synced_at: datetime | None = None
     tracks_synced: int
     tags_synced: int

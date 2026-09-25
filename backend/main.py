@@ -1,15 +1,16 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from config import get_settings
 from database import engine
-from routers.users import router as users_router
-from routers.automations import router as automations_router
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from routers.auth import router as auth_router
 from routers.auth_oauth import router as auth_oauth_router
+from routers.automations import router as automations_router
 from routers.generated_playlists import router as generated_playlists_router
+from routers.users import router as users_router
 from services.automation_runner import run_due_automations
 
 settings = get_settings()

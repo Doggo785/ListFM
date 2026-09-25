@@ -104,7 +104,7 @@ Google and Discord OAuth are optional. The login buttons only show when the matc
 
 ## Local dev
 
-`./dev.sh` starts the backend and the frontend in one step. Or use two terminals from the repo root:
+From the repo root, open two terminals:
 
 ```bash
 # Terminal 1, backend

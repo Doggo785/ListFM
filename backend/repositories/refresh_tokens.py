@@ -1,13 +1,12 @@
 import uuid
-from datetime import datetime, timedelta, timezone
-
-from fastapi import Request
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime, timedelta
 
 from config import get_settings
+from fastapi import Request
 from models.refresh_token import RefreshToken
 from services.auth import hash_refresh_token
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def create_refresh_token(
@@ -18,7 +17,7 @@ async def create_refresh_token(
     request: Request,
 ) -> RefreshToken:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rt = RefreshToken(
         id=str(uuid.uuid4()),
         user_id=user_id,

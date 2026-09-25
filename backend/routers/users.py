@@ -1,24 +1,24 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query
 from models.user import User
 from repositories.tracks import CACHE_TTL
 from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tracks
+from routers.deps import get_current_active_user, get_current_user_lastfm_username
+from schemas import RecentTracksResponse, Track, UserInfo
 from services.lastfm import (
     epoch_to_datetime,
+    get_loved_tracks,
     get_recent_tracks,
+    get_top_artists_tracks,
     get_top_tags,
     get_top_tracks,
-    get_top_artists_tracks,
-    get_loved_tracks,
     get_user_info,
 )
-from schemas import RecentTracksResponse, Track, UserInfo
-from routers.deps import get_current_active_user, get_current_user_lastfm_username
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def _stored_recents_fresh(stored: list[dict]) -> bool:
     """Stored recents are servable when the newest play is within the TTL."""
     newest = stored[0].get("played_at")
     return newest is not None and newest >= (
-        datetime.now(timezone.utc) - CACHE_TTL
+        datetime.now(UTC) - CACHE_TTL
     )
 
 

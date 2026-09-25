@@ -2,12 +2,10 @@ import asyncio
 import os
 from logging.config import fileConfig
 
+from alembic import context
+from config import get_settings
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
-
-from config import get_settings
 
 config = context.config
 
@@ -22,11 +20,10 @@ else:
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-from database import Base
-
 # Import all models so Base.metadata knows about every table.
 # This is required for `alembic revision --autogenerate` to detect all tables.
 import models  # noqa: F401
+from database import Base
 
 target_metadata = Base.metadata
 

@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-from models.user import User
 from models.auth_provider import AuthProvider
+from models.user import User
 from schemas import UserCreate, UserUpdate
 from services.rate_limit import DUPLICATE_EMAIL_MESSAGE
 
@@ -62,7 +62,7 @@ async def get_lastfm_provider(db: AsyncSession, user_id: str) -> AuthProvider | 
 
 async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) -> User:
     """Caller is responsible for committing the session."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = User(
         id=str(uuid.uuid4()),
         email=data.email,
@@ -102,7 +102,7 @@ async def update_user(db: AsyncSession, user_id: str, data: UserUpdate) -> User 
     for field, value in update_data.items():
         setattr(user, field, value)
 
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(user)
     return user
@@ -120,7 +120,7 @@ async def _get_or_create_user_from_provider(
 
     Caller is responsible for committing the session.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     result = await db.execute(
         select(User)
@@ -230,6 +230,6 @@ async def delete_user(db: AsyncSession, user_id: str) -> bool:
     user = await get_user_by_id(db, user_id)
     if user is None:
         return False
-    user.deleted_at = datetime.now(timezone.utc)
+    user.deleted_at = datetime.now(UTC)
     await db.flush()
     return True

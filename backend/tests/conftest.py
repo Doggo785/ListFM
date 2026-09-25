@@ -1,30 +1,30 @@
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+import jwt
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-import jwt
-from sqlalchemy import delete, select, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
 from config import get_settings
 from database import get_db
-from backend.main import app
-from services.rate_limit import (
-    login_limiter,
-    register_limiter,
-    register_email_limiter,
-    refresh_limiter,
-    link_lastfm_limiter,
-    oauth_login_limiter,
-    complete_email_limiter,
-)
+from httpx import ASGITransport, AsyncClient
 from models.auth_provider import AuthProvider
 from models.refresh_token import RefreshToken
 from models.user import User
 from models.user_track import UserTrack
+from services.rate_limit import (
+    complete_email_limiter,
+    link_lastfm_limiter,
+    login_limiter,
+    oauth_login_limiter,
+    refresh_limiter,
+    register_email_limiter,
+    register_limiter,
+)
+from sqlalchemy import delete, select, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from backend.main import app
 
 # Dedicated throwaway database — NEVER point tests at the production/dev "listfm"
 # database: the _cleanup_db fixture deletes every row before/after each test.
@@ -171,7 +171,7 @@ def _get_user_id_from_cookies(client: AsyncClient) -> str:
 def _make_expired_token(user_id: str) -> str:
     settings = get_settings()
     return jwt.encode(
-        {"sub": user_id, "exp": datetime.now(timezone.utc) - timedelta(hours=1)},
+        {"sub": user_id, "exp": datetime.now(UTC) - timedelta(hours=1)},
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )

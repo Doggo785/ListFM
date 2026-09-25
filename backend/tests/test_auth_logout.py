@@ -2,14 +2,14 @@ import hashlib
 
 import pytest
 from httpx import AsyncClient
+from models.refresh_token import RefreshToken
 from sqlalchemy import select
 
 from .conftest import (
-    _TestSessionLocal,
     _cleanup_user,
+    _TestSessionLocal,
     _unique_email,
 )
-from models.refresh_token import RefreshToken
 
 
 @pytest.mark.asyncio

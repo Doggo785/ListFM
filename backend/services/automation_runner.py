@@ -13,13 +13,9 @@ in the default executor, never on the event loop.
 import asyncio
 import functools
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
-
 from database import async_session
 from models.automation import Automation
 from models.automation_history import AutomationHistory
@@ -31,13 +27,16 @@ from schemas import GeneratedPlaylistCreate, Track
 from services.enrich_cache import enrich_tracks_cached
 from services.filter_engine import apply_filters
 from services.lastfm import (
-    get_top_tracks,
-    get_recent_tracks,
-    get_loved_tracks,
-    get_top_artists_tracks,
-    enrich_tracks,
     deduplicate,
+    enrich_tracks,
+    get_loved_tracks,
+    get_recent_tracks,
+    get_top_artists_tracks,
+    get_top_tracks,
 )
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 logger = logging.getLogger(__name__)
 
@@ -167,12 +166,12 @@ def is_due(automation: Automation, now: datetime | None = None) -> bool:
 
     An automation that has never run (``last_run`` is None) is due immediately.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     cron = getattr(automation, "cron", None)
     if not cron:
         return False
     try:
-        trigger = CronTrigger.from_crontab(cron, timezone=timezone.utc)
+        trigger = CronTrigger.from_crontab(cron, timezone=UTC)
     except ValueError:
         return False
     last_run = getattr(automation, "last_run", None)
@@ -198,8 +197,8 @@ async def _mark_success(db: AsyncSession, history, result: dict, automation: Aut
     history.tracks_generated = result["total"]
     history.tracks_before_filter = result["before_filter"]
     history.tracks_after_filter = result["total"]
-    history.completed_at = datetime.now(timezone.utc)
-    automation.last_run = datetime.now(timezone.utc)
+    history.completed_at = datetime.now(UTC)
+    automation.last_run = datetime.now(UTC)
     await db.flush()
 
 
@@ -207,7 +206,7 @@ async def _mark_failure(db: AsyncSession, history, exc: Exception) -> None:
     """Record a failed run on the history row."""
     history.status = "failed"
     history.error_message = str(exc)[:2000]
-    history.completed_at = datetime.now(timezone.utc)
+    history.completed_at = datetime.now(UTC)
     await db.flush()
 
 
@@ -231,8 +230,8 @@ async def run_automation(
     runs in the default executor so the event loop is never blocked.
     Returns the history row (uncommitted — the caller commits).
     """
-    scheduled_for = scheduled_for or datetime.now(timezone.utc)
-    started_at = datetime.now(timezone.utc)
+    scheduled_for = scheduled_for or datetime.now(UTC)
+    started_at = datetime.now(UTC)
     history = await create_automation_history(
         db,
         automation_id=automation.id,
@@ -300,7 +299,7 @@ async def get_retryable_failures(
     tick supersedes the old chain instead of doubling it. Attempt
     MAX_ATTEMPT rows are terminal and never returned.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     # Automations owning at least one non-terminal failure (served by the
     # (status, attempt) index); only their chains get ranked below.
     candidates = (
@@ -377,7 +376,7 @@ async def run_due_automations(session_factory=async_session) -> None:
     via the endpoint's 409). ``session_factory`` is injectable for tests.
     """
     async with session_factory() as db:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         automations = await get_enabled_automations(db)
         for automation in automations:
             if not is_due(automation, now):
