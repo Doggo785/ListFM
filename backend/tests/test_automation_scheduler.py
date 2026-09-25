@@ -8,15 +8,12 @@ Covers:
   (5min -> 20min -> 1h), then stay failed; newer chains supersede old ones
 """
 
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-import uuid
-from sqlalchemy import delete, func, select
-
-from .conftest import _TestSessionLocal, _cleanup_user, _get_user_id_from_cookies, _unique_email
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
@@ -24,6 +21,14 @@ from models.playlist_track import PlaylistTrack
 from models.track import Track
 from repositories.automation_history import create_automation_history
 from services.automation_runner import MAX_ATTEMPT, run_due_automations
+from sqlalchemy import delete, func, select
+
+from .conftest import (
+    _cleanup_user,
+    _get_user_id_from_cookies,
+    _TestSessionLocal,
+    _unique_email,
+)
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
@@ -546,7 +551,7 @@ async def test_retry_reruns_failed_with_original_scheduled_for(client: AsyncClie
         assert created.status_code == 201
         automation_id = created.json()["id"]
 
-        origin = datetime.now(timezone.utc) - timedelta(minutes=6)
+        origin = datetime.now(UTC) - timedelta(minutes=6)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
@@ -574,7 +579,7 @@ async def test_retry_waits_for_backoff(client: AsyncClient):
         created = await client.post("/api/automations", json=_create_body())
         automation_id = created.json()["id"]
 
-        origin = datetime.now(timezone.utc) - timedelta(minutes=1)
+        origin = datetime.now(UTC) - timedelta(minutes=1)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
@@ -596,7 +601,7 @@ async def test_retry_stops_after_max_attempt(client: AsyncClient):
         created = await client.post("/api/automations", json=_create_body())
         automation_id = created.json()["id"]
 
-        origin = datetime.now(timezone.utc) - timedelta(hours=2)
+        origin = datetime.now(UTC) - timedelta(hours=2)
         await _insert_failed_run(
             automation_id, attempt=MAX_ATTEMPT, scheduled_for=origin
         )
@@ -620,7 +625,7 @@ async def test_newer_chain_supersedes_old_failure(client: AsyncClient):
         created = await client.post("/api/automations", json=_create_body())
         automation_id = created.json()["id"]
 
-        old_origin = datetime.now(timezone.utc) - timedelta(hours=2)
+        old_origin = datetime.now(UTC) - timedelta(hours=2)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=old_origin)
         # A newer completed run supersedes the old failed chain.
         async with _TestSessionLocal() as db:
@@ -629,7 +634,7 @@ async def test_newer_chain_supersedes_old_failure(client: AsyncClient):
                 automation_id=automation_id,
                 status="completed",
                 tracks_generated=1,
-                scheduled_for=datetime.now(timezone.utc) - timedelta(minutes=30),
+                scheduled_for=datetime.now(UTC) - timedelta(minutes=30),
                 attempt=1,
             )
             await db.commit()
@@ -657,7 +662,7 @@ async def test_retry_skips_disabled_automation(client: AsyncClient):
         )
         assert patched.status_code == 200
 
-        origin = datetime.now(timezone.utc) - timedelta(minutes=6)
+        origin = datetime.now(UTC) - timedelta(minutes=6)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
@@ -680,7 +685,7 @@ async def test_sweep_skips_when_lock_held(client: AsyncClient):
         assert created.status_code == 201
         automation_id = created.json()["id"]
 
-        origin = datetime.now(timezone.utc) - timedelta(minutes=6)
+        origin = datetime.now(UTC) - timedelta(minutes=6)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
         async with _TestSessionLocal() as db:

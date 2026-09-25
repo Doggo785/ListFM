@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 import pylast
 import pytest
-
 from services.lastfm import get_user_info
 
 # Sentinel: get_playcount() raises WSError (simulates a non-existent account).

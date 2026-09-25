@@ -20,14 +20,11 @@ Callers must commit the session (writes happen on misses).
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-
-from sqlalchemy import select, tuple_
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from models.album import Album
-from models.artist_tag import ArtistTag
 from models.album_tag import AlbumTag
+from models.artist_tag import ArtistTag
 from models.tag import Tag
 from models.track import Track
 from models.user_track import UserTrack
@@ -36,12 +33,14 @@ from repositories.tags import upsert_album_tag, upsert_artist_tag
 from repositories.tracks import CACHE_TTL, get_or_create_track
 from repositories.user_tracks import upsert_user_track
 from services.lastfm import enrich_tracks, epoch_to_datetime, get_lastfm_call_count
+from sqlalchemy import select, tuple_
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 
 def _fresh(ts) -> bool:
-    return ts is not None and ts >= (datetime.now(timezone.utc) - CACHE_TTL)
+    return ts is not None and ts >= (datetime.now(UTC) - CACHE_TTL)
 
 
 async def _read_cached_tracks(
@@ -154,7 +153,7 @@ async def _write_back(
     db: AsyncSession, *, user_id: str, base_tracks: list[dict], enriched_tracks: list[dict]
 ) -> None:
     """Persist live enrich results (core, tags, user data). Caller commits."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for base, info in zip(base_tracks, enriched_tracks):
         artist = base.get("artist", "")
         title = base.get("title", "")

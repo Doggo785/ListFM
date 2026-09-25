@@ -3,7 +3,6 @@ import uuid
 
 import pytest
 from httpx import AsyncClient
-
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
     RateLimiter,

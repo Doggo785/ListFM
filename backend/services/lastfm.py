@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pylast
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import get_settings
 
 PERIOD_MAP = {
@@ -57,7 +57,7 @@ def get_lastfm_call_count() -> int:
 def epoch_to_datetime(ts) -> datetime | None:
     """Last.fm epoch seconds (or None) to aware datetime, forgiving."""
     try:
-        return datetime.fromtimestamp(int(ts), tz=timezone.utc) if ts is not None else None
+        return datetime.fromtimestamp(int(ts), tz=UTC) if ts is not None else None
     except (TypeError, ValueError, OverflowError, OSError):
         return None
 

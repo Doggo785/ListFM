@@ -1,15 +1,14 @@
 import uuid
-from datetime import datetime, timezone
-
-from sqlalchemy import desc, func, select, tuple_
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime
 
 from models.album import Album
 from models.track import Track
 from models.user_track import UserTrack
+from sqlalchemy import desc, func, select, tuple_
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
-EPOCH_FLOOR = datetime(1970, 1, 1, tzinfo=timezone.utc)
+EPOCH_FLOOR = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 async def get_user_track(db: AsyncSession, user_id: str, track_id: str) -> UserTrack | None:
@@ -31,7 +30,7 @@ async def upsert_user_track(
 
     Caller is responsible for committing the session.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     update_values = {
         "user_playcount": user_playcount,
@@ -89,7 +88,7 @@ async def update_last_played(
 
     Caller is responsible for committing the session.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Use atomic upsert — only update last_played_at if the new value is greater
     stmt = (
@@ -136,7 +135,7 @@ async def upsert_last_played_at(
             user_id=user_id,
             track_id=track_id,
             last_played_at=last_played_at,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         .on_conflict_do_update(
             index_elements=["user_id", "track_id"],
@@ -195,7 +194,7 @@ async def bulk_store_recent_plays(
     merged: dict[tuple[str, str], datetime | None] = {}
     for title, artist, played_at in plays:
         key = (artist, title)
-        prev = merged.get(key, None)
+        prev = merged.get(key)
         if key not in merged or (
             played_at is not None and (prev is None or played_at > prev)
         ):
@@ -208,7 +207,7 @@ async def bulk_store_recent_plays(
     by_key = await _tracks_by_key(db, pairs)
     missing = [p for p in pairs if p not in by_key]
     if missing:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await db.execute(
             insert(Track)
             .values(
@@ -228,7 +227,7 @@ async def bulk_store_recent_plays(
         await db.flush()
         by_key = await _tracks_by_key(db, pairs)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = insert(UserTrack).values(
         [
             {

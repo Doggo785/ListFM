@@ -1,8 +1,8 @@
 import hashlib
 import time
 from collections import defaultdict
-from fastapi import HTTPException, Request
 
+from fastapi import HTTPException, Request
 
 # Shared across register / complete-email / provider-bind so the response body
 # never reveals whether an email already exists (anti-enumeration).

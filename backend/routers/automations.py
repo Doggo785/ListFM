@@ -1,36 +1,36 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
-from schemas import (
-    AutomationCreate,
-    AutomationUpdate,
-    AutomationRead,
-    AutomationHistoryRead,
-    PreviewRequest,
-    LASTFM_USERNAME_REGEX,
-)
-from repositories.automation_history import get_automation_history
+from fastapi import APIRouter, Depends, HTTPException
 from models.automation import Automation
 from models.user import User
+from repositories.automation_history import get_automation_history
+from repositories.automations import (
+    create_automation,
+    delete_automation,
+    get_automations,
+    update_automation,
+)
 from routers.deps import (
-    get_current_user_lastfm_username,
     get_current_active_user,
+    get_current_user_lastfm_username,
     get_owned_automation,
 )
-from repositories.automations import (
-    get_automations,
-    create_automation,
-    update_automation,
-    delete_automation,
+from schemas import (
+    LASTFM_USERNAME_REGEX,
+    AutomationCreate,
+    AutomationHistoryRead,
+    AutomationRead,
+    AutomationUpdate,
+    PreviewRequest,
 )
 from services.automation_runner import (
+    UnsupportedSourceTypeError,
     run_automation,
     run_automation_pipeline_cached,
-    UnsupportedSourceTypeError,
 )
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api", tags=["automations"])
 
@@ -130,7 +130,7 @@ async def run_automation_now(
     if not locked:
         raise HTTPException(status_code=409, detail="Automation already running")
     history = await run_automation(
-        db, automation, scheduled_for=datetime.now(timezone.utc), attempt=1
+        db, automation, scheduled_for=datetime.now(UTC), attempt=1
     )
     try:
         await db.commit()

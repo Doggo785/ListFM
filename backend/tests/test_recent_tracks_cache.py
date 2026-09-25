@@ -6,19 +6,18 @@ DB rows use the throwaway listfm_test database (autouse truncate).
 
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select, update
-
 from models.user import User
 from models.user_track import UserTrack
-from repositories.user_tracks import get_user_track, upsert_user_track
 from repositories.tracks import get_track_by_artist_title
+from repositories.user_tracks import get_user_track, upsert_user_track
+from sqlalchemy import select, update
 
-from .conftest import _TestSessionLocal, _cleanup_user, _unique_email
+from .conftest import _cleanup_user, _TestSessionLocal, _unique_email
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
@@ -90,7 +89,7 @@ async def test_recents_stale_refetches_live(client: AsyncClient):
         async with _TestSessionLocal() as db:
             await db.execute(
                 update(UserTrack).values(
-                    last_played_at=datetime.now(timezone.utc) - timedelta(hours=25)
+                    last_played_at=datetime.now(UTC) - timedelta(hours=25)
                 )
             )
             await db.commit()
@@ -137,7 +136,7 @@ async def test_recents_store_never_clobbers_user_stats(client: AsyncClient):
         async with _TestSessionLocal() as db:
             await db.execute(
                 update(UserTrack).values(
-                    last_played_at=datetime.now(timezone.utc) - timedelta(hours=25)
+                    last_played_at=datetime.now(UTC) - timedelta(hours=25)
                 )
             )
             await db.commit()

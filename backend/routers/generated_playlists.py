@@ -1,18 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from database import get_db
-from schemas import GeneratedPlaylistCreate, GeneratedPlaylistRead, PlaylistTrackItem
+from fastapi import APIRouter, Depends, HTTPException
 from models.user import User
-from routers.deps import get_current_user_lastfm_username, get_current_active_user
 from repositories.generated_playlists import (
-    get_generated_playlists,
-    get_generated_playlist,
-    get_playlist_tracks,
     create_generated_playlist,
     delete_generated_playlist,
+    get_generated_playlist,
+    get_generated_playlists,
+    get_playlist_tracks,
 )
+from routers.deps import get_current_active_user, get_current_user_lastfm_username
+from schemas import GeneratedPlaylistCreate, GeneratedPlaylistRead, PlaylistTrackItem
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api", tags=["generated_playlists"])
 

@@ -1,10 +1,9 @@
 import uuid
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import UTC, datetime, timedelta
 
 from models.album import Album
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 CACHE_TTL = timedelta(hours=24)
 
@@ -31,7 +30,7 @@ async def get_or_create_album(
     Uses SELECT FOR UPDATE to prevent race conditions on concurrent inserts.
     Caller is responsible for committing the session.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     result = await db.execute(
         select(Album)

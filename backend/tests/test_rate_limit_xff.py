@@ -1,6 +1,5 @@
 import pytest
 from httpx import AsyncClient
-
 from services.rate_limit import register_limiter
 
 from .conftest import _cleanup_user, _unique_email

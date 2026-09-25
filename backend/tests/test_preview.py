@@ -7,11 +7,11 @@ cron parseable by the scheduler, maxSize bounded 1-200 with explicit 0->50):
 - success -> 200 with {tracks, total}
 """
 
+import uuid
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-import uuid
 
 from .conftest import _cleanup_user, _unique_email
 
