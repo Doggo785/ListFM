@@ -2,7 +2,7 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.14.2
 certifi==2026.2.25
-click==8.3.2
+click==8.3.3
 fastapi==0.135.3
 h11==0.16.0
 httpcore==1.0.9
@@ -26,5 +26,9 @@ passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.1,<5.0.0
 pytest>=9.0.3
 pytest-asyncio>=0.23.0
+pytest-cov==7.1.0
+diff-cover==10.6.0
 httpx-oauth>=0.13.0
 apscheduler==3.11.3
+# Explicit floor for a transitive dep (via pytest): fixes PYSEC-2023-117 / PYSEC-2026-2987.
+pygments==2.20.0

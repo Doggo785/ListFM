@@ -279,7 +279,7 @@ def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> li
     network = get_network()
     to_enrich = tracks[:max_enrich]
     tail = tracks[max_enrich:]
-    tag_caches = {}
+    tag_caches: dict = {}
     cache_lock = threading.Lock()
 
     def _enrich_one(track):
@@ -289,7 +289,7 @@ def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> li
         result.update(get_track_full_info(network, username, artist, title, tag_caches, cache_lock))
         return result
 
-    enriched_order = [None] * len(to_enrich)
+    enriched_order: list[dict | None] = [None] * len(to_enrich)
     with ThreadPoolExecutor(max_workers=5) as pool:
         future_to_idx = {pool.submit(_enrich_one, t): i for i, t in enumerate(to_enrich)}
         for future in as_completed(future_to_idx):
