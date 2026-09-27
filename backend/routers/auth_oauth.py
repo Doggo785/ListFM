@@ -2,6 +2,7 @@ import asyncio
 import secrets
 import uuid
 from datetime import UTC, datetime
+from typing import cast
 from urllib.parse import urlencode
 
 import httpx
@@ -281,14 +282,14 @@ async def oauth_callback(
         err := _check_oauth_callback_params(code, state, oauth_state, settings)
     ) is not None:
         return err
-    assert code is not None  # narrowed by _check_oauth_callback_params above
+    code = cast(str, code)  # guaranteed non-None by _check_oauth_callback_params above
 
     client = _google_client() if provider == "google" else _discord_client()
     redirect_uri = _redirect_uri(provider, settings)
     token, err = await _exchange_oauth_code(client, code, redirect_uri, settings)
     if err is not None:
         return err
-    assert token is not None  # _exchange_oauth_code returns (token, None) or (None, redirect)
+    token = cast(dict, token)  # contract: (token, None) or (None, error redirect)
 
     access_token = token["access_token"]
     try:
