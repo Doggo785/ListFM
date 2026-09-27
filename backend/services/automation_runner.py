@@ -367,6 +367,46 @@ async def _try_run_lock(db: AsyncSession, automation_id: str) -> bool:
     )
 
 
+async def _run_single(
+    session_factory,
+    automation_id: str,
+    *,
+    scheduled_for: datetime,
+    attempt: int,
+) -> bool:
+    """Run one automation in its own session with isolated commit/rollback.
+
+    Returns True when the run committed. Any error rolls back only this
+    run's session, so one automation can never poison the rest of the sweep.
+    """
+    async with session_factory() as db:
+        automation = (await get_automations_by_ids(db, [automation_id])).get(
+            automation_id
+        )
+        if automation is None:
+            logger.info(
+                "sweep skipping run for %s: automation gone or disabled",
+                automation_id,
+            )
+            return False
+        if not await _try_run_lock(db, automation_id):
+            logger.info(
+                "sweep skipping automation %s: run already in flight",
+                automation_id,
+            )
+            return False
+        try:
+            await run_automation(
+                db, automation, scheduled_for=scheduled_for, attempt=attempt
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.exception("sweep run failed for automation %s", automation_id)
+            return False
+        return True
+
+
 async def run_due_automations(session_factory=async_session) -> None:
     """Sweep all enabled automations and run those that are due.
 
@@ -377,79 +417,38 @@ async def run_due_automations(session_factory=async_session) -> None:
     in flight wins, the sweep skips instead of doubling it (and vice versa
     via the endpoint's 409). ``session_factory`` is injectable for tests.
 
-    Each automation commits independently in deterministic creation order:
-    one automation's DB failure rolls back only its own run, never the rest.
+    Each run owns its session: one automation's DB failure rolls back only
+    its own transaction, never the rest of the sweep. Due runs go in
+    deterministic creation order; retries go oldest season first.
     """
-
-    async def _commit_one(label: str, automation_id: str, db: AsyncSession) -> None:
-        try:
-            await db.commit()
-        except Exception:
-            await db.rollback()
-            logger.exception("sweep commit failed for %s %s", label, automation_id)
-            raise
-
     async with session_factory() as db:
         now = datetime.now(UTC)
         automations = await get_enabled_automations(db)
-        for automation in automations:
-            if not is_due(automation, now):
-                continue
-            if not await _try_run_lock(db, automation.id):
-                logger.info(
-                    "sweep skipping automation %s: run already in flight",
-                    automation.id,
-                )
-                # Release the failed lock attempt's transaction state.
-                await db.rollback()
-                continue
-            try:
-                await run_automation(db, automation, scheduled_for=now)
-                await _commit_one("automation", automation.id, db)
-            except Exception:
-                logger.exception("sweep run failed for automation %s", automation.id)
-                continue
+        due_jobs = [
+            (a.id, now, 1) for a in automations if is_due(a, now)
+        ]
         try:
             retryable = await get_retryable_failures(db, now)
         except Exception:
-            await db.rollback()
             logger.exception("sweep failed reading retryable failures")
             return
-        if retryable:
-            # Deterministic retry order: oldest season first.
-            retryable = sorted(retryable, key=lambda r: (r.scheduled_for, r.automation_id))
-            by_id = await get_automations_by_ids(
-                db, [failed.automation_id for failed in retryable]
-            )
-            for failed in retryable:
-                automation = by_id.get(failed.automation_id)
-                if automation is None:
-                    logger.info(
-                        "sweep skipping retry for %s: automation gone or disabled",
-                        failed.automation_id,
-                    )
-                    continue
-                if not await _try_run_lock(db, automation.id):
-                    logger.info(
-                        "sweep skipping retry for %s: run already in flight",
-                        automation.id,
-                    )
-                    await db.rollback()
-                    continue
-                logger.info(
-                    "retrying automation %s (attempt %d, scheduled for %s)",
-                    automation.id,
-                    failed.attempt + 1,
-                    failed.scheduled_for.isoformat(),
-                )
-                try:
-                    await run_automation(
-                        db,
-                        automation,
-                        scheduled_for=failed.scheduled_for,
-                        attempt=failed.attempt + 1,
-                    )
-                    await _commit_one("retry", automation.id, db)
-                except Exception:
-                    logger.exception("sweep retry failed for automation %s", automation.id)
-                    continue
+    for automation_id, scheduled_for, attempt in due_jobs:
+        await _run_single(
+            session_factory,
+            automation_id,
+            scheduled_for=scheduled_for,
+            attempt=attempt,
+        )
+    for failed in sorted(retryable, key=lambda r: (r.scheduled_for, r.automation_id)):
+        logger.info(
+            "retrying automation %s (attempt %d, scheduled for %s)",
+            failed.automation_id,
+            failed.attempt + 1,
+            failed.scheduled_for.isoformat(),
+        )
+        await _run_single(
+            session_factory,
+            failed.automation_id,
+            scheduled_for=failed.scheduled_for,
+            attempt=failed.attempt + 1,
+        )

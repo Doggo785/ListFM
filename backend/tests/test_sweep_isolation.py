@@ -103,7 +103,20 @@ async def test_sweep_isolates_run_failure(client):
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         calls = {"n": 0}
+        rollbacks = []
         real_run = automation_runner.run_automation
+        real_factory = _TestSessionLocal
+
+        def rollback_counting_factory():
+            db = real_factory()
+            orig_rollback = db.rollback
+
+            async def counting_rollback():
+                rollbacks.append(1)
+                return await orig_rollback()
+
+            db.rollback = counting_rollback  # type: ignore[method-assign]
+            return db
 
         async def flaky_run(db, automation, **kwargs):
             calls["n"] += 1
@@ -121,9 +134,11 @@ async def test_sweep_isolates_run_failure(client):
             patch.object(automation_runner, "run_automation", side_effect=flaky_run),
         ):
             await automation_runner.run_due_automations(
-                session_factory=_TestSessionLocal
+                session_factory=rollback_counting_factory
             )
 
+        # The failed run must leave a clean transaction behind.
+        assert len(rollbacks) >= 1
         async with _TestSessionLocal() as db:
             rows = (await db.execute(select(AutomationHistory))).scalars().all()
             # First failed at commit/run level (rolled back), second completed.
@@ -185,5 +200,64 @@ async def test_sweep_survives_retry_failures(client):
             await automation_runner.run_due_automations(
                 session_factory=_TestSessionLocal
             )
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+async def test_retries_run_oldest_season_first(client):
+    """Retryable failures are retried in scheduled_for order."""
+    from datetime import UTC, datetime, timedelta
+
+    from repositories.automation_history import create_automation_history
+    from services import automation_runner
+
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+        created2 = await client.post("/api/automations", json=_create_body())
+        assert created2.status_code == 201
+        first_id = created.json()["id"]
+        second_id = created2.json()["id"]
+
+        older = datetime.now(UTC) - timedelta(hours=2)
+        newer = datetime.now(UTC) - timedelta(minutes=30)
+        by_automation = {first_id: newer, second_id: older}
+        async with _TestSessionLocal() as db:
+            for automation_id, scheduled_for in by_automation.items():
+                await create_automation_history(
+                    db,
+                    automation_id=automation_id,
+                    status="failed",
+                    error_message="boom",
+                    scheduled_for=scheduled_for,
+                    attempt=1,
+                    started_at=scheduled_for,
+                )
+            await db.commit()
+
+        call_order: list[str] = []
+        real_run = automation_runner.run_automation
+
+        async def recording_run(db, automation, **kwargs):
+            call_order.append(automation.id)
+            return await real_run(db, automation, **kwargs)
+
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with (
+            patch.object(automation_runner, "is_due", return_value=False),
+            patch.object(automation_runner, "get_top_tracks", return_value=tracks),
+            patch(
+                "services.enrich_cache.enrich_tracks",
+                side_effect=lambda u, t, max_enrich=50: t,
+            ),
+            patch.object(automation_runner, "run_automation", side_effect=recording_run),
+        ):
+            await automation_runner.run_due_automations(
+                session_factory=_TestSessionLocal
+            )
+
+        assert call_order == [second_id, first_id]
     finally:
         await _cleanup_user_with_automations(client, email)
