@@ -114,7 +114,7 @@ async def _read_cached_tracks(
         else {}
     )
 
-    out = []
+    out: list[dict | None] = []
     for track in tracks:
         row = by_key.get((track.get("artist", ""), track.get("title", "")))
         if row is None or not _fresh(row.last_fetched_at):
