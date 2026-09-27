@@ -12,6 +12,7 @@ from routers.automations import router as automations_router
 from routers.generated_playlists import router as generated_playlists_router
 from routers.users import router as users_router
 from services.automation_runner import run_due_automations
+from sqlalchemy.exc import SQLAlchemyError
 
 settings = get_settings()
 
@@ -65,6 +66,15 @@ async def db_connection_error_handler(request: Request, exc: OSError):
     return JSONResponse(
         status_code=503,
         content={"detail": "Service temporarily unavailable. Database connection failed."},
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
+    """Return generic JSON 500 for unhandled DB errors (never leak internals)."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Database error. Please try again later."},
     )
 
 

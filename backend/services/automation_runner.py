@@ -153,10 +153,12 @@ async def run_automation_pipeline_cached(
 async def get_enabled_automations(db: AsyncSession) -> list[Automation]:
     """All non-deleted, enabled automations across every user."""
     result = await db.execute(
-        select(Automation).where(
+        select(Automation)
+        .where(
             Automation.enabled.is_(True),
             Automation.deleted_at.is_(None),
         )
+        .order_by(Automation.created_at, Automation.id)
     )
     return list(result.scalars().all())
 
@@ -374,7 +376,19 @@ async def run_due_automations(session_factory=async_session) -> None:
     Every run takes the shared advisory lock first: a manual trigger
     in flight wins, the sweep skips instead of doubling it (and vice versa
     via the endpoint's 409). ``session_factory`` is injectable for tests.
+
+    Each automation commits independently in deterministic creation order:
+    one automation's DB failure rolls back only its own run, never the rest.
     """
+
+    async def _commit_one(label: str, automation_id: str, db: AsyncSession) -> None:
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            logger.exception("sweep commit failed for %s %s", label, automation_id)
+            raise
+
     async with session_factory() as db:
         now = datetime.now(UTC)
         automations = await get_enabled_automations(db)
@@ -386,10 +400,24 @@ async def run_due_automations(session_factory=async_session) -> None:
                     "sweep skipping automation %s: run already in flight",
                     automation.id,
                 )
+                # Release the failed lock attempt's transaction state.
+                await db.rollback()
                 continue
-            await run_automation(db, automation, scheduled_for=now)
-        retryable = await get_retryable_failures(db, now)
+            try:
+                await run_automation(db, automation, scheduled_for=now)
+                await _commit_one("automation", automation.id, db)
+            except Exception:
+                logger.exception("sweep run failed for automation %s", automation.id)
+                continue
+        try:
+            retryable = await get_retryable_failures(db, now)
+        except Exception:
+            await db.rollback()
+            logger.exception("sweep failed reading retryable failures")
+            return
         if retryable:
+            # Deterministic retry order: oldest season first.
+            retryable = sorted(retryable, key=lambda r: (r.scheduled_for, r.automation_id))
             by_id = await get_automations_by_ids(
                 db, [failed.automation_id for failed in retryable]
             )
@@ -406,6 +434,7 @@ async def run_due_automations(session_factory=async_session) -> None:
                         "sweep skipping retry for %s: run already in flight",
                         automation.id,
                     )
+                    await db.rollback()
                     continue
                 logger.info(
                     "retrying automation %s (attempt %d, scheduled for %s)",
@@ -413,10 +442,14 @@ async def run_due_automations(session_factory=async_session) -> None:
                     failed.attempt + 1,
                     failed.scheduled_for.isoformat(),
                 )
-                await run_automation(
-                    db,
-                    automation,
-                    scheduled_for=failed.scheduled_for,
-                    attempt=failed.attempt + 1,
-                )
-        await db.commit()
+                try:
+                    await run_automation(
+                        db,
+                        automation,
+                        scheduled_for=failed.scheduled_for,
+                        attempt=failed.attempt + 1,
+                    )
+                    await _commit_one("retry", automation.id, db)
+                except Exception:
+                    logger.exception("sweep retry failed for automation %s", automation.id)
+                    continue
