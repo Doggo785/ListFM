@@ -76,12 +76,12 @@ ListFM/
 
 ## Anti-Patterns (This Project)
 
-- **Business logic in routers**: `backend/routers/auth.py` (232 lines) handles token rotation/session logic that belongs in services
+- **Business logic in routers**: `backend/routers/auth.py` (238 lines) handles token rotation/session logic that belongs in services
 - **Repository pattern breached**: Routers use raw `select()` queries instead of repository calls
-- **Filter engine on frontend**: `frontend/src/lib/filter-engine.js` — domain logic should be server-side
-- **`filter_groups` untyped in backend**: `schemas.py` uses `list[dict]` while JS defines a complex typed structure
+- **Filter engine duplicated**: client copy (`frontend/src/lib/filter-engine.js`) for instant preview + server port (`backend/services/filter_engine.py`) for preview/sweep — keep both in sync when adding ops
+- **`filter_groups` partly untyped**: `AutomationCreate/Update/Read` use typed `FilterGroups`, but history snapshots (`AutomationHistoryRead`, `GeneratedPlaylistRead`) still use `list[dict]`
 - **Schema-DB mismatch**: Automation `source.type/period` stored as flat DB columns, reconstructed by `model_validator`
-- **Dead protocol surface**: `TokenResponse` body returned but frontend only uses cookies
+- **Compat-only response body**: `TokenResponse` body carries no tokens (cookies only) and the frontend ignores it — kept deliberately to shrink XSS surface, not dead code to delete
 
 ## Commands
 

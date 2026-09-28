@@ -2,20 +2,21 @@
 
 ## Overview
 
-Data access layer for ListFM: 8 files providing read/write operations against the PostgreSQL schema.
+Data access layer for ListFM: 9 files providing read/write operations against the PostgreSQL schema.
 
 ## File Map
 
 | File | Lines | Role |
 |------|-------|------|
 | `users.py` | 235 | User CRUD + auth provider management (email, Last.fm, Google, Discord) |
-| `tracks.py` | 86 | Track lookups (by ID, by artist+title) with `get_or_create_track` using `SELECT FOR UPDATE` and 24h cache TTL |
-| `albums.py` | 58 | Album lookups mirroring tracks pattern: `get_or_create_album` with `SELECT FOR UPDATE` + 24h cache TTL |
-| `tags.py` | 122 | Tag CRUD using `INSERT ... ON CONFLICT`; upsert functions for track-tag and album-tag associations |
-| `user_tracks.py` | 110 | User-track relationship records: playcount, loved status, sync state, last played timestamps |
-| `automations.py` | 100 | Full CRUD for automation rules with user-scoped queries |
-| `generated_playlists.py` | 88 | Full CRUD for saved playlists; creates `PlaylistTrack` junction records in the same transaction |
-| `refresh_tokens.py` | 51 | Refresh token rows: `create_refresh_token`, `get_refresh_token_by_hash`, `revoke_refresh_token_family` |
+| `tracks.py` | 91 | Track lookups (by ID, by artist+title) with `get_or_create_track` using `SELECT FOR UPDATE` and 24h cache TTL |
+| `albums.py` | 57 | Album lookups mirroring tracks pattern: `get_or_create_album` with `SELECT FOR UPDATE` + 24h cache TTL |
+| `tags.py` | 166 | Tag CRUD using `INSERT ... ON CONFLICT`; upsert functions for track-tag and album-tag associations |
+| `user_tracks.py` | 253 | User-track relationship records: playcount, loved status, sync state, last played timestamps |
+| `automations.py` | 119 | Full CRUD for automation rules with user-scoped queries |
+| `automation_history.py` | 64 | Run history rows: create/get with `scheduled_for` preserved across retries |
+| `generated_playlists.py` | 114 | Full CRUD for saved playlists; creates `PlaylistTrack` junction records in the same transaction |
+| `refresh_tokens.py` | 58 | Refresh token rows: `create_refresh_token`, `get_refresh_token_by_hash`, `revoke_refresh_token_family` |
 
 ## Patterns
 

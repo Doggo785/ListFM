@@ -2,15 +2,15 @@
 
 ## Overview
 
-19 components across 4 subdirectories: design system primitives (`ui/`), decorative/utility elements (`elements/`), complex form builders (`builder/`), and the wizard step components.
+20 component files across 3 subdirectories: design system primitives (`ui/`), decorative/utility elements (`elements/`), complex form builders (`builder/`), plus the wizard step components and `AuthGuard` at root.
 
 ## Directory Map
 
 | Directory | Files | Role |
 |-----------|-------|------|
-| `ui/` | 8 | Design system: Button, Sidebar system, TiltedCard, BorderGlow, Grainient (WebGL), CustomSelect, PlaylistLogo (SVG generator) |
-| `elements/` | 3 | ScrollToTop, Loader (styled-components radar spinner), CountUp (spring-animated counter) |
-| `builder/` | 2 + 5 (steps) | FilterBuilder (580 lines), CronEditor + 5 wizard step components |
+| `ui/` | 8 jsx + css | Design system: Button, Sidebar system, PlaylistCard (exports `TiltedCard` + `NewPlaylistCard`), BorderGlow, Grainient (WebGL) + css, CustomSelect, PlaylistLogo (SVG generator) |
+| `elements/` | 4 | ScrollToTop, Loader (styled-components radar spinner), CountUp (spring-animated counter), AccountLinkPrompt |
+| `builder/` | 2 + 5 (steps) | FilterBuilder (580 lines, inner `FilterRow`), CronEditor + 5 wizard step components |
 | root | 1 | AuthGuard — route protection wrapper |
 
 ## Key Patterns
@@ -24,8 +24,7 @@
 
 ## Hotspots
 
-- **FilterBuilder.jsx (580 lines)**: `renderValueInput()` is a 209-line inner function with 5 branches. The tag search branch (106 lines) has its own state and should be `TagFilterInput.jsx`.
-- **FilterRow (302 lines)**: Contains `renderValueInput()`, `fieldOptions`/`operatorOptions` recomputed every render, and a click-outside listener.
+- **FilterBuilder.jsx (580 lines)**: inner `FilterRow` (line 74) contains `renderValueInput()`, `fieldOptions`/`operatorOptions` recomputed every render, and a click-outside listener. The tag search branch has its own state and should be `TagFilterInput.jsx`.
 - **Grainient.jsx (281 lines)**: 18 uniform props, inline GLSL shaders, `WeakMap`-based instance tracking.
 - **BorderGlow.jsx (245 lines)**: 4 animation states, 13-layer box-shadow, cursor proximity math, conic gradient masks.
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-13 SQLAlchemy ORM models backing users, tracks, tags, albums, automations, and playlists for the Last.fm playlist engine.
+14 SQLAlchemy ORM models backing users, tracks, tags, albums, automations, and playlists for the Last.fm playlist engine.
 
 ## Structure
 
@@ -15,6 +15,7 @@
 | `Album` | `albums` | Deduplicated albums keyed by (title, artist); tracks reference |
 | `Tag` | `tags` | Genre/folksonomy tags; unique by name |
 | `TrackTag` | `track_tags` | M2M junction: tracks to tags with normalized weight (0-100) |
+| `ArtistTag` | `artist_tags` | M2M junction: artists to tags with normalized weight (0-100) |
 | `AlbumTag` | `album_tags` | M2M junction: albums to tags with normalized weight (0-100) |
 | `UserTrack` | `user_tracks` | Per-user track stats: playcount, loved flag, last played, sync timestamps |
 | `Automation` | `automations` | Playlist generation rules: source type/period, filter tree (JSONB), cron, soft-delete |
@@ -45,7 +46,7 @@ GeneratedPlaylist ──N:M── Track  (via PlaylistTrack with position)
 
 - **UUID PKs everywhere**: All primary keys are `String(36)` with string UUIDs generated at the application layer (not DB-native UUID type).
 - **Soft-delete via `deleted_at`**: Present on `User`, `Automation`, and `GeneratedPlaylist`. All queries should filter `WHERE deleted_at IS NULL`.
-- **Timestamps**: Every model has `created_at` (server-default `now()`). Models with mutable data (`User`, `Automation`, `RefreshToken`) also carry `updated_at` with `onupdate`.
+- **Timestamps**: Every model has `created_at` (server-default `now()`). `User` and `Automation` also carry `updated_at` with `onupdate`.
 - **Automation source is flat**: `source_type`, `source_period`, and `output_max_size` are direct columns, not a nested object. The Pydantic schema reconstructs a `source` object via `model_validator`.
 - **Filter storage**: `filter_groups` is `JSONB` on `Automation`, `GeneratedPlaylist`, and `AutomationHistory`. It stores a recursive filter tree whose schema lives on the frontend (`filter-engine.js`). No server-side validation of the filter structure.
 - **No provider-token columns**: `AuthProvider` lost `access_token`, `refresh_token` and `token_expires_at` (migration `a9c4e2f1b7d3`, 2026-09-25) — no flow ever wrote them, and Codacy flagged the plaintext columns as a trap. If provider tokens ever need to persist, add the columns back encrypted at rest (e.g. Fernet TypeDecorator), never plaintext.

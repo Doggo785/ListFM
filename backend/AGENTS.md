@@ -17,21 +17,21 @@ FastAPI app bootstrap: config, DB engine, schema models, Alembic migrations, and
 
 ## Key Patterns
 
-- **Lifespan**: Modern `@asynccontextmanager` pattern — shutdown only disposes engine. **No startup logic** (no DB health check).
+- **Lifespan**: Modern `@asynccontextmanager` pattern — startup launches the automation sweep scheduler when `ENABLE_SCHEDULER` is on (off by default so `--reload` dev stays single-job); shutdown stops it and disposes the engine. **No DB health check at startup** — app starts even if PostgreSQL is unreachable.
 - **Settings**: pydantic-settings `@lru_cache` singleton. JWT secret validated ≥32 chars at startup. `.env` loaded from project root.
 - **DB session**: `expire_on_commit=False` — avoids `DetachedInstanceError` but can read stale post-commit.
 - **Alembic**: `DATABASE_URL` from env var, not hardcoded. Async migrations via `async_engine_from_config` + `asyncio.run`. Side-effect model import (`import models`) for autogenerate.
-- **Exception handler**: `@app.exception_handler(OSError)` returns clean JSON 503 when PostgreSQL is unreachable (instead of HTML 500).
+- **Exception handlers**: `@app.exception_handler(OSError)` returns clean JSON 503 when PostgreSQL is unreachable, `@app.exception_handler(SQLAlchemyError)` returns generic JSON 500 (never leak internals). Other unhandled errors still return FastAPI defaults.
 - **Single middleware**: CORS only — no auth, logging, or timing middleware.
 - **Routes**: 5 routers registered flat, each defining its own prefix — auth (`/api/auth`), OAuth (`/api/auth`), users (`/api`), automations (`/api`), generated playlists (`/api`).
 
 ## Anti-Patterns
 
-- **No global JSON 500 handler** — only `OSError` (DB unreachable) is handled; other unhandled errors still return FastAPI default HTML.
+- **No global JSON 500 handler** — only `OSError` (503) and `SQLAlchemyError` (500) are handled; other unhandled errors still return FastAPI defaults.
 - **No transaction middleware** — 10+ endpoints manually duplicate `try/commit/except/rollback`.
 - **No startup DB health check** — app starts even if database is unreachable.
-- **Sync `services/lastfm.py` in async routes** — `pylast` calls block the event loop; no `run_in_executor` wrapper.
-- **`schemas.py` monolithic** — 276 lines, 29 models. Auth, automations, tracks, albums, playlists all in one file.
+- **Sync `services/lastfm.py` needs wrapping** — `pylast` is blocking; current callers use `asyncio.to_thread` (routers) and `run_in_executor` (runner). Keep that discipline for every new call.
+- **`schemas.py` monolithic** — 350 lines, 33 classes. Auth, automations, tracks, albums, playlists all in one file.
 
 ## Notes
 

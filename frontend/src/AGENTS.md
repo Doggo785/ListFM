@@ -9,7 +9,8 @@ React 19 SPA entry point: `main.jsx` mounts with `BrowserRouter` + `AuthProvider
 | Concern | File | Lines |
 |---------|------|-------|
 | Entry point | `main.jsx` | 16 |
-| Route definitions + page transitions | `App.jsx` | 94 |
+| Route definitions + page transitions | `App.jsx` | 96 |
+| Data hooks (`useAutomations`, `useAutomation`) | `hooks/` | 68 + 42 |
 | Tailwind 4 theme tokens + Geist font | `index.css` | — |
 | Legacy layout CSS | `App.css` | — |
 
@@ -23,7 +24,7 @@ React 19 SPA entry point: `main.jsx` mounts with `BrowserRouter` + `AuthProvider
 
 ## Anti-Patterns
 
-- **No code splitting** — all 8 views in initial bundle.
+- **No code splitting** — all 9 views in initial bundle.
 - **No error boundaries** — any render crash takes down the entire app.
-- **No custom data-fetching hooks** — raw `useEffect` + async in every view. `api.js` has module-level `_username` singleton cache (untestable, stale data risk).
+- **No custom data-fetching hooks outside automations** — only `hooks/useAutomations.js` + `hooks/useAutomation.js` exist (used by Playlists/PlaylistDetail). Every other view does raw `useEffect` + async. `api.js` has module-level `_username` singleton cache (untestable, stale data risk).
 - **Module-level mutable state** in `api.js` — `_username` variable is a singleton.
