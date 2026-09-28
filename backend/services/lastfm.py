@@ -184,6 +184,7 @@ def get_track_full_info(
     title: str,
     tag_caches: dict | None = None,
     tag_lock: threading.Lock | None = None,
+    only: set[str] | None = None,
 ) -> dict:
     result = {
         "listeners": 0,
@@ -194,88 +195,106 @@ def get_track_full_info(
         "album": None,
         "album_tags": [],
     }
+
+    def _want(key: str) -> bool:
+        """Whether this enrich key is needed (None = full fetch, today's behavior).
+
+        Skipped keys keep the safe defaults above: the caller (fetch-only-
+        what-filters-need) guarantees no active filter reads them.
+        """
+        return only is None or key in only
+
     try:
         track = pylast.Track(artist, title, network, username=username)
     except Exception:  # noqa: BLE001 -- unconstructable track: return the empty result
         return result
 
-    try:
-        _throttled_call()
-        result["listeners"] = track.get_listener_count()
-    except Exception:
-        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+    if _want("listeners"):
+        try:
+            _throttled_call()
+            result["listeners"] = track.get_listener_count()
+        except Exception:
+            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
-    try:
-        _throttled_call()
-        result["global_playcount"] = track.get_playcount()
-    except Exception:
-        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+    if _want("global_playcount"):
+        try:
+            _throttled_call()
+            result["global_playcount"] = track.get_playcount()
+        except Exception:
+            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
-    try:
-        _throttled_call()
-        result["userplaycount"] = track.get_userplaycount() or 0
-    except Exception:
-        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+    if _want("userplaycount"):
+        try:
+            _throttled_call()
+            result["userplaycount"] = track.get_userplaycount() or 0
+        except Exception:
+            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
-    try:
-        _throttled_call()
-        result["userloved"] = bool(track.get_userloved())
-    except Exception:
-        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+    if _want("userloved"):
+        try:
+            _throttled_call()
+            result["userloved"] = bool(track.get_userloved())
+        except Exception:
+            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     caches = tag_caches if tag_caches is not None else {}
     artist_cache = caches.setdefault("artist", {})
     album_cache = caches.setdefault("album", {})
     cache_guard = tag_lock if tag_lock is not None else nullcontext()
 
-    try:
-        artist_key = artist.strip().lower()
-        with cache_guard:
-            if artist_key in artist_cache:
-                result["artist_tags"] = artist_cache[artist_key]
-            else:
-                _throttled_call()
-                artist_obj = network.get_artist(artist)
-                raw_tags = [
-                    {"name": t.item.name, "count": int(t.weight)}
-                    for t in artist_obj.get_top_tags(limit=10)
-                    if int(t.weight) > 0
-                ]
-                result["artist_tags"] = _normalize_tags(raw_tags)
-                artist_cache[artist_key] = result["artist_tags"]
-    except Exception:
-        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
-
-    try:
-        _throttled_call()
-        album = track.get_album()
-        if album and album.title:
-            album_name = album.title
-            result["album"] = album_name
-            album_key = f"{artist.strip().lower()}|{album_name.strip().lower()}"
+    if _want("artist_tags"):
+        try:
+            artist_key = artist.strip().lower()
             with cache_guard:
-                if album_key in album_cache:
-                    result["album_tags"] = album_cache[album_key]
+                if artist_key in artist_cache:
+                    result["artist_tags"] = artist_cache[artist_key]
                 else:
-                    try:
-                        _throttled_call()
-                        album_obj = network.get_album(artist, album_name)
-                        raw_tags = [
-                            {"name": t.item.name, "count": int(t.weight)}
-                            for t in album_obj.get_top_tags(limit=10)
-                            if int(t.weight) > 0
-                        ]
-                        result["album_tags"] = _normalize_tags(raw_tags)
-                    except Exception:  # noqa: BLE001 -- one bad album keeps the rest
-                        result["album_tags"] = []
-                    album_cache[album_key] = result["album_tags"]
-    except Exception:
-        logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+                    _throttled_call()
+                    artist_obj = network.get_artist(artist)
+                    raw_tags = [
+                        {"name": t.item.name, "count": int(t.weight)}
+                        for t in artist_obj.get_top_tags(limit=10)
+                        if int(t.weight) > 0
+                    ]
+                    result["artist_tags"] = _normalize_tags(raw_tags)
+                    artist_cache[artist_key] = result["artist_tags"]
+        except Exception:
+            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+
+    if _want("album") or _want("album_tags"):
+        try:
+            _throttled_call()
+            album = track.get_album()
+            if album and album.title:
+                album_name = album.title
+                result["album"] = album_name
+                if _want("album_tags"):
+                    album_key = f"{artist.strip().lower()}|{album_name.strip().lower()}"
+                    with cache_guard:
+                        if album_key in album_cache:
+                            result["album_tags"] = album_cache[album_key]
+                        else:
+                            try:
+                                _throttled_call()
+                                album_obj = network.get_album(artist, album_name)
+                                raw_tags = [
+                                    {"name": t.item.name, "count": int(t.weight)}
+                                    for t in album_obj.get_top_tags(limit=10)
+                                    if int(t.weight) > 0
+                                ]
+                                result["album_tags"] = _normalize_tags(raw_tags)
+                            except Exception:  # noqa: BLE001 -- one bad album keeps the rest
+                                result["album_tags"] = []
+                            album_cache[album_key] = result["album_tags"]
+        except Exception:
+            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     return result
 
 
-def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> list[dict]:
+def enrich_tracks(
+    username: str, tracks: list[dict], max_enrich: int = 50, only: set[str] | None = None
+) -> list[dict]:
     network = get_network()
     to_enrich = tracks[:max_enrich]
     tail = tracks[max_enrich:]
@@ -286,7 +305,9 @@ def enrich_tracks(username: str, tracks: list[dict], max_enrich: int = 50) -> li
         artist = track.get("artist", "")
         title = track.get("title", "")
         result = dict(track)
-        result.update(get_track_full_info(network, username, artist, title, tag_caches, cache_lock))
+        result.update(
+            get_track_full_info(network, username, artist, title, tag_caches, cache_lock, only)
+        )
         return result
 
     enriched_order: list[dict | None] = [None] * len(to_enrich)

@@ -86,7 +86,15 @@ def run_automation_pipeline(
     limit = track_limit if not max_tracks else min(max_tracks, track_limit)
     source_tracks = dispatch_source_tracks(source_type, username, period, limit)
     deduped = deduplicate(source_tracks)
-    enriched = enrich_tracks(username, deduped, max_enrich=limit)
+    needs = needed_fields(filter_groups)
+    # No enrich key needed (no filters, or only dispatch fields like rank):
+    # skip the live layer entirely instead of fetching data nobody reads.
+    # Anything else runs the full fetch + write-back, unchanged.
+    enriched = (
+        deduped
+        if not needs
+        else enrich_tracks(username, deduped, max_enrich=limit)
+    )
     filtered = apply_filters(enriched, filter_groups)
     tracks = filtered[:limit]
     return {
@@ -126,9 +134,13 @@ async def run_automation_pipeline_cached(
         ),
     )
     deduped = deduplicate(source_tracks)
-    enriched, stats = await enrich_tracks_cached(
-        db, user_id=user_id, username=username, tracks=deduped, max_enrich=limit
-    )
+    needs = needed_fields(filter_groups)
+    if not needs:
+        enriched, stats = deduped, {"hits": 0, "misses": 0, "lastfm_calls": 0}
+    else:
+        enriched, stats = await enrich_tracks_cached(
+            db, user_id=user_id, username=username, tracks=deduped, max_enrich=limit
+        )
     filtered = apply_filters(enriched, filter_groups)
     tracks = filtered[:limit]
     logger.info(
@@ -191,6 +203,63 @@ def _filter_groups_to_json(filter_groups):
         g.model_dump(mode="json") if hasattr(g, "model_dump") else g
         for g in filter_groups
     ]
+
+
+# Enrich keys a filter tree can read. playcount/rank/timestamp come from the
+# dispatch list itself, so they need no enrichment. Anything unknown falls
+# back to the full set (safe: fetch more, never filter on missing data).
+# Non-empty needs always run a FULL fetch + write-back (today's behavior):
+# partial fetches skip write-back only once per-group freshness lands
+# (next tranche), so repeated runs keep warming the cache like before.
+FULL_FETCH_KEYS = frozenset(
+    {
+        "listeners",
+        "global_playcount",
+        "userplaycount",
+        "userloved",
+        "artist_tags",
+        "album",
+        "album_tags",
+    }
+)
+_FIELD_TO_ENRICH_KEYS = {
+    "userplaycount": {"userplaycount"},
+    "userloved": {"userloved"},
+    "global_playcount": {"global_playcount"},
+    "listeners": {"listeners"},
+    "tags": {"artist_tags", "album", "album_tags"},
+}
+
+
+def _fg_get(obj, key, default=None):
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def needed_fields(filter_groups) -> set[str]:
+    """Enrich keys the active filters actually read (empty = skip enrich).
+
+    Walks conditions and nested groups (dicts or Pydantic models, like the
+    filter engine). Unknown field -> full set: fetch more rather than risk
+    filtering on defaults.
+    """
+    if not filter_groups:
+        return set()
+    needed: set[str] = set()
+    for group in filter_groups:
+        for condition in _fg_get(group, "conditions") or []:
+            field = _fg_get(condition, "field")
+            if field in _FIELD_TO_ENRICH_KEYS:
+                needed.update(_FIELD_TO_ENRICH_KEYS[field])
+            elif field in ("playcount", "rank", "timestamp", None):
+                continue
+            else:
+                return set(FULL_FETCH_KEYS)
+        needed.update(needed_fields(_fg_get(group, "groups") or []))
+        if needed >= FULL_FETCH_KEYS:
+            return set(FULL_FETCH_KEYS)
+    return needed
 
 
 async def _mark_success(db: AsyncSession, history, result: dict, automation: Automation) -> None:

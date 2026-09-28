@@ -181,6 +181,26 @@ async def test_preview_second_identical_run_hits_cache(client: AsyncClient):
                 "name": "preview",
                 "source": {"type": "top_tracks", "period": "3m"},
                 "output": {"maxSize": 5},
+                # Non-empty needs: warming is pinned on the full fetch path
+                # (empty needs skip the live layer by design).
+                "filterGroups": [
+                    {
+                        "id": "g1",
+                        "logic": "AND",
+                        "conditions": [
+                            {
+                                "id": "c1",
+                                "field": "userplaycount",
+                                "operator": "gte",
+                                "value": 0,
+                                "valueMax": None,
+                                "countMin": 0,
+                                "tagSource": "artist",
+                            }
+                        ],
+                        "groups": [],
+                    }
+                ],
             }
         }
         with patch(
