@@ -229,3 +229,13 @@ __marimo__/
 
 test_data.csv
 dev.sh
+
+# Local agent/tooling state (not versioned, shared ignore for clones/worktrees)
+.opencode/
+.worktrees/
+.slopless/
+.omo/
+.codegraph
+.ua/
+TODO.md
+TODO.local.md
