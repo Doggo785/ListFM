@@ -11,6 +11,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  // Explicit so vitest's esbuild fallback uses the same runtime as babel.
+  esbuild: {
+    jsx: "automatic",
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

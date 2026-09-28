@@ -223,6 +223,10 @@ function Dashboard() {
             <StatBlock value={automations.length} label="Automations" color="#22c55e" delay={0.3} />
           </motion.div>
 
+          <motion.p variants={fadeUp} className="text-center text-xs text-neutral-500">
+            Partial preview · last 50 plays
+          </motion.p>
+
           <motion.div variants={fadeUp}>
             <div className="w-12 h-px bg-neutral-800 mx-auto" />
           </motion.div>
