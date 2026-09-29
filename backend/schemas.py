@@ -219,6 +219,19 @@ class PreviewRequest(BaseModel):
     """Preview body: the full automation draft, validated like a create."""
 
     automation: AutomationCreate
+    # Client-generated ticket for live progress polling during the request.
+    # The client polls GET /automations/preview-progress/{token} while the
+    # POST runs; absent token = today's fire-and-wait behavior.
+    progress_token: str | None = Field(default=None, max_length=64)
+
+
+class ProgressRead(BaseModel):
+    """Live progress snapshot for a run or preview ticket."""
+
+    stage: str
+    done: int
+    total: int
+    error: str | None = None
 
 
 class AutomationUpdate(BaseModel):

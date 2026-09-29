@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 import pylast
 from config import get_settings
+from services.progress import PipelineCancelled, store as progress_store
 
 logger = logging.getLogger(__name__)
 
@@ -293,7 +294,11 @@ def get_track_full_info(
 
 
 def enrich_tracks(
-    username: str, tracks: list[dict], max_enrich: int = 50, only: set[str] | None = None
+    username: str,
+    tracks: list[dict],
+    max_enrich: int = 50,
+    only: set[str] | None = None,
+    progress_key: str | None = None,
 ) -> list[dict]:
     network = get_network()
     to_enrich = tracks[:max_enrich]
@@ -302,6 +307,8 @@ def enrich_tracks(
     cache_lock = threading.Lock()
 
     def _enrich_one(track):
+        if progress_key is not None and progress_store.is_cancelled(progress_key):
+            raise PipelineCancelled()
         artist = track.get("artist", "")
         title = track.get("title", "")
         result = dict(track)
@@ -311,14 +318,23 @@ def enrich_tracks(
         return result
 
     enriched_order: list[dict | None] = [None] * len(to_enrich)
+    completed = 0
     with ThreadPoolExecutor(max_workers=5) as pool:
         future_to_idx = {pool.submit(_enrich_one, t): i for i, t in enumerate(to_enrich)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             try:
                 enriched_order[idx] = future.result()
+            except PipelineCancelled:
+                for pending in future_to_idx:
+                    pending.cancel()
+                raise
             except Exception:  # noqa: BLE001 -- failed enrichment falls back to the raw track
                 enriched_order[idx] = to_enrich[idx]
+            else:
+                completed += 1
+                if progress_key is not None:
+                    progress_store.report(progress_key, "enrich", completed, len(to_enrich))
 
     return [r for r in enriched_order if r is not None] + tail
 

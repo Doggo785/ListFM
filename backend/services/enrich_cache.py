@@ -19,6 +19,7 @@ Callers must commit the session (writes happen on misses).
 """
 
 import asyncio
+import functools
 import logging
 from datetime import UTC, datetime
 
@@ -197,6 +198,7 @@ async def enrich_tracks_cached(
     username: str,
     tracks: list[dict],
     max_enrich: int = 50,
+    progress_key: str | None = None,
 ) -> tuple[list[dict], dict]:
     """Enrich via cache, live-fetching only misses. Returns (tracks, stats)."""
     to_enrich = tracks[:max_enrich]
@@ -209,7 +211,17 @@ async def enrich_tracks_cached(
         miss_tracks = [to_enrich[i] for i in miss_idx]
         before = get_lastfm_call_count()
         loop = asyncio.get_running_loop()
-        live = await loop.run_in_executor(None, enrich_tracks, username, miss_tracks, len(miss_tracks))
+        live = await loop.run_in_executor(
+            None,
+            functools.partial(
+                enrich_tracks,
+                username,
+                miss_tracks,
+                len(miss_tracks),
+                only=None,
+                progress_key=progress_key,
+            ),
+        )
         stats["lastfm_calls"] = get_lastfm_call_count() - before
         await _write_back(db, user_id=user_id, base_tracks=miss_tracks, enriched_tracks=live)
         for i, enriched in zip(miss_idx, live):

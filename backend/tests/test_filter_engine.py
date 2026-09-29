@@ -259,7 +259,7 @@ def test_runner_uses_server_filters():
     ]
     filter_groups = [_group(conditions=[_condition(field="userplaycount", operator="gte", value=10)])]
     with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
-        "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+        "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
     ):
         result = run_automation_pipeline("user", "top_tracks", "3m", filter_groups, max_tracks=50)
     assert result["total"] == 1

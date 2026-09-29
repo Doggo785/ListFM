@@ -309,7 +309,7 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
             }
         }
         with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
-            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50: t
+            "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
             resp = await client.post(
                 "/api/automations/preview",

@@ -85,11 +85,13 @@ export async function getRecentTracks(limit = 50) {
   return request(`/api/recent-tracks?limit=${limit}`);
 }
 
-export async function previewAutomation(automation) {
+export async function previewAutomation(automation, progressToken) {
   requireUsername();
   return request("/api/automations/preview", {
     method: "POST",
-    body: JSON.stringify({ automation }),
+    body: JSON.stringify(
+      progressToken ? { automation, progress_token: progressToken } : { automation }
+    ),
   });
 }
 
@@ -159,6 +161,54 @@ export async function saveGeneratedPlaylist(playlist) {
     method: "POST",
     body: JSON.stringify(playlist),
   });
+}
+
+export function newProgressToken() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export async function getPreviewProgress(token) {
+  requireUsername();
+  return request(`/api/automations/preview-progress/${token}`);
+}
+
+export async function cancelPreview(token) {
+  requireUsername();
+  return request(`/api/automations/preview-progress/${token}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getRunProgress(id) {
+  requireUsername();
+  return request(`/api/automations/${id}/run-progress`);
+}
+
+const TERMINAL_STAGES = new Set(["done", "error", "cancelled"]);
+
+export async function pollProgress(
+  getSnapshot,
+  { intervalMs = 2000, timeoutMs = 10 * 60 * 1000, onUpdate, shouldStop } = {}
+) {
+  const started = Date.now();
+  let snapshot = { stage: "queued", done: 0, total: 0 };
+  for (;;) {
+    if (shouldStop && shouldStop()) return snapshot;
+    snapshot = await getSnapshot();
+    if (onUpdate) onUpdate(snapshot);
+    if (TERMINAL_STAGES.has(snapshot.stage)) return snapshot;
+    if (Date.now() - started > timeoutMs) {
+      const err = new Error(
+        "Still running after 10 minutes. It continues in the background — check the run history."
+      );
+      err.code = "PROGRESS_TIMEOUT";
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
 }
 
 

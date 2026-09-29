@@ -75,7 +75,7 @@ async def test_sweep_commits_per_automation(client):
             patch.object(automation_runner, "get_top_tracks", return_value=tracks),
             patch(
                 "services.enrich_cache.enrich_tracks",
-                side_effect=lambda u, t, max_enrich=50: t,
+                side_effect=lambda u, t, max_enrich=50, **kwargs: t,
             ),
         ):
             await automation_runner.run_due_automations(session_factory=counting_factory)
@@ -129,7 +129,7 @@ async def test_sweep_isolates_run_failure(client):
             patch.object(automation_runner, "get_top_tracks", return_value=tracks),
             patch(
                 "services.enrich_cache.enrich_tracks",
-                side_effect=lambda u, t, max_enrich=50: t,
+                side_effect=lambda u, t, max_enrich=50, **kwargs: t,
             ),
             patch.object(automation_runner, "run_automation", side_effect=flaky_run),
         ):
@@ -250,7 +250,7 @@ async def test_retries_run_oldest_season_first(client):
             patch.object(automation_runner, "get_top_tracks", return_value=tracks),
             patch(
                 "services.enrich_cache.enrich_tracks",
-                side_effect=lambda u, t, max_enrich=50: t,
+                side_effect=lambda u, t, max_enrich=50, **kwargs: t,
             ),
             patch.object(automation_runner, "run_automation", side_effect=recording_run),
         ):
