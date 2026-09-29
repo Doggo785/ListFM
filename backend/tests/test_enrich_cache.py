@@ -264,6 +264,9 @@ async def test_pipeline_cached_reports_cache_stats():
     suffix = uuid.uuid4().hex[:8]
     tracks = [{"artist": f"Pipe Artist {suffix}", "title": f"Pipe Song {suffix}"}]
     live = [{**tracks[0], **_live_info()}]
+    # Non-empty needs: the full fetch + write-back path (empty needs skip
+    # the live layer by design, so warming is pinned here, not on []).
+    groups = [{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}]
     async with _TestSessionLocal() as db:
         with patch(
             "services.automation_runner.get_top_tracks", return_value=tracks
@@ -274,7 +277,7 @@ async def test_pipeline_cached_reports_cache_stats():
                 username="u",
                 source_type="top_tracks",
                 period="3m",
-                filter_groups=[],
+                filter_groups=groups,
                 max_tracks=10,
             )
             assert first["total"] == 1
@@ -285,7 +288,7 @@ async def test_pipeline_cached_reports_cache_stats():
                 username="u",
                 source_type="top_tracks",
                 period="3m",
-                filter_groups=[],
+                filter_groups=groups,
                 max_tracks=10,
             )
             assert second["cache_hits"] == 1
