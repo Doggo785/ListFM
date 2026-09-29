@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -13,6 +14,14 @@ from routers.generated_playlists import router as generated_playlists_router
 from routers.users import router as users_router
 from services.automation_runner import run_due_automations
 from sqlalchemy.exc import SQLAlchemyError
+
+# App loggers (pipeline, enrich cache, ...) propagate to root. Without this,
+# their INFO lines go nowhere and uvicorn only shows its own access logs.
+# basicConfig is a no-op if the host already configured root (tests, etc.).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 settings = get_settings()
 
