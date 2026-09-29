@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from database import get_db
@@ -24,6 +25,7 @@ from schemas import (
     AutomationUpdate,
     PreviewRequest,
     ProgressRead,
+    RunRequest,
 )
 from services.automation_runner import (
     UnsupportedSourceTypeError,
@@ -36,6 +38,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api", tags=["automations"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.post("/automations/preview")
@@ -69,6 +73,7 @@ async def preview_automation(
     except PipelineCancelled:
         if progress_key is not None:
             progress_store.finish(progress_key)
+        logger.info("preview ticket %s cancelled by user", body.progress_token)
         return {
             "tracks": [],
             "total": 0,
@@ -120,6 +125,7 @@ async def cancel_preview(
     """Flag a preview ticket cancelled; the pipeline stops between tracks."""
     if not progress_store.cancel(f"preview:{token}"):
         raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
+    logger.info("preview ticket %s flagged cancelled", token)
 
 
 @router.get(
@@ -128,12 +134,26 @@ async def cancel_preview(
 async def run_progress(
     automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
+    token: str | None = None,
 ):
     """Live progress snapshot for the automation's in-flight run.
 
-    Falls back to the latest history row once the live ticket is gone
-    (finished runs, server restart), so polling always terminates.
+    With a client ticket (?token=), only the ticket is read: a missing
+    ticket is 404 (the UI treats it as "not created yet" for a grace
+    period). Without a ticket, falls back to the latest history row once
+    the live ticket is gone (finished runs, server restart), so polling
+    always terminates.
     """
+    if token:
+        progress = progress_store.read(f"run:{token}")
+        if progress is None:
+            raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
+        return ProgressRead(
+            stage=progress.stage,
+            done=progress.done,
+            total=progress.total,
+            error=progress.error,
+        )
     progress = progress_store.read(f"run:{automation.id}")
     if progress is not None:
         return ProgressRead(
@@ -187,6 +207,7 @@ async def get_automation_history_entries(
 async def run_automation_now(
     automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
+    body: RunRequest | None = None,
 ):
     """Trigger one manual run now (same pipeline as the scheduled sweep).
 
@@ -200,6 +221,9 @@ async def run_automation_now(
     client-side guard).
     The lock releases on commit/rollback/disconnect, so a crashed run can
     never wedge the automation.
+
+    With body.progress_token, progress reports to a client ticket
+    (GET run-progress?token=); otherwise to the legacy run:{id} ticket.
     """
     locked = (
         await db.execute(
@@ -208,7 +232,8 @@ async def run_automation_now(
     ).scalar()
     if not locked:
         raise HTTPException(status_code=409, detail="Automation already running")
-    progress_key = f"run:{automation.id}"
+    token = body.progress_token if body and body.progress_token else None
+    progress_key = f"run:{token}" if token else f"run:{automation.id}"
     progress_store.start(progress_key)
     history = await run_automation(
         db, automation, scheduled_for=datetime.now(UTC), attempt=1, progress_key=progress_key

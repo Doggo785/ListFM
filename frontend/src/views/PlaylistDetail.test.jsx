@@ -133,6 +133,14 @@ describe("PlaylistDetail progress", () => {
       await clickButton(container, "Run now");
       await waitForText(container, "Done");
       expect(container.textContent).toContain("3 of 10 tracks");
+      expect(runAutomationNow).toHaveBeenCalledWith("a1", "test-token");
+      expect(getRunProgress).toHaveBeenCalledWith("a1", "test-token");
+      const entry = container.querySelector('div[role="button"]');
+      expect(entry).not.toBeNull();
+      await act(async () => {
+        entry.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      });
+      await waitForText(container, "Finished");
     } finally {
       await teardown(container, root);
     }

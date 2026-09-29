@@ -6,6 +6,7 @@ import {
   newProgressToken,
   pollProgress,
   previewAutomation,
+  runAutomationNow,
   setCurrentUsername,
 } from "@/lib/api";
 
@@ -90,6 +91,18 @@ describe("progress endpoints", () => {
     expect(url).toContain("/api/automations/a1/run-progress");
   });
 
+  it("runAutomationNow omits the body without a token", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "h1", status: "completed" }),
+    });
+    await runAutomationNow("a1");
+    const [, options] = globalThis.fetch.mock.calls[0];
+    expect(options.method).toBe("POST");
+    expect(options.body).toBeUndefined();
+  });
+
   it("newProgressToken falls back without randomUUID", () => {
     vi.stubGlobal("crypto", {});
     expect(typeof newProgressToken()).toBe("string");
@@ -124,6 +137,42 @@ describe("pollProgress", () => {
     const getSnapshot = vi.fn(async () => ({ stage: "error", done: 0, total: 0 }));
     const snapshot = await pollProgress(getSnapshot);
     expect(snapshot.stage).toBe("error");
+  });
+
+  it("treats 404 as queued within the grace period", async () => {
+    const notFound = new Error("API 404: Unknown or expired progress ticket");
+    const getSnapshot = vi
+      .fn()
+      .mockRejectedValueOnce(notFound)
+      .mockResolvedValueOnce({ stage: "enrich", done: 2, total: 5 })
+      .mockResolvedValue({ stage: "done", done: 5, total: 5 });
+    const seen = [];
+    const snapshot = await pollProgress(getSnapshot, {
+      intervalMs: 1,
+      notFoundGraceMs: 1000,
+      onUpdate: (s) => seen.push(s.stage),
+    });
+    expect(snapshot.stage).toBe("done");
+    expect(seen[0]).toBe("queued");
+  });
+
+  it("throws 404 after the grace period", async () => {
+    const getSnapshot = vi.fn(async () => {
+      throw new Error("API 404: Unknown or expired progress ticket");
+    });
+    await expect(
+      pollProgress(getSnapshot, { intervalMs: 1, notFoundGraceMs: 5 })
+    ).rejects.toThrow("API 404");
+  });
+
+  it("throws non-404 errors immediately", async () => {
+    const getSnapshot = vi.fn(async () => {
+      throw new Error("gone");
+    });
+    await expect(
+      pollProgress(getSnapshot, { intervalMs: 1, notFoundGraceMs: 1000 })
+    ).rejects.toThrow("gone");
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it("throws a timeout error after timeoutMs", async () => {

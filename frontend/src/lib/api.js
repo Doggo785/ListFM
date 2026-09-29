@@ -133,10 +133,11 @@ export async function getAutomationHistory(id) {
   return request(`/api/automations/${id}/history`);
 }
 
-export async function runAutomationNow(id) {
+export async function runAutomationNow(id, progressToken) {
   requireUsername();
   return request(`/api/automations/${id}/run`, {
     method: "POST",
+    ...(progressToken ? { body: JSON.stringify({ progress_token: progressToken }) } : {}),
   });
 }
 
@@ -182,22 +183,42 @@ export async function cancelPreview(token) {
   });
 }
 
-export async function getRunProgress(id) {
+export async function getRunProgress(id, token) {
   requireUsername();
-  return request(`/api/automations/${id}/run-progress`);
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  return request(`/api/automations/${id}/run-progress${query}`);
 }
 
 const TERMINAL_STAGES = new Set(["done", "error", "cancelled"]);
 
 export async function pollProgress(
   getSnapshot,
-  { intervalMs = 2000, timeoutMs = 10 * 60 * 1000, onUpdate, shouldStop } = {}
+  {
+    intervalMs = 2000,
+    timeoutMs = 10 * 60 * 1000,
+    notFoundGraceMs = 15000,
+    onUpdate,
+    shouldStop,
+  } = {}
 ) {
   const started = Date.now();
   let snapshot = { stage: "queued", done: 0, total: 0 };
   for (;;) {
     if (shouldStop && shouldStop()) return snapshot;
-    snapshot = await getSnapshot();
+    try {
+      snapshot = await getSnapshot();
+    } catch (err) {
+      // The ticket may not exist yet: the poll often fires before the POST
+      // created it server-side. Treat 404 as "queued" for a grace period.
+      const notFound = err instanceof Error && /API 404/.test(err.message);
+      if (notFound && Date.now() - started < notFoundGraceMs) {
+        snapshot = { stage: "queued", done: 0, total: 0 };
+        if (onUpdate) onUpdate(snapshot);
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        continue;
+      }
+      throw err;
+    }
     if (onUpdate) onUpdate(snapshot);
     if (TERMINAL_STAGES.has(snapshot.stage)) return snapshot;
     if (Date.now() - started > timeoutMs) {

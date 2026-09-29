@@ -304,8 +304,11 @@ export default function PlaylistDetail() {
     setRunningNow(true);
     setRunError(null);
     setRunProgress({ stage: "queued", done: 0, total: 0 });
+    const token = newProgressToken();
     let stopped = false;
-    pollProgress(() => getRunProgress(id), {
+    // Fire the POST first so the ticket exists ASAP, then poll alongside it.
+    const postPromise = runAutomationNow(id, token);
+    pollProgress(() => getRunProgress(id, token), {
       onUpdate: (s) => {
         if (!stopped) setRunProgress(s);
       },
@@ -314,7 +317,7 @@ export default function PlaylistDetail() {
       if (!stopped) setRunError(err.message || "Failed to track run progress");
     });
     try {
-      await runAutomationNow(id);
+      await postPromise;
       stopped = true;
       setRunError(null);
       const entries = await getAutomationHistory(id);
@@ -393,6 +396,8 @@ export default function PlaylistDetail() {
     setPreviewTracks(null);
     setRawTracks(null);
     setPreviewProgress({ stage: "queued", done: 0, total: 0 });
+    // Fire the POST first so the ticket exists ASAP, then poll alongside it.
+    const postPromise = previewAutomation(automation, token);
     pollProgress(() => getPreviewProgress(token), {
       onUpdate: (s) => {
         if (!previewStoppedRef.current) setPreviewProgress(s);
@@ -404,7 +409,7 @@ export default function PlaylistDetail() {
       }
     });
     try {
-      const data = await previewAutomation(automation, token);
+      const data = await postPromise;
       previewStoppedRef.current = true;
       setPreviewError(null);
       if (data.cancelled) {
@@ -687,10 +692,17 @@ export default function PlaylistDetail() {
                       key={entry.id}
                       className="rounded-xl border border-neutral-800 bg-[#141414] overflow-hidden"
                     >
-                      <button
-                        type="button"
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={() => toggleEntry(entry)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleEntry(entry);
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors cursor-pointer"
                       >
                         <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${statusDot(entry.status)}`} />
                         <div className="min-w-0 flex-1">
@@ -724,7 +736,7 @@ export default function PlaylistDetail() {
                             {runningNow ? "Running..." : "Re-run"}
                           </button>
                         )}
-                      </button>
+                      </div>
                       {expanded && (
                         <div className="px-4 pb-4 pt-1 border-t border-neutral-800/60">
                           {scheduledDiffers(entry) && (

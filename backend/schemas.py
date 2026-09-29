@@ -234,6 +234,12 @@ class ProgressRead(BaseModel):
     error: str | None = None
 
 
+class RunRequest(BaseModel):
+    """Optional body for POST /automations/{id}/run (all fields optional)."""
+
+    progress_token: str | None = Field(default=None, max_length=64)
+
+
 class AutomationUpdate(BaseModel):
     name: str | None = None
     description: str | None = None

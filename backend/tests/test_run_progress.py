@@ -268,6 +268,42 @@ async def test_run_progress_live_then_db_fallback(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_run_with_token_reports_on_ticket(client: AsyncClient):
+    """POST run with a token reports progress on run:{token}."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_automation_body([]))
+        automation_id = created.json()["id"]
+        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        with (
+            patch(
+                "services.automation_runner.get_top_tracks", return_value=tracks
+            ),
+            patch(
+                "services.enrich_cache.enrich_tracks",
+                side_effect=lambda u, t, max_enrich=50, **kwargs: t,
+            ),
+        ):
+            run = await client.post(
+                f"/api/automations/{automation_id}/run",
+                json={"progress_token": "tok-1"},
+            )
+        assert run.status_code == 200
+        progress = await client.get(
+            f"/api/automations/{automation_id}/run-progress?token=tok-1"
+        )
+        assert progress.status_code == 200
+        assert progress.json()["stage"] == "done"
+        unknown = await client.get(
+            f"/api/automations/{automation_id}/run-progress?token=nope"
+        )
+        assert unknown.status_code == 404
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
 async def test_run_progress_no_runs_yet_404(client: AsyncClient):
     """Run-progress with no history row and no ticket is 404."""
     email = _unique_email()
