@@ -42,6 +42,20 @@ router = APIRouter(prefix="/api", tags=["automations"])
 logger = logging.getLogger(__name__)
 
 
+def _ticket_or_404(key: str) -> ProgressRead:
+    """Read a live progress ticket or raise 404 when unknown/expired."""
+    progress = progress_store.read(key)
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
+    return ProgressRead(
+        stage=progress.stage,
+        done=progress.done,
+        total=progress.total,
+        calls=progress.calls,
+        error=progress.error,
+    )
+
+
 @router.post("/automations/preview")
 async def preview_automation(
     body: PreviewRequest,
@@ -109,16 +123,7 @@ async def preview_progress(
     current_user: User = Depends(get_current_active_user),
 ):
     """Live progress snapshot for an in-flight preview ticket."""
-    progress = progress_store.read(f"preview:{token}")
-    if progress is None:
-        raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
-    return ProgressRead(
-        stage=progress.stage,
-        done=progress.done,
-        total=progress.total,
-        calls=progress.calls,
-        error=progress.error,
-    )
+    return _ticket_or_404(f"preview:{token}")
 
 
 @router.delete("/automations/preview-progress/{token}", status_code=204)
@@ -149,16 +154,7 @@ async def run_progress(
     always terminates.
     """
     if token:
-        progress = progress_store.read(f"run:{token}")
-        if progress is None:
-            raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
-        return ProgressRead(
-            stage=progress.stage,
-            done=progress.done,
-            total=progress.total,
-            calls=progress.calls,
-            error=progress.error,
-        )
+        return _ticket_or_404(f"run:{token}")
     progress = progress_store.read(f"run:{automation.id}")
     if progress is not None:
         return ProgressRead(
