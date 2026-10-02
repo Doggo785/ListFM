@@ -107,6 +107,16 @@ describe("progress endpoints", () => {
     vi.stubGlobal("crypto", {});
     expect(typeof newProgressToken()).toBe("string");
   });
+
+  it("newProgressToken uses getRandomValues without randomUUID", () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues: (bytes) => {
+        bytes.fill(171);
+        return bytes;
+      },
+    });
+    expect(newProgressToken()).toBe("ab".repeat(16));
+  });
 });
 
 describe("pollProgress", () => {

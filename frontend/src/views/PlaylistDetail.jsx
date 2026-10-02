@@ -86,21 +86,23 @@ function FieldRow({ label, children }) {
   );
 }
 
-const STAGE_LABELS = {
-  queued: "Starting...",
-  source: "Fetching track list...",
-  enrich: "Enriching tracks...",
-  filter: "Applying filters...",
-  running: "Running...",
-  done: "Done",
-  error: "Failed",
-  cancelled: "Cancelled",
-};
+const STAGE_LABELS = new Map([
+  ["queued", "Starting..."],
+  ["source", "Fetching track list..."],
+  ["enrich", "Enriching tracks..."],
+  ["filter", "Applying filters..."],
+  ["running", "Running..."],
+  ["done", "Done"],
+  ["error", "Failed"],
+  ["cancelled", "Cancelled"],
+]);
 
 function ProgressBar({ progress, onCancel }) {
   if (!progress) return null;
   const { stage, done, total, calls } = progress;
-  const label = STAGE_LABELS[stage] || stage;
+  // Map lookup (not obj[stage]): stage comes from the server, and computed
+  // member access on plain objects is a prototype-pollution-shaped pattern.
+  const label = STAGE_LABELS.get(stage) ?? stage;
   const active = !["done", "error", "cancelled"].includes(stage);
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null;
   return (

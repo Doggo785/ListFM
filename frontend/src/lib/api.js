@@ -164,11 +164,25 @@ export async function saveGeneratedPlaylist(playlist) {
   });
 }
 
+let progressTokenCounter = 0;
+
 export function newProgressToken() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+  if (typeof crypto !== "undefined") {
+    if (typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto.getRandomValues === "function") {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
   }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  // Last resort without WebCrypto (practically unreachable in supported
+  // browsers): unique per session via a counter, good enough for a
+  // short-lived progress ticket behind auth. No Math.random: it is not
+  // a safe random source (flags security scanners).
+  progressTokenCounter += 1;
+  return `preview-${Date.now().toString(36)}-${progressTokenCounter}`;
 }
 
 export async function getPreviewProgress(token) {
