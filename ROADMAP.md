@@ -33,6 +33,46 @@ Référence cap: `VISION.md`. Ordre voulu: **fonctionnel d'abord**, P0 vital cou
 
 12. Unifier contrat `filterGroups` camel partout (ou snake documenté), vérifier `track_count`/`automation_id` ownership, cascade soft-delete, RBAC ou suppression du rôle, dédupliquer frontend (SVG OAuth, Grainient props, SOURCE_OPTIONS, Sidebar), trancher dark-only, a11y modals (role/focus/Escape), timeout/abort côté `api.js`, `isValidCron` stricte partagée front/back, borne récursion filtres.
 
+## P3 — vitesse (perf Last.fm, ouverte 2026-09-29)
+
+Constat owner (test manuel) : preview avec filtres de ~4 min pour 50 morceaux
+(~300 appels Last.fm : jusqu'à 7 par morceau + ~1s d'attente entre appels),
+spinner aveugle, cancel sans effet visible. Tranche 1 mergée (#42) : skip
+enrich quand les filtres n'en ont pas besoin (cas "dsf" sans filtres : ~300 → ~1 appel).
+
+Leçons de `felhag/lastfm-stats-web` (étudié 2026-10-02, voir notes ci-dessous) :
+gros paquets (1000/page), jamais de détails morceau par morceau (stats
+calculées en local), tags par artiste en arrière-plan, stockage local +
+reprise incrémentale (ne recharger que le nouveau). Eux font des stats
+(comptages locaux) ; nous on filtre (besoin des champs filtrés) : on ne
+fera jamais zéro appel avec un filtre tag actif, mais on s'en rapproche.
+
+Tranches (une petite PR chacune, rituel habituel : tests + CI verte + "go merge #N") :
+
+- **T2 — retour en direct (PR #43, en cours)** : run async + compteur/barre
+  sur run et preview (polling ticket), cancel preview qui arrête le serveur,
+  logs `pipeline:`/`enrich cache:` visibles, états done/error/cancelled.
+- **T3 — vitesse pure** : paquets à 200, `extended=1` sur recents (loved +
+  images offerts), cadence ~1s → ~0,25s avec repli auto sur erreur 29.
+  Cible : cas filtré type ~300 → ~50-100 appels en moins d'une minute.
+- **T4 — cache malin** : fini le TTL qui jette tout → recents incrémentaux
+  (stocker avec date, ne recharger que le nouveau depuis `from`), fraîcheur
+  par groupe (noyau global / tags globaux / données perso) + colonne
+  `tags_fetched_at`, règle d'or (jamais filtrer sur du non-cherché), tags
+  par artiste persistants et partagés entre users. Brancher le `only=`
+  (déjà prêt et testé depuis #42) avec write-back par groupe.
+- **T5 — retry honnête** : vraie route retry avec `scheduled_for` d'origine +
+  fenêtre `from/to` ancrée (réelle grâce à T4, plus un label), états "nouvel
+  essai prévu" vs "échec définitif". Le bouton Re-run actuel refait un run
+  neuf (même appel que Run now) : à rebrancher sur cette route.
+- **T6 — alertes auto (promesse en suspens)** : `dependabot.yml` (màj hebdo)
+  + scan `osv-scanner` planifié, pour ne plus découvrir les failles par
+  hasard (cf. `fast-uri`, `brace-expansion` tombés en pleine PR).
+
+Règle : ne jamais casser le réchauffement du cache des runs répétés pour
+gagner sur un run isolé (leçon de #42 : le partiel sans write-back coûtait
+plus cher sur 30 jours). Mesurer avant/après sur "dsf" à chaque tranche.
+
 ## Explicitement après
 
 Export Spotify/YouTube, social/partage, presets, multi-provider. Ne pas attaquer sans feu vert.
