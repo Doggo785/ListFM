@@ -48,6 +48,10 @@ class ProgressStore:
             progress = self._entries.get(key)
             if progress is None:
                 return
+            if progress.stage in ("cancelled", "error", "done"):
+                # Terminal states stick: late worker threads must not flip
+                # a cancelled run back to "enrich".
+                return
             progress.stage = stage
             progress.done = done
             progress.total = total

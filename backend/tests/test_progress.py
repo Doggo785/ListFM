@@ -31,6 +31,18 @@ def test_cancel_flags_and_finish_keeps_cancelled_readable():
     assert store.read("k").stage == "cancelled"
 
 
+def test_terminal_stage_sticks_against_late_reports():
+    store = ProgressStore()
+    store.start("k")
+    store.report("k", "enrich", 3, 10)
+    assert store.read("k").stage == "enrich"
+    store.cancel("k")
+    store.report("k", "enrich", 5, 10)
+    finished = store.read("k")
+    assert finished.stage == "cancelled"
+    assert (finished.done, finished.total) == (3, 10)
+
+
 def test_finish_marks_done_or_error():
     store = ProgressStore()
     store.start("ok")

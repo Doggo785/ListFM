@@ -6,6 +6,8 @@ Previews carry a client-made ticket, runs reuse f"run:{automation_id}"
 (single-flight guarantees one run per automation at a time).
 """
 
+import asyncio
+import time
 import uuid
 from unittest.mock import patch
 
@@ -389,3 +391,125 @@ async def _cleanup_user_with_automations(client: AsyncClient, email: str) -> Non
             await db.execute(delete(Automation).where(Automation.user_id == user_id))
         await db.commit()
     await _cleanup_user(client, email)
+
+
+def _slow_info(*args, **kwargs):
+    time.sleep(0.2)
+    return {
+        "listeners": 1,
+        "global_playcount": 2,
+        "userplaycount": 3,
+        "userloved": False,
+        "artist_tags": [],
+        "album": None,
+        "album_tags": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_pipeline_reports_live_counts():
+    """Polling the store during a slow run sees enrich counts climb."""
+    suffix = uuid.uuid4().hex[:8]
+    tracks = [{"artist": f"RA {suffix}", "title": f"RT {suffix} {i}"} for i in range(12)]
+    key = f"live:{suffix}"
+    async with _TestSessionLocal() as db:
+        db.add(User(id=f"u-{suffix}"))
+        await db.commit()
+
+    async def drive():
+        async with _TestSessionLocal() as db:
+            with (
+                patch(
+                    "services.automation_runner.dispatch_source_tracks",
+                    return_value=[dict(t) for t in tracks],
+                ),
+                patch("services.lastfm.get_network", return_value=object()),
+                patch(
+                    "services.lastfm.get_track_full_info", side_effect=_slow_info
+                ),
+                patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+            ):
+                return await run_automation_pipeline_cached(
+                    db,
+                    user_id=f"u-{suffix}",
+                    username="u",
+                    source_type="recent_tracks",
+                    period="3m",
+                    filter_groups=[{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}],
+                    max_tracks=50,
+                    progress_key=key,
+                )
+
+    progress_store.start(key)
+    task = asyncio.create_task(drive())
+    seen = []
+    while not task.done():
+        progress = progress_store.read(key)
+        if progress is not None:
+            seen.append((progress.stage, progress.done, progress.total))
+        await asyncio.sleep(0.02)
+    result = await task
+    assert result["total"] == 12
+    enrich_reports = [s for s in seen if s[0] == "enrich"]
+    assert enrich_reports, f"never saw enrich progress, saw: {seen[:12]}"
+    assert enrich_reports[-1][1] > enrich_reports[0][1], f"counts never climbed: {seen[:12]}"
+    assert progress_store.read(key).stage == "filter"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_cancel_aborts_midrun():
+    """Cancelling mid-run aborts the pipeline instead of finishing it."""
+    suffix = uuid.uuid4().hex[:8]
+    tracks = [{"artist": f"CA {suffix}", "title": f"CT {suffix} {i}"} for i in range(20)]
+    key = f"cancel:{suffix}"
+    finished = []
+
+    def slow_info(*args, **kwargs):
+        time.sleep(0.4)
+        finished.append(args[3])
+        return {
+            "listeners": 1,
+            "global_playcount": 2,
+            "userplaycount": 3,
+            "userloved": False,
+            "artist_tags": [],
+            "album": None,
+            "album_tags": [],
+        }
+
+    async with _TestSessionLocal() as db:
+        db.add(User(id=f"u-{suffix}"))
+        await db.commit()
+
+    async def drive():
+        async with _TestSessionLocal() as db:
+            with (
+                patch(
+                    "services.automation_runner.dispatch_source_tracks",
+                    return_value=[dict(t) for t in tracks],
+                ),
+                patch("services.lastfm.get_network", return_value=object()),
+                patch("services.lastfm.get_track_full_info", side_effect=slow_info),
+                patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+            ):
+                return await run_automation_pipeline_cached(
+                    db,
+                    user_id=f"u-{suffix}",
+                    username="u",
+                    source_type="recent_tracks",
+                    period="3m",
+                    filter_groups=[{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}],
+                    max_tracks=50,
+                    progress_key=key,
+                )
+
+    progress_store.start(key)
+    task = asyncio.create_task(drive())
+    await asyncio.sleep(0.3)
+    assert progress_store.cancel(key) is True
+    with pytest.raises(PipelineCancelled):
+        await task
+    assert len(finished) < len(tracks), (
+        f"server kept working after cancel: {len(finished)}/{len(tracks)}"
+    )
+    assert progress_store.read(key).stage == "cancelled"
