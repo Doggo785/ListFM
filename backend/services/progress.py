@@ -22,6 +22,7 @@ class Progress:
     stage: str = "queued"
     done: int = 0
     total: int = 0
+    calls: int = 0
     error: str | None = None
     updated_at: float = field(default_factory=time.monotonic)
 
@@ -75,6 +76,20 @@ class ProgressStore:
         with self._lock:
             progress = self._entries.get(key)
             return progress is not None and progress.stage == "cancelled"
+
+    def bump_calls(self, key: str, count: int = 1) -> None:
+        """Add completed Last.fm calls to the ticket (liveliness counter).
+
+        Ignored on missing or terminal tickets, like report().
+        """
+        with self._lock:
+            progress = self._entries.get(key)
+            if progress is None:
+                return
+            if progress.stage in ("cancelled", "error", "done"):
+                return
+            progress.calls += count
+            progress.updated_at = time.monotonic()
 
     def finish(self, key: str, error: str | None = None) -> None:
         with self._lock:

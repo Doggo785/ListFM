@@ -113,7 +113,11 @@ async def preview_progress(
     if progress is None:
         raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
     return ProgressRead(
-        stage=progress.stage, done=progress.done, total=progress.total, error=progress.error
+        stage=progress.stage,
+        done=progress.done,
+        total=progress.total,
+        calls=progress.calls,
+        error=progress.error,
     )
 
 
@@ -152,6 +156,7 @@ async def run_progress(
             stage=progress.stage,
             done=progress.done,
             total=progress.total,
+            calls=progress.calls,
             error=progress.error,
         )
     progress = progress_store.read(f"run:{automation.id}")
@@ -160,6 +165,7 @@ async def run_progress(
             stage=progress.stage,
             done=progress.done,
             total=progress.total,
+            calls=progress.calls,
             error=progress.error,
         )
     rows = await get_automation_history(db, automation.id)

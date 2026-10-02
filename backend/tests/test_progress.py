@@ -38,9 +38,20 @@ def test_terminal_stage_sticks_against_late_reports():
     assert store.read("k").stage == "enrich"
     store.cancel("k")
     store.report("k", "enrich", 5, 10)
+    store.bump_calls("k")
     finished = store.read("k")
     assert finished.stage == "cancelled"
-    assert (finished.done, finished.total) == (3, 10)
+    assert (finished.done, finished.total, finished.calls) == (3, 10, 0)
+
+
+def test_bump_calls_counts_live_calls():
+    store = ProgressStore()
+    store.start("k")
+    store.bump_calls("k")
+    store.bump_calls("k", 4)
+    assert store.read("k").calls == 5
+    store.bump_calls("ghost")
+    assert store.read("ghost") is None
 
 
 def test_finish_marks_done_or_error():

@@ -99,7 +99,7 @@ const STAGE_LABELS = {
 
 function ProgressBar({ progress, onCancel }) {
   if (!progress) return null;
-  const { stage, done, total } = progress;
+  const { stage, done, total, calls } = progress;
   const label = STAGE_LABELS[stage] || stage;
   const active = !["done", "error", "cancelled"].includes(stage);
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null;
@@ -111,6 +111,11 @@ function ProgressBar({ progress, onCancel }) {
           {typeof done === "number" && typeof total === "number" && total > 0 && (
             <span className="text-neutral-500 tabular-nums">
               {" "}· {done} of {total} tracks
+            </span>
+          )}
+          {typeof calls === "number" && calls > 0 && (
+            <span className="text-neutral-600 tabular-nums">
+              {" "}· {calls} calls
             </span>
           )}
         </p>
@@ -197,6 +202,8 @@ export default function PlaylistDetail() {
   const [previewProgress, setPreviewProgress] = useState(null);
   const previewTokenRef = useRef(null);
   const previewStoppedRef = useRef(false);
+  const lastPreviewCalls = useRef(0);
+  const lastRunCalls = useRef(0);
   const [expandedId, setExpandedId] = useState(null);
   const [entryTracks, setEntryTracks] = useState({});
   const [tracksLoadingId, setTracksLoadingId] = useState(null);
@@ -310,7 +317,10 @@ export default function PlaylistDetail() {
     const postPromise = runAutomationNow(id, token);
     pollProgress(() => getRunProgress(id, token), {
       onUpdate: (s) => {
-        if (!stopped) setRunProgress(s);
+        if (!stopped) {
+          lastRunCalls.current = s.calls ?? 0;
+          setRunProgress(s);
+        }
       },
       shouldStop: () => stopped,
     }).catch((err) => {
@@ -327,6 +337,7 @@ export default function PlaylistDetail() {
         stage: "done",
         done: latest?.tracks_after_filter ?? 0,
         total: latest?.tracks_before_filter ?? 0,
+        calls: lastRunCalls.current,
       });
     } catch (err) {
       stopped = true;
@@ -400,7 +411,10 @@ export default function PlaylistDetail() {
     const postPromise = previewAutomation(automation, token);
     pollProgress(() => getPreviewProgress(token), {
       onUpdate: (s) => {
-        if (!previewStoppedRef.current) setPreviewProgress(s);
+        if (!previewStoppedRef.current) {
+          lastPreviewCalls.current = s.calls ?? 0;
+          setPreviewProgress(s);
+        }
       },
       shouldStop: () => previewStoppedRef.current,
     }).catch((err) => {
@@ -420,7 +434,12 @@ export default function PlaylistDetail() {
       setRawTracks(enriched);
       const filtered = applyFilterGroups(enriched, automation.filterGroups);
       setPreviewTracks(filtered);
-      setPreviewProgress({ stage: "done", done: filtered.length, total: enriched.length });
+      setPreviewProgress({
+        stage: "done",
+        done: filtered.length,
+        total: enriched.length,
+        calls: lastPreviewCalls.current,
+      });
     } catch (err) {
       previewStoppedRef.current = true;
       setPreviewError(err.message || "Failed to load preview");

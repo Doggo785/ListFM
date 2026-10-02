@@ -231,6 +231,7 @@ class ProgressRead(BaseModel):
     stage: str
     done: int
     total: int
+    calls: int = 0
     error: str | None = None
 
 

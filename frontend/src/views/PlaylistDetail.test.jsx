@@ -120,7 +120,7 @@ describe("PlaylistDetail progress", () => {
         },
       ]);
     runAutomationNow.mockResolvedValue({ id: "h1", status: "completed" });
-    getRunProgress.mockResolvedValue({ stage: "enrich", done: 3, total: 10 });
+    getRunProgress.mockResolvedValue({ stage: "enrich", done: 3, total: 10, calls: 128 });
     pollProgress.mockImplementation(async (getSnapshot, opts) => {
       const snapshot = await getSnapshot();
       opts?.onUpdate?.(snapshot);
@@ -133,6 +133,7 @@ describe("PlaylistDetail progress", () => {
       await clickButton(container, "Run now");
       await waitForText(container, "Done");
       expect(container.textContent).toContain("3 of 10 tracks");
+      expect(container.textContent).toContain("128 calls");
       expect(runAutomationNow).toHaveBeenCalledWith("a1", "test-token");
       expect(getRunProgress).toHaveBeenCalledWith("a1", "test-token");
       const entry = container.querySelector('div[role="button"]');
