@@ -139,7 +139,10 @@ async def run_automation_pipeline_cached(
     )
     deduped = deduplicate(source_tracks)
     if progress_key is not None:
-        progress_store.report(progress_key, "source", len(deduped), len(deduped))
+        # done=0 on purpose: the list is fetched but nothing is enriched
+        # yet. Reporting done=len here would pin the bar at 100% (the bug
+        # the user saw); it climbs with each finished track instead.
+        progress_store.report(progress_key, "source", 0, len(deduped))
     needs = needed_fields(filter_groups)
     if not needs:
         enriched, stats = deduped, {"hits": 0, "misses": 0, "lastfm_calls": 0}
