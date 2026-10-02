@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import {
@@ -30,6 +30,11 @@ import {
   getGeneratedPlaylistTracks,
   updateAutomation,
   deleteAutomation,
+  newProgressToken,
+  getPreviewProgress,
+  cancelPreview,
+  getRunProgress,
+  pollProgress,
 } from "@/lib/api";
 import { useAutomation } from "@/hooks/useAutomation";
 import {
@@ -77,6 +82,67 @@ function FieldRow({ label, children }) {
         {label}
       </label>
       {children}
+    </div>
+  );
+}
+
+const STAGE_LABELS = new Map([
+  ["queued", "Starting..."],
+  ["source", "Fetching track list..."],
+  ["enrich", "Enriching tracks..."],
+  ["filter", "Applying filters..."],
+  ["running", "Running..."],
+  ["done", "Done"],
+  ["error", "Failed"],
+  ["cancelled", "Cancelled"],
+]);
+
+function ProgressBar({ progress, onCancel }) {
+  if (!progress) return null;
+  const { stage, done, total, calls } = progress;
+  // Map lookup (not obj[stage]): stage comes from the server, and computed
+  // member access on plain objects is a prototype-pollution-shaped pattern.
+  const label = STAGE_LABELS.get(stage) ?? stage;
+  const active = !["done", "error", "cancelled"].includes(stage);
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null;
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-[#141414] px-4 py-3" role="status">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-neutral-300">
+          {label}
+          {typeof done === "number" && typeof total === "number" && total > 0 && (
+            <span className="text-neutral-500 tabular-nums">
+              {" "}· {done} of {total} tracks
+            </span>
+          )}
+          {typeof calls === "number" && calls > 0 && (
+            <span className="text-neutral-600 tabular-nums">
+              {" "}· {calls} calls
+            </span>
+          )}
+        </p>
+        {active && onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[#ff530b] hover:text-[#ff530b] transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      {active && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-800">
+          {pct === null ? (
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-[#ff530b]" />
+          ) : (
+            <div
+              className="h-full rounded-full bg-[#ff530b] transition-all"
+              style={{ width: `${pct}%` }}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -134,6 +200,12 @@ export default function PlaylistDetail() {
   const [historyError, setHistoryError] = useState(null);
   const [runningNow, setRunningNow] = useState(false);
   const [runError, setRunError] = useState(null);
+  const [runProgress, setRunProgress] = useState(null);
+  const [previewProgress, setPreviewProgress] = useState(null);
+  const previewTokenRef = useRef(null);
+  const previewStoppedRef = useRef(false);
+  const lastPreviewCalls = useRef(0);
+  const lastRunCalls = useRef(0);
   const [expandedId, setExpandedId] = useState(null);
   const [entryTracks, setEntryTracks] = useState({});
   const [tracksLoadingId, setTracksLoadingId] = useState(null);
@@ -240,10 +312,37 @@ export default function PlaylistDetail() {
     if (runningNow) return;
     setRunningNow(true);
     setRunError(null);
+    setRunProgress({ stage: "queued", done: 0, total: 0 });
+    const token = newProgressToken();
+    let stopped = false;
+    // Fire the POST first so the ticket exists ASAP, then poll alongside it.
+    const postPromise = runAutomationNow(id, token);
+    pollProgress(() => getRunProgress(id, token), {
+      onUpdate: (s) => {
+        if (!stopped) {
+          lastRunCalls.current = s.calls ?? 0;
+          setRunProgress(s);
+        }
+      },
+      shouldStop: () => stopped,
+    }).catch((err) => {
+      if (!stopped) setRunError(err.message || "Failed to track run progress");
+    });
     try {
-      await runAutomationNow(id);
-      await loadHistory();
+      await postPromise;
+      stopped = true;
+      setRunError(null);
+      const entries = await getAutomationHistory(id);
+      setHistory(entries);
+      const latest = entries[0];
+      setRunProgress({
+        stage: "done",
+        done: latest?.tracks_after_filter ?? 0,
+        total: latest?.tracks_before_filter ?? 0,
+        calls: lastRunCalls.current,
+      });
     } catch (err) {
+      stopped = true;
       setRunError(err.message || "Failed to run automation");
     } finally {
       setRunningNow(false);
@@ -302,20 +401,64 @@ export default function PlaylistDetail() {
 
   const loadPreview = async () => {
     if (!username?.trim()) return;
+    const token = newProgressToken();
+    previewTokenRef.current = token;
+    previewStoppedRef.current = false;
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewTracks(null);
     setRawTracks(null);
+    setPreviewProgress({ stage: "queued", done: 0, total: 0 });
+    // Fire the POST first so the ticket exists ASAP, then poll alongside it.
+    const postPromise = previewAutomation(automation, token);
+    pollProgress(() => getPreviewProgress(token), {
+      onUpdate: (s) => {
+        if (!previewStoppedRef.current) {
+          lastPreviewCalls.current = s.calls ?? 0;
+          setPreviewProgress(s);
+        }
+      },
+      shouldStop: () => previewStoppedRef.current,
+    }).catch((err) => {
+      if (!previewStoppedRef.current) {
+        setPreviewError(err.message || "Failed to track preview progress");
+      }
+    });
     try {
-      const data = await previewAutomation(automation);
+      const data = await postPromise;
+      previewStoppedRef.current = true;
+      setPreviewError(null);
+      if (data.cancelled) {
+        setPreviewProgress({ stage: "cancelled", done: 0, total: 0 });
+        return;
+      }
       const enriched = data.tracks || [];
       setRawTracks(enriched);
       const filtered = applyFilterGroups(enriched, automation.filterGroups);
       setPreviewTracks(filtered);
+      setPreviewProgress({
+        stage: "done",
+        done: filtered.length,
+        total: enriched.length,
+        calls: lastPreviewCalls.current,
+      });
     } catch (err) {
+      previewStoppedRef.current = true;
       setPreviewError(err.message || "Failed to load preview");
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const handleCancelPreview = async () => {
+    previewStoppedRef.current = true;
+    setPreviewProgress({ stage: "cancelled", done: 0, total: 0 });
+    const token = previewTokenRef.current;
+    if (!token) return;
+    try {
+      await cancelPreview(token);
+    } catch {
+      // Already finished or expired server-side; the UI state above stands.
     }
   };
 
@@ -537,6 +680,8 @@ export default function PlaylistDetail() {
                 </p>
               </div>
 
+              <ProgressBar progress={runProgress} />
+
               {runError && (
                 <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center">
                   <p className="text-sm text-red-400">{runError}</p>
@@ -568,10 +713,17 @@ export default function PlaylistDetail() {
                       key={entry.id}
                       className="rounded-xl border border-neutral-800 bg-[#141414] overflow-hidden"
                     >
-                      <button
-                        type="button"
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={() => toggleEntry(entry)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleEntry(entry);
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors cursor-pointer"
                       >
                         <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${statusDot(entry.status)}`} />
                         <div className="min-w-0 flex-1">
@@ -605,7 +757,7 @@ export default function PlaylistDetail() {
                             {runningNow ? "Running..." : "Re-run"}
                           </button>
                         )}
-                      </button>
+                      </div>
                       {expanded && (
                         <div className="px-4 pb-4 pt-1 border-t border-neutral-800/60">
                           {scheduledDiffers(entry) && (
@@ -729,6 +881,7 @@ export default function PlaylistDetail() {
                         </span>
                       )}
                     </p>
+                    <ProgressBar progress={previewProgress} onCancel={handleCancelPreview} />
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-5 min-h-0">

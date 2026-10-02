@@ -85,11 +85,13 @@ export async function getRecentTracks(limit = 50) {
   return request(`/api/recent-tracks?limit=${limit}`);
 }
 
-export async function previewAutomation(automation) {
+export async function previewAutomation(automation, progressToken) {
   requireUsername();
   return request("/api/automations/preview", {
     method: "POST",
-    body: JSON.stringify({ automation }),
+    body: JSON.stringify(
+      progressToken ? { automation, progress_token: progressToken } : { automation }
+    ),
   });
 }
 
@@ -131,10 +133,11 @@ export async function getAutomationHistory(id) {
   return request(`/api/automations/${id}/history`);
 }
 
-export async function runAutomationNow(id) {
+export async function runAutomationNow(id, progressToken) {
   requireUsername();
   return request(`/api/automations/${id}/run`, {
     method: "POST",
+    ...(progressToken ? { body: JSON.stringify({ progress_token: progressToken }) } : {}),
   });
 }
 
@@ -159,6 +162,88 @@ export async function saveGeneratedPlaylist(playlist) {
     method: "POST",
     body: JSON.stringify(playlist),
   });
+}
+
+let progressTokenCounter = 0;
+
+export function newProgressToken() {
+  if (typeof crypto !== "undefined") {
+    if (typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto.getRandomValues === "function") {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  }
+  // Last resort without WebCrypto (practically unreachable in supported
+  // browsers): unique per session via a counter, good enough for a
+  // short-lived progress ticket behind auth. No Math.random: it is not
+  // a safe random source (flags security scanners).
+  progressTokenCounter += 1;
+  return `preview-${Date.now().toString(36)}-${progressTokenCounter}`;
+}
+
+export async function getPreviewProgress(token) {
+  requireUsername();
+  return request(`/api/automations/preview-progress/${token}`);
+}
+
+export async function cancelPreview(token) {
+  requireUsername();
+  return request(`/api/automations/preview-progress/${token}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getRunProgress(id, token) {
+  requireUsername();
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  return request(`/api/automations/${id}/run-progress${query}`);
+}
+
+const TERMINAL_STAGES = new Set(["done", "error", "cancelled"]);
+
+export async function pollProgress(
+  getSnapshot,
+  {
+    intervalMs = 2000,
+    timeoutMs = 10 * 60 * 1000,
+    notFoundGraceMs = 15000,
+    onUpdate,
+    shouldStop,
+  } = {}
+) {
+  const started = Date.now();
+  let snapshot = { stage: "queued", done: 0, total: 0 };
+  for (;;) {
+    if (shouldStop && shouldStop()) return snapshot;
+    try {
+      snapshot = await getSnapshot();
+    } catch (err) {
+      // The ticket may not exist yet: the poll often fires before the POST
+      // created it server-side. Treat 404 as "queued" for a grace period.
+      const notFound = err instanceof Error && /API 404/.test(err.message);
+      if (notFound && Date.now() - started < notFoundGraceMs) {
+        snapshot = { stage: "queued", done: 0, total: 0 };
+        if (onUpdate) onUpdate(snapshot);
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        continue;
+      }
+      throw err;
+    }
+    if (onUpdate) onUpdate(snapshot);
+    if (TERMINAL_STAGES.has(snapshot.stage)) return snapshot;
+    if (Date.now() - started > timeoutMs) {
+      const err = new Error(
+        "Still running after 10 minutes. It continues in the background — check the run history."
+      );
+      err.code = "PROGRESS_TIMEOUT";
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
 }
 
 

@@ -34,6 +34,7 @@ from services.lastfm import (
     get_top_artists_tracks,
     get_top_tracks,
 )
+from services.progress import store as progress_store
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -115,11 +116,14 @@ async def run_automation_pipeline_cached(
     filter_groups: list,
     max_tracks: int,
     track_limit: int = DEFAULT_TRACK_LIMIT,
+    progress_key: str | None = None,
 ) -> dict:
     """Cache-first pipeline: dispatch live, enrich from DB cache, filter.
 
     Returns the sync pipeline's keys plus ``cache_hits``, ``cache_misses``
-    and ``lastfm_calls`` for logs and UI.
+    and ``lastfm_calls`` for logs and UI. When ``progress_key`` is set,
+    each stage reports (stage, done, total) to the progress store so the
+    UI can poll a live counter.
     """
     limit = track_limit if not max_tracks else min(max_tracks, track_limit)
     loop = asyncio.get_running_loop()
@@ -134,14 +138,26 @@ async def run_automation_pipeline_cached(
         ),
     )
     deduped = deduplicate(source_tracks)
+    if progress_key is not None:
+        # done=0 on purpose: the list is fetched but nothing is enriched
+        # yet. Reporting done=len here would pin the bar at 100% (the bug
+        # the user saw); it climbs with each finished track instead.
+        progress_store.report(progress_key, "source", 0, len(deduped))
     needs = needed_fields(filter_groups)
     if not needs:
         enriched, stats = deduped, {"hits": 0, "misses": 0, "lastfm_calls": 0}
     else:
         enriched, stats = await enrich_tracks_cached(
-            db, user_id=user_id, username=username, tracks=deduped, max_enrich=limit
+            db,
+            user_id=user_id,
+            username=username,
+            tracks=deduped,
+            max_enrich=limit,
+            progress_key=progress_key,
         )
     filtered = apply_filters(enriched, filter_groups)
+    if progress_key is not None:
+        progress_store.report(progress_key, "filter", len(filtered), len(deduped))
     tracks = filtered[:limit]
     logger.info(
         "pipeline: %d source -> %d kept (%d cache hits, %d misses, %d Last.fm calls)",
@@ -287,6 +303,7 @@ async def run_automation(
     *,
     scheduled_for: datetime | None = None,
     attempt: int = 1,
+    progress_key: str | None = None,
 ) -> AutomationHistory:
     """Run one automation's pipeline and record history + last_run.
 
@@ -322,14 +339,19 @@ async def run_automation(
             period=automation.source_period,
             filter_groups=automation.filter_groups,
             max_tracks=automation.output_max_size,
+            progress_key=progress_key,
         )
     except Exception as exc:  # noqa: BLE001 - record any pipeline failure
         await _mark_failure(db, history, exc)
+        if progress_key is not None:
+            progress_store.finish(progress_key, error=str(exc)[:500])
         return history
 
     playlist = await _persist_result_playlist(db, automation, result)
     history.generated_playlist_id = playlist.id
     await _mark_success(db, history, result, automation)
+    if progress_key is not None:
+        progress_store.finish(progress_key)
     return history
 
 

@@ -17,7 +17,7 @@ _TRACKS = [
 ]
 
 
-def _info(network, username, artist, title, caches, lock, only=None):
+def _info(network, username, artist, title, caches, lock, only=None, progress_key=None):
     return {"listeners": 7, "artist": artist, "title": title}
 
 
@@ -38,7 +38,7 @@ def test_enrich_tracks_preserves_order_and_passes_tail_through():
 def test_enrich_tracks_falls_back_to_raw_track_on_failure():
     """A track whose enrichment raises is returned unenriched, others unaffected."""
 
-    def _flaky(network, username, artist, title, caches, lock, only=None):
+    def _flaky(network, username, artist, title, caches, lock, only=None, progress_key=None):
         if title == "two":
             raise RuntimeError("boom")
         return {"listeners": 7}

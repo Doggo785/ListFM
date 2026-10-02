@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 import pylast
 from config import get_settings
+from services.progress import PipelineCancelled, store as progress_store
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,7 @@ def get_track_full_info(
     tag_caches: dict | None = None,
     tag_lock: threading.Lock | None = None,
     only: set[str] | None = None,
+    progress_key: str | None = None,
 ) -> dict:
     result = {
         "listeners": 0,
@@ -204,6 +206,19 @@ def get_track_full_info(
         """
         return only is None or key in only
 
+    def _gated() -> None:
+        """One throttled call that also reports progress and honors cancel.
+
+        Checks the ticket first so a cancelled run stops between calls
+        instead of draining every in-flight track, then counts the
+        completed call so the UI ticks roughly once per second.
+        """
+        if progress_key is not None and progress_store.is_cancelled(progress_key):
+            raise PipelineCancelled()
+        _throttled_call()
+        if progress_key is not None:
+            progress_store.bump_calls(progress_key)
+
     try:
         track = pylast.Track(artist, title, network, username=username)
     except Exception:  # noqa: BLE001 -- unconstructable track: return the empty result
@@ -211,28 +226,28 @@ def get_track_full_info(
 
     if _want("listeners"):
         try:
-            _throttled_call()
+            _gated()
             result["listeners"] = track.get_listener_count()
         except Exception:
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("global_playcount"):
         try:
-            _throttled_call()
+            _gated()
             result["global_playcount"] = track.get_playcount()
         except Exception:
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("userplaycount"):
         try:
-            _throttled_call()
+            _gated()
             result["userplaycount"] = track.get_userplaycount() or 0
         except Exception:
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("userloved"):
         try:
-            _throttled_call()
+            _gated()
             result["userloved"] = bool(track.get_userloved())
         except Exception:
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
@@ -249,7 +264,7 @@ def get_track_full_info(
                 if artist_key in artist_cache:
                     result["artist_tags"] = artist_cache[artist_key]
                 else:
-                    _throttled_call()
+                    _gated()
                     artist_obj = network.get_artist(artist)
                     raw_tags = [
                         {"name": t.item.name, "count": int(t.weight)}
@@ -263,7 +278,7 @@ def get_track_full_info(
 
     if _want("album") or _want("album_tags"):
         try:
-            _throttled_call()
+            _gated()
             album = track.get_album()
             if album and album.title:
                 album_name = album.title
@@ -275,7 +290,7 @@ def get_track_full_info(
                             result["album_tags"] = album_cache[album_key]
                         else:
                             try:
-                                _throttled_call()
+                                _gated()
                                 album_obj = network.get_album(artist, album_name)
                                 raw_tags = [
                                     {"name": t.item.name, "count": int(t.weight)}
@@ -293,7 +308,11 @@ def get_track_full_info(
 
 
 def enrich_tracks(
-    username: str, tracks: list[dict], max_enrich: int = 50, only: set[str] | None = None
+    username: str,
+    tracks: list[dict],
+    max_enrich: int = 50,
+    only: set[str] | None = None,
+    progress_key: str | None = None,
 ) -> list[dict]:
     network = get_network()
     to_enrich = tracks[:max_enrich]
@@ -302,23 +321,43 @@ def enrich_tracks(
     cache_lock = threading.Lock()
 
     def _enrich_one(track):
+        if progress_key is not None and progress_store.is_cancelled(progress_key):
+            raise PipelineCancelled()
         artist = track.get("artist", "")
         title = track.get("title", "")
         result = dict(track)
         result.update(
-            get_track_full_info(network, username, artist, title, tag_caches, cache_lock, only)
+            get_track_full_info(
+                network,
+                username,
+                artist,
+                title,
+                tag_caches,
+                cache_lock,
+                only,
+                progress_key=progress_key,
+            )
         )
         return result
 
     enriched_order: list[dict | None] = [None] * len(to_enrich)
+    completed = 0
     with ThreadPoolExecutor(max_workers=5) as pool:
         future_to_idx = {pool.submit(_enrich_one, t): i for i, t in enumerate(to_enrich)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             try:
                 enriched_order[idx] = future.result()
+            except PipelineCancelled:
+                for pending in future_to_idx:
+                    pending.cancel()
+                raise
             except Exception:  # noqa: BLE001 -- failed enrichment falls back to the raw track
                 enriched_order[idx] = to_enrich[idx]
+            else:
+                completed += 1
+                if progress_key is not None:
+                    progress_store.report(progress_key, "enrich", completed, len(to_enrich))
 
     return [r for r in enriched_order if r is not None] + tail
 

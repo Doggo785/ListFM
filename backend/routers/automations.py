@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from database import get_db
@@ -23,17 +24,36 @@ from schemas import (
     AutomationRead,
     AutomationUpdate,
     PreviewRequest,
+    ProgressRead,
+    RunRequest,
 )
 from services.automation_runner import (
     UnsupportedSourceTypeError,
     run_automation,
     run_automation_pipeline_cached,
 )
+from services.progress import PipelineCancelled, store as progress_store
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api", tags=["automations"])
+
+logger = logging.getLogger(__name__)
+
+
+def _ticket_or_404(key: str) -> ProgressRead:
+    """Read a live progress ticket or raise 404 when unknown/expired."""
+    progress = progress_store.read(key)
+    if progress is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
+    return ProgressRead(
+        stage=progress.stage,
+        done=progress.done,
+        total=progress.total,
+        calls=progress.calls,
+        error=progress.error,
+    )
 
 
 @router.post("/automations/preview")
@@ -46,6 +66,9 @@ async def preview_automation(
     if not LASTFM_USERNAME_REGEX.match(username):
         raise HTTPException(status_code=422, detail="Invalid Last.fm username")
     automation = body.automation
+    progress_key = f"preview:{body.progress_token}" if body.progress_token else None
+    if progress_key is not None:
+        progress_store.start(progress_key)
 
     # Cache-first pipeline: repeated previews of the same tracks hit the DB
     # instead of Last.fm. Cache writes commit below (a broken cache layer
@@ -59,7 +82,22 @@ async def preview_automation(
             period=automation.source.period,
             filter_groups=automation.filter_groups,
             max_tracks=automation.output.maxSize,
+            progress_key=progress_key,
         )
+    except PipelineCancelled:
+        if progress_key is not None:
+            progress_store.finish(progress_key)
+        logger.info("preview ticket %s cancelled by user", body.progress_token)
+        return {
+            "tracks": [],
+            "total": 0,
+            "before_filter": 0,
+            "source_tracks": [],
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "lastfm_calls": 0,
+            "cancelled": True,
+        }
     except UnsupportedSourceTypeError:
         raise HTTPException(status_code=422, detail="Unsupported source type")
     except HTTPException:
@@ -73,7 +111,69 @@ async def preview_automation(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save preview cache")
 
+    if progress_key is not None:
+        progress_store.finish(progress_key)
+    result["cancelled"] = False
     return result
+
+
+@router.get("/automations/preview-progress/{token}", response_model=ProgressRead)
+async def preview_progress(
+    token: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Live progress snapshot for an in-flight preview ticket."""
+    return _ticket_or_404(f"preview:{token}")
+
+
+@router.delete("/automations/preview-progress/{token}", status_code=204)
+async def cancel_preview(
+    token: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Flag a preview ticket cancelled; the pipeline stops between tracks."""
+    if not progress_store.cancel(f"preview:{token}"):
+        raise HTTPException(status_code=404, detail="Unknown or expired progress ticket")
+    logger.info("preview ticket %s flagged cancelled", token)
+
+
+@router.get(
+    "/automations/{automation_id}/run-progress", response_model=ProgressRead
+)
+async def run_progress(
+    automation: Automation = Depends(get_owned_automation),
+    db: AsyncSession = Depends(get_db),
+    token: str | None = None,
+):
+    """Live progress snapshot for the automation's in-flight run.
+
+    With a client ticket (?token=), only the ticket is read: a missing
+    ticket is 404 (the UI treats it as "not created yet" for a grace
+    period). Without a ticket, falls back to the latest history row once
+    the live ticket is gone (finished runs, server restart), so polling
+    always terminates.
+    """
+    if token:
+        return _ticket_or_404(f"run:{token}")
+    progress = progress_store.read(f"run:{automation.id}")
+    if progress is not None:
+        return ProgressRead(
+            stage=progress.stage,
+            done=progress.done,
+            total=progress.total,
+            calls=progress.calls,
+            error=progress.error,
+        )
+    rows = await get_automation_history(db, automation.id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="No runs yet")
+    latest = rows[0]
+    if latest.status == "completed":
+        done = latest.tracks_after_filter or 0
+        return ProgressRead(stage="done", done=done, total=done)
+    if latest.status == "failed":
+        return ProgressRead(stage="error", done=0, total=0, error=latest.error_message)
+    return ProgressRead(stage="running", done=0, total=0)
 
 
 @router.get("/automations", response_model=list[AutomationRead])
@@ -109,6 +209,7 @@ async def get_automation_history_entries(
 async def run_automation_now(
     automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
+    body: RunRequest | None = None,
 ):
     """Trigger one manual run now (same pipeline as the scheduled sweep).
 
@@ -122,6 +223,9 @@ async def run_automation_now(
     client-side guard).
     The lock releases on commit/rollback/disconnect, so a crashed run can
     never wedge the automation.
+
+    With body.progress_token, progress reports to a client ticket
+    (GET run-progress?token=); otherwise to the legacy run:{id} ticket.
     """
     locked = (
         await db.execute(
@@ -130,8 +234,11 @@ async def run_automation_now(
     ).scalar()
     if not locked:
         raise HTTPException(status_code=409, detail="Automation already running")
+    token = body.progress_token if body and body.progress_token else None
+    progress_key = f"run:{token}" if token else f"run:{automation.id}"
+    progress_store.start(progress_key)
     history = await run_automation(
-        db, automation, scheduled_for=datetime.now(UTC), attempt=1
+        db, automation, scheduled_for=datetime.now(UTC), attempt=1, progress_key=progress_key
     )
     try:
         await db.commit()

@@ -1,0 +1,51 @@
+# Automatic dependency updates (see ROADMAP P3/T6).
+#
+# - Security updates: opened by GitHub itself as soon as an advisory drops
+#   (enabled in repo settings), CI still has to pass, a human still merges.
+# - Version updates below: weekly Monday group PRs (minor+patch only, so
+#   majors like vitest 4 keep coming as separate PRs needing real review).
+# - Nothing auto-merges, ever (repo rule: the agent never merges either).
+# - Caveat: npm `overrides` pins in frontend/package.json sometimes need a
+#   manual touch-up when Dependabot only bumps the lockfile. If that
+#   friction bites, Renovate handles overrides better (to evaluate later).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    groups:
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    groups:
+      pip-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    groups:
+      actions-updates:
+        patterns: ["*"]
+        update-types: ["minor", "patch", "major"]
+    open-pull-requests-limit: 3
+    labels: ["dependencies"]
