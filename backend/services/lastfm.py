@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from datetime import UTC, datetime
 
+import httpx
 import pylast
 from config import get_settings
 from services.progress import PipelineCancelled, store as progress_store
@@ -22,11 +23,14 @@ PERIOD_MAP = {
     "overall": pylast.PERIOD_OVERALL,
 }
 
-# Outbound Last.fm etiquette: ~1s between calls, process-wide (the enrich
-# ThreadPool shares one gate). Patch to 0 in tests to skip the sleeps.
-LASTFM_MIN_INTERVAL = 1.0
+# Outbound Last.fm etiquette: ~4 calls/sec max, process-wide (the enrich
+# ThreadPool shares one gate). Observed ceiling is ~5/sec with error 29
+# past it; on 29 the whole process backs off for a minute (see below).
+# Patch to 0 in tests to skip the sleeps.
+LASTFM_MIN_INTERVAL = 0.25
 _throttle_lock = threading.Lock()
 _last_call_monotonic = 0.0
+_rate_limit_until = 0.0
 _lastfm_call_count = 0
 
 
@@ -35,16 +39,51 @@ def _throttled_call() -> None:
 
     Must wrap each network-touching block (not just each track): the pool
     runs 5 threads and without a shared gate they fire concurrently.
+    Also honors the backoff window set after an error 29.
     """
     global _last_call_monotonic, _lastfm_call_count
     with _throttle_lock:
         now = time.monotonic()
-        wait = LASTFM_MIN_INTERVAL - (now - _last_call_monotonic)
+        wait = max(
+            LASTFM_MIN_INTERVAL - (now - _last_call_monotonic),
+            _rate_limit_until - now,
+        )
         if wait > 0:
             time.sleep(wait)
             now = time.monotonic()
         _last_call_monotonic = now
         _lastfm_call_count += 1
+
+
+def note_rate_limited(retry_after: float = 60.0) -> None:
+    """Back off all outbound calls after an error 29 (rate limit exceeded)."""
+    global _rate_limit_until
+    with _throttle_lock:
+        _rate_limit_until = max(_rate_limit_until, time.monotonic() + retry_after)
+
+
+def is_rate_limit_error(exc: BaseException) -> bool:
+    """True for Last.fm error 29, unwrapping `raise ... from` chains."""
+    seen_ids: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen_ids:
+        seen_ids.add(id(current))
+        if str(getattr(current, "status", "") or "") == "29":
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _note_possible_rate_limit(exc: Exception) -> None:
+    """Arm the process-wide backoff after a Last.fm error 29.
+
+    Call this from an except handler that still logs: ruff exempts
+    logging-only handlers from BLE001, and the caller's justified noqa
+    covers this bookkeeping call.
+    """
+    if is_rate_limit_error(exc):
+        note_rate_limited()
+        logger.warning("get_track_full_info: rate limited (29), backing off")
 
 
 def reset_lastfm_call_count() -> None:
@@ -90,10 +129,94 @@ def get_network() -> pylast.LastFMNetwork:
     )
 
 
-def get_recent_tracks(username: str, limit: int = 5) -> list[dict]:
+LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
+
+
+def _pick_image(images) -> str | None:
+    """Usable image URL from an extended=1 image list (UI-sized first)."""
+    if not isinstance(images, list):
+        return None
+    by_size = {
+        img.get("size"): img.get("#text")
+        for img in images
+        if isinstance(img, dict) and img.get("#text")
+    }
+    for size in ("large", "extralarge", "medium", "small"):
+        if by_size.get(size):
+            return by_size[size]
+    return None
+
+
+def get_recent_tracks_extended(
+    username: str, limit: int = 5, time_from: int | None = None, time_to: int | None = None
+) -> list[dict] | None:
+    """Recents with loved + image per track, or None when unusable.
+
+    One paginated call with extended=1 instead of one call plus per-track
+    lookups. Any unexpected shape or transport error returns None so the
+    caller falls back to the pylast path (never worse than today).
+    """
+    params: dict[str, object] = {
+        "method": "user.getrecenttracks",
+        "user": username,
+        "api_key": get_settings().lastfm_api_key,
+        "format": "json",
+        "limit": min(limit + 1, 200),
+        "extended": 1,
+    }
+    if time_from:
+        params["from"] = time_from
+    if time_to:
+        params["to"] = time_to
+    try:
+        response = httpx.get(LASTFM_API_URL, params=params, timeout=30)
+        response.raise_for_status()
+        nodes = response.json()["recenttracks"]["track"]
+    except Exception:
+        logger.debug("get_recent_tracks_extended: falling back to pylast", exc_info=True)
+        return None
+    if isinstance(nodes, dict):
+        nodes = [nodes]
+    if not isinstance(nodes, list):
+        return None
+    tracks = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        if node.get("@attr", {}).get("nowplaying") == "true":
+            continue
+        title = node.get("name")
+        artist = node.get("artist", {})
+        artist_name = artist.get("name") if isinstance(artist, dict) else artist
+        if not title or not artist_name:
+            continue
+        date = node.get("date", {})
+        timestamp = date.get("uts") if isinstance(date, dict) else None
+        track: dict[str, object] = {
+            "title": title,
+            "artist": artist_name,
+            "timestamp": int(timestamp) if timestamp else None,
+        }
+        if "loved" in node:
+            track["userloved"] = node["loved"] == "1"
+        image = _pick_image(node.get("image"))
+        if image:
+            track["image"] = image
+        tracks.append(track)
+        if len(tracks) >= limit:
+            break
+    return tracks
+
+
+def get_recent_tracks(
+    username: str, limit: int = 5, time_from: int | None = None, time_to: int | None = None
+) -> list[dict]:
+    extended = get_recent_tracks_extended(username, limit, time_from, time_to)
+    if extended is not None:
+        return extended
     network = get_network()
     user = network.get_user(username)
-    recent = user.get_recent_tracks(limit=limit)
+    recent = user.get_recent_tracks(limit=limit, time_from=time_from, time_to=time_to)
     return [
         {
             "title": t.track.title,
@@ -228,28 +351,32 @@ def get_track_full_info(
         try:
             _gated()
             result["listeners"] = track.get_listener_count()
-        except Exception:
+        except Exception as exc:
+            _note_possible_rate_limit(exc)
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("global_playcount"):
         try:
             _gated()
             result["global_playcount"] = track.get_playcount()
-        except Exception:
+        except Exception as exc:
+            _note_possible_rate_limit(exc)
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("userplaycount"):
         try:
             _gated()
             result["userplaycount"] = track.get_userplaycount() or 0
-        except Exception:
+        except Exception as exc:
+            _note_possible_rate_limit(exc)
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("userloved"):
         try:
             _gated()
             result["userloved"] = bool(track.get_userloved())
-        except Exception:
+        except Exception as exc:
+            _note_possible_rate_limit(exc)
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     caches = tag_caches if tag_caches is not None else {}
@@ -273,7 +400,8 @@ def get_track_full_info(
                     ]
                     result["artist_tags"] = _normalize_tags(raw_tags)
                     artist_cache[artist_key] = result["artist_tags"]
-        except Exception:
+        except Exception as exc:
+            _note_possible_rate_limit(exc)
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     if _want("album") or _want("album_tags"):
@@ -301,7 +429,8 @@ def get_track_full_info(
                             except Exception:  # noqa: BLE001 -- one bad album keeps the rest
                                 result["album_tags"] = []
                             album_cache[album_key] = result["album_tags"]
-        except Exception:
+        except Exception as exc:
+            _note_possible_rate_limit(exc)
             logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
 
     return result
@@ -338,6 +467,10 @@ def enrich_tracks(
                 progress_key=progress_key,
             )
         )
+        # Dispatch-provided loved flags (extended=1) survive: enrich
+        # defaults must not clobber values fetched from the same source.
+        if "userloved" in track:
+            result["userloved"] = track["userloved"]
         return result
 
     enriched_order: list[dict | None] = [None] * len(to_enrich)

@@ -88,6 +88,9 @@ def run_automation_pipeline(
     source_tracks = dispatch_source_tracks(source_type, username, period, limit)
     deduped = deduplicate(source_tracks)
     needs = needed_fields(filter_groups)
+    if deduped and all("userloved" in t for t in deduped):
+        # extended=1 dispatch already fetched loved flags: no live call.
+        needs.discard("userloved")
     # No enrich key needed (no filters, or only dispatch fields like rank):
     # skip the live layer entirely instead of fetching data nobody reads.
     # Anything else runs the full fetch + write-back, unchanged.
@@ -144,6 +147,9 @@ async def run_automation_pipeline_cached(
         # the user saw); it climbs with each finished track instead.
         progress_store.report(progress_key, "source", 0, len(deduped))
     needs = needed_fields(filter_groups)
+    if deduped and all("userloved" in t for t in deduped):
+        # extended=1 dispatch already fetched loved flags: no live call.
+        needs.discard("userloved")
     if not needs:
         enriched, stats = deduped, {"hits": 0, "misses": 0, "lastfm_calls": 0}
     else:

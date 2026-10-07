@@ -222,6 +222,42 @@ def test_sync_pipeline_empty_filters_skips_enrich():
     assert result["before_filter"] == 1
 
 
+def test_loved_only_filter_skips_enrich_on_extended_tracks():
+    """extended=1 loved flags make the live layer unnecessary for loved filters."""
+    tracks = [
+        {"title": "loved", "artist": "a", "userloved": True},
+        {"title": "meh", "artist": "a", "userloved": False},
+    ]
+    groups = [
+        {"conditions": [{"field": "userloved", "operator": "is", "value": True}]}
+    ]
+    with (
+        patch(
+            "services.automation_runner.dispatch_source_tracks", return_value=tracks
+        ),
+        patch("services.automation_runner.enrich_tracks") as mock_enrich,
+    ):
+        result = run_automation_pipeline("u", "recent_tracks", "3m", groups, max_tracks=50)
+    mock_enrich.assert_not_called()
+    assert [t["title"] for t in result["tracks"]] == ["loved"]
+
+
+def test_merge_preserves_dispatch_loved_over_enrich_defaults():
+    """A dispatch-known loved=True survives the enrich merge."""
+    tracks = [{"artist": "A", "title": "one", "userloved": True}]
+    with (
+        patch("services.lastfm.get_network", return_value=object()),
+        patch(
+            "services.lastfm.get_track_full_info",
+            return_value={"listeners": 7, "userloved": False},
+        ),
+        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+    ):
+        out = enrich_tracks("user", tracks)
+    assert out[0]["listeners"] == 7
+    assert out[0]["userloved"] is True
+
+
 @pytest.mark.asyncio
 async def test_cached_pipeline_empty_filters_writes_nothing():
     """Empty filters: no enrich call and no track row in DB."""
@@ -249,6 +285,45 @@ async def test_cached_pipeline_empty_filters_writes_nothing():
     assert result["total"] == 1
     async with _TestSessionLocal() as db:
         assert await get_track_by_artist_title(db, f"A {suffix}", f"T {suffix}") is None
+
+
+@pytest.mark.asyncio
+async def test_write_back_stores_dispatch_image():
+    """Extended dispatch images persist on track rows for future UI."""
+    suffix = uuid.uuid4().hex[:8]
+    base = {
+        "artist": f"IA {suffix}",
+        "title": f"IT {suffix}",
+        "image": "http://img/174/x.png",
+    }
+    live = [{**base, **_live_info()}]
+    groups = [{"conditions": [_cond("listeners")]}]
+    async with _TestSessionLocal() as db:
+        db.add(User(id=f"u-{suffix}"))
+        await db.commit()
+    async with _TestSessionLocal() as db:
+        with (
+            patch(
+                "services.automation_runner.dispatch_source_tracks",
+                return_value=[dict(base)],
+            ),
+            patch("services.enrich_cache.enrich_tracks", return_value=live),
+        ):
+            result = await run_automation_pipeline_cached(
+                db,
+                user_id=f"u-{suffix}",
+                username="u",
+                source_type="recent_tracks",
+                period="3m",
+                filter_groups=groups,
+                max_tracks=50,
+            )
+            await db.commit()
+    assert result["total"] == 1
+    async with _TestSessionLocal() as db:
+        row = await get_track_by_artist_title(db, base["artist"], base["title"])
+        assert row is not None
+        assert row.image_url == "http://img/174/x.png"
 
 
 @pytest.mark.asyncio
