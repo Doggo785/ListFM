@@ -6,14 +6,16 @@ the async bridge. The cache is per-user: every read and write is keyed by
 carry identical userplaycount/userloved values.
 
 - read path (all async): track core (TTL via ``last_fetched_at``), album
-  title, artist tags and album tags, per-user data (TTL via
-  ``last_synced_at``). All-or-nothing per track: anything missing or stale
-  triggers a full live refetch of that track. The track stamp gates the
-  whole snapshot — write-back always stores core and tags atomically, so a
-  fresh track implies freshly fetched tags (including legitimately empty
-  tag lists, which have no rows to timestamp).
+  title, artist tags and album tags (TTL via ``tags_fetched_at``), per-user
+  data (TTL via ``last_synced_at``). All-or-nothing per track: anything
+  missing or stale triggers a full live refetch of that track. The two
+  track stamps gate their own group — write-back always stores core and
+  tags atomically, so a fresh row implies freshly fetched tags (including
+  legitimately empty tag lists, which have no rows to timestamp). Rows
+  that never went through a full fetch (``tags_fetched_at`` NULL) always
+  miss until they do.
 - miss path: the existing sync ``enrich_tracks`` runs in an executor (with
-  the global ~1s throttle gate inside), then results are written back.
+  the global throttle gate inside), then results are written back.
 
 Callers must commit the session (writes happen on misses).
 """
@@ -121,6 +123,12 @@ async def _read_cached_tracks(
         if row is None or not _fresh(row.last_fetched_at):
             out.append(None)
             continue
+        if not _fresh(row.tags_fetched_at):
+            # Tags never verified (or stale): mirror them like any other
+            # miss. The migration backfills old rows, so this only fires
+            # for rows that genuinely skipped a full fetch.
+            out.append(None)
+            continue
         album_title = None
         if row.album_id:
             album = albums_map.get(row.album_id)
@@ -172,13 +180,19 @@ async def _write_back(
             listeners=info.get("listeners", 0) or 0,
             global_playcount=info.get("global_playcount", 0) or 0,
             image_url=info.get("image") or None,
+            # No stamp here: this function stamps explicitly below, and is
+            # the sole stamper of both columns (see module docstring).
+            mark_fetched=False,
         )
         # A live fetch re-stamps the row even if the core was still fresh
         # (e.g. only the tags were stale), so the next read is a full hit.
         track.listeners = info.get("listeners", 0) or 0
         track.global_playcount = info.get("global_playcount", 0) or 0
         track.album_id = album_id or track.album_id
+        if info.get("image"):
+            track.image_url = info["image"]
         track.last_fetched_at = now
+        track.tags_fetched_at = now
         await db.flush()
         for tag in info.get("artist_tags") or []:
             await upsert_artist_tag(db, artist, tag["name"], tag["count"])

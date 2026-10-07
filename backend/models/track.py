@@ -17,4 +17,5 @@ class Track(Base):
     global_playcount: Mapped[int] = mapped_column(Integer, default=0)
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # cache invalidation
+    tags_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # per-group freshness: NULL = tags never verified
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
