@@ -114,14 +114,11 @@ jobs:
       - name: Dependency vulnerability scan (fail on High/Critical only)
         # osv-scanner exits 1 on ANY finding, but CONSTRAINTS.md (W1) tolerates
         # Medium/Low: gate on numeric max_severity (CVSS >= 7.0 = High).
-        # W2 allowlists one High with no upstream fix (braces, dev-tooling
-        # chain only); expires 2027-01-05, then the gate goes red again.
         run: |
           osv-scanner scan source -r . --format json --output /tmp/osv.json || true
           python3 - <<'EOF'
           import json, sys
           data = json.load(open('/tmp/osv.json'))
-          tolerated = {"GHSA-vfj7-8cjw-p6xm"}  # W2, expires 2027-01-05
           bad = []
           for res in data.get('results', []):
               for pkg in res.get('packages', []):
@@ -133,11 +130,8 @@ jobs:
                       except (TypeError, ValueError):
                           print(f"no parseable severity for {label} {g.get('ids')}, failing safe")
                           sys.exit(1)
-                      ids = set(g.get('ids', []))
-                      if sev >= 7.0 and not ids <= tolerated:
+                      if sev >= 7.0:
                           bad.append(f"{g.get('ids')} {label} (max_severity={sev})")
-                      elif sev >= 7.0:
-                          print(f"TOLERATED (W2): {g.get('ids')} {label}")
           if bad:
               print('FAIL: High/Critical vulnerabilities found:')
               print('\n'.join(f'  - {b}' for b in bad))

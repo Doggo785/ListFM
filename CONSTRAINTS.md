@@ -33,7 +33,7 @@ Règle non négociable rappelée : l'agent n'a JAMAIS le droit de merger, il ouv
 | Coverage diff backend | ≥ 80 % des lignes modifiées. Raison : force un test sur le nouveau code sans exiger 80 % sur un héritage. Vérifié : 100 % sur le diff du PR de verrouillage. | `pytest --cov=backend --cov-report=xml` + `diff-cover coverage.xml --compare-branch=origin/dev --fail-under=80` | task end (scope = diff), CI job `backend-tests` |
 | Coverage diff frontend | ≥ 80 % des lignes modifiées. Raison : idem, côté UI où la couverture globale est quasi nulle. | `vitest run --coverage --coverage.reporter=cobertura` + `diff-cover coverage/cobertura-coverage.xml --compare-branch=origin/dev --fail-under=80` (dans `frontend/`) | task end (scope = diff), CI job `frontend-tests` |
 | Secrets | 0 leak. Raison : JWT + tokens Last.fm ; externe, l'agent ne peut pas négocier avec. Vérifié : 229 commits, 0 leak. | `gitleaks detect --redact --no-banner --source .` | every edit, CI job `gitleaks` |
-| Dépendances | **0 Critical, 0 High non-toléré** (atteint le 2026-09-27 : bumps `click`, `pygments`, overrides `hono`/`qs`/`fast-uri`/`js-yaml` + transitifs npm). Raison : cible ambitieuse tenue, plus de build rouge permanent. Medium résiduels = vitest dev uniquement, voir W1. 1 High toléré (pas de fix upstream, chaîne dev-only) : voir W2. Le job CI gate sur `max_severity >= 7.0` (osv exit 1 dès le moindre finding, même Low). | `osv-scanner scan source -r . --format json` + gate Python sur `max_severity` (voir job `osv-scanner` de `ci.yml`) | task end, CI job `osv-scanner` |
+| Dépendances | **0 Critical, 0 High** (atteint le 2026-09-27 : bumps `click`, `pygments`, overrides `hono`/`qs`/`fast-uri`/`js-yaml` + transitifs npm). Raison : cible ambitieuse tenue, plus de build rouge permanent. Medium résiduels = vitest dev uniquement, voir W1. Le job CI gate sur `max_severity >= 7.0` (osv exit 1 dès le moindre finding, même Low). | `osv-scanner scan source -r . --format json` + gate Python sur `max_severity` (voir job `osv-scanner` de `ci.yml`) | task end, CI job `osv-scanner` |
 
 ## Mesuré, pas encore enforced (ratchets + cibles)
 
@@ -74,6 +74,5 @@ Au moins une contrainte est externe (gitleaks, osv-scanner : bases externes, pas
 | ID | Règle | Path | Raison | Owner | Expires |
 |----|-------|------|--------|-------|---------|
 | W1 | `vitest`+`@vitest/mocker` 3.2.7 gardés (2 Medium `GHSA-82fw-gwwq-j7x9`, dev-only, fix = majeur 4.x) | `frontend/package.json` | Majeur vitest 4 à évaluer à part ; ne retient pas la baseline 0 High. | owner | 2026-12-26 |
-| W2 | `braces` 3.0.3 via `shadcn > fast-glob > micromatch` (`GHSA-vfj7-8cjw-p6xm`, DoS par pattern malveillant, 8.7) : aucun fix publié (dernière 3.0.x), chaîne outillage dev uniquement jamais servie aux navigateurs. Gate CI allowlisté par ID avec expiry (voir `ci.yml`). | `frontend/package-lock.json` | Réévaluer à l'expiry (fix upstream probable) ou en supprimant `shadcn` des deps si le CLI n'est plus utilisé. | owner | 2027-01-05 |
 
 Durée max d'exception : 90 jours, avec owner nommé.
