@@ -94,7 +94,7 @@ async def test_stale_tags_force_refetch_then_hit():
         await db.execute(
             update(Track)
             .where(Track.artist == base["artist"], Track.title == base["title"])
-            .values(tags_fetched_at=datetime.now(UTC) - timedelta(hours=25))
+            .values(tags_fetched_at=datetime.now(UTC) - timedelta(days=8))  # beyond GLOBAL_TTL
         )
         await db.commit()
     async with _TestSessionLocal() as db:
