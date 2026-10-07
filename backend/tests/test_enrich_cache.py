@@ -87,7 +87,7 @@ async def test_artist_tags_roundtrip():
 
 @pytest.mark.asyncio
 async def test_stale_track_row_forces_refetch():
-    """A track row older than the TTL refetches live even with tags stored."""
+    """A track row older than the global TTL refetches live even with tags stored."""
     user_id = await _make_user_id()
     suffix = uuid.uuid4().hex[:8]
     tracks = [{"artist": f"Stale Artist {suffix}", "title": f"Stale Song {suffix}"}]
@@ -106,7 +106,7 @@ async def test_stale_track_row_forces_refetch():
                     Track.artist == tracks[0]["artist"],
                     Track.title == tracks[0]["title"],
                 )
-                .values(last_fetched_at=datetime.now(UTC) - timedelta(hours=25))
+                .values(last_fetched_at=datetime.now(UTC) - timedelta(days=8))  # beyond GLOBAL_TTL
             )
             await db.commit()
             out, stats = await enrich_tracks_cached(

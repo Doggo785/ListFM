@@ -5,9 +5,11 @@ the async bridge. The cache is per-user: every read and write is keyed by
 ``user_id`` (freshness via ``last_synced_at``), so warm and live paths always
 carry identical userplaycount/userloved values.
 
-- read path (all async): track core (TTL via ``last_fetched_at``), album
-  title, artist tags and album tags (TTL via ``tags_fetched_at``), per-user
-  data (TTL via ``last_synced_at``). All-or-nothing per track: anything
+- read path (all async): track core (TTL ``GLOBAL_TTL``), album
+  title, artist tags and album tags (TTL ``GLOBAL_TTL`` via
+  ``tags_fetched_at``), per-user data (``_user_data_fresh``: 24h-fresh, or
+  unreplayed-since-verify with loved on its own 7d clock, plus a 30d safety
+  net). All-or-nothing per track: anything
   missing or stale triggers a full live refetch of that track. The two
   track stamps gate their own group — write-back always stores core and
   tags atomically, so a fresh row implies freshly fetched tags (including
@@ -23,7 +25,7 @@ Callers must commit the session (writes happen on misses).
 import asyncio
 import functools
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from models.album import Album
 from models.album_tag import AlbumTag
@@ -41,9 +43,50 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
+# Freshness policy (4b): slow-moving global data lives longer; personal
+# data refreshes only where something could have changed. Documented
+# compromise: global figures up to 7 days old can sit near a narrow filter
+# threshold (e.g. "under 10,000 plays") and flip it. Rare, accepted,
+# pinned by test.
+GLOBAL_TTL = timedelta(days=7)
+# Loved needs its own clock: liking needs no replay to change it.
+# NOTE (scaling): this re-checks loved for every track in the run once a
+# week (~1 call/track). If playlists get much bigger or automations many
+# more, per-track loved fetches are the first place to look.
+LOVED_TTL = timedelta(days=7)
+# Safety net: whatever the signals say, personal data older than this is
+# re-verified. Bounds any hole in the replay signal to a month.
+SAFETY_NET_TTL = timedelta(days=30)
 
-def _fresh(ts) -> bool:
-    return ts is not None and ts >= (datetime.now(UTC) - CACHE_TTL)
+
+def _fresh(ts, ttl=CACHE_TTL) -> bool:
+    return ts is not None and ts >= (datetime.now(UTC) - ttl)
+
+
+def _user_data_fresh(user_row) -> bool:
+    """Personal data is servable without refetch when nothing changed it.
+
+    - synced within 24h: freshly verified, trust everything;
+    - not replayed since verify (last_played_at <= last_synced_at): the
+      playcount is exact by construction, no call needed;
+    - loved is trusted on its own 7d clock (see LOVED_TTL);
+    - synced over 30d ago: safety net, refetch regardless;
+    - unknown last play (NULL): never trusted past 24h.
+    """
+    if user_row is None:
+        return False
+    synced = user_row.last_synced_at
+    if synced is None:
+        return False
+    now = datetime.now(UTC)
+    if now - synced > SAFETY_NET_TTL:
+        return False
+    if now - synced <= CACHE_TTL:
+        return True
+    if not _fresh(synced, LOVED_TTL):
+        return False
+    played = user_row.last_played_at
+    return played is not None and played <= synced
 
 
 async def _read_cached_tracks(
@@ -120,10 +163,10 @@ async def _read_cached_tracks(
     out: list[dict | None] = []
     for track in tracks:
         row = by_key.get((track.get("artist", ""), track.get("title", "")))
-        if row is None or not _fresh(row.last_fetched_at):
+        if row is None or not _fresh(row.last_fetched_at, GLOBAL_TTL):
             out.append(None)
             continue
-        if not _fresh(row.tags_fetched_at):
+        if not _fresh(row.tags_fetched_at, GLOBAL_TTL):
             # Tags never verified (or stale): mirror them like any other
             # miss. The migration backfills old rows, so this only fires
             # for rows that genuinely skipped a full fetch.
@@ -140,7 +183,8 @@ async def _read_cached_tracks(
         else:
             album_tags = []
         user_row = user_map.get(row.id)
-        if user_row is None or not _fresh(user_row.last_synced_at):
+        # The explicit None keeps mypy narrowing (helper also guards it).
+        if user_row is None or not _user_data_fresh(user_row):
             out.append(None)
             continue
         out.append(
