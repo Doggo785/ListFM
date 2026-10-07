@@ -171,6 +171,7 @@ async def _write_back(
             album_id=album_id,
             listeners=info.get("listeners", 0) or 0,
             global_playcount=info.get("global_playcount", 0) or 0,
+            image_url=info.get("image") or None,
         )
         # A live fetch re-stamps the row even if the core was still fresh
         # (e.g. only the tags were stale), so the next read is a full hit.

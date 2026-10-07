@@ -294,3 +294,72 @@ async def test_pipeline_cached_reports_cache_stats():
             assert second["cache_hits"] == 1
             assert second["lastfm_calls"] == 0
             assert second["tracks"] == first["tracks"]
+
+
+def test_is_rate_limit_error_detects_29_and_chains():
+    """Only error 29 counts, directly or wrapped in `raise ... from`."""
+    assert lastfm.is_rate_limit_error(lastfm.pylast.WSError(None, "29", "slow down")) is True
+    assert lastfm.is_rate_limit_error(lastfm.pylast.WSError(None, "8", "other")) is False
+    assert lastfm.is_rate_limit_error(RuntimeError("boom")) is False
+    try:
+        try:
+            raise lastfm.pylast.WSError(None, "29", "slow down")
+        except lastfm.pylast.WSError as inner:
+            raise lastfm.pylast.PyLastError() from inner
+    except lastfm.pylast.PyLastError as chained:
+        assert lastfm.is_rate_limit_error(chained) is True
+
+
+def test_note_possible_rate_limit_arms_backoff_only_on_29():
+    """A 29 arms the process-wide backoff; other errors just log."""
+    with patch.object(lastfm, "note_rate_limited") as mock_note:
+        lastfm._note_possible_rate_limit(lastfm.pylast.WSError(None, "29", "slow down"))
+        mock_note.assert_called_once_with()
+        lastfm._note_possible_rate_limit(RuntimeError("boom"))
+        assert mock_note.call_count == 1
+
+
+def test_throttled_call_honors_backoff_window():
+    """After note_rate_limited, gated calls sleep out the window."""
+    with patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0):
+        try:
+            lastfm.note_rate_limited(0.2)
+            start = time.monotonic()
+            _throttled_call()
+            assert time.monotonic() - start >= 0.15
+        finally:
+            lastfm._rate_limit_until = 0.0
+
+
+def test_enrich_29_error_arms_backoff_and_keeps_defaults():
+    """A 29 on one getter degrades that field and arms the backoff."""
+
+    class _FlakyTrack:
+        def get_listener_count(self):
+            raise lastfm.pylast.WSError(None, "29", "Rate limit exceeded")
+
+        def get_playcount(self):
+            return 5
+
+        def get_userplaycount(self):
+            return 0
+
+        def get_userloved(self):
+            return False
+
+        def get_album(self):
+            return None
+
+    with (
+        patch("services.lastfm.get_network", return_value=object()),
+        patch("services.lastfm.pylast.Track", return_value=_FlakyTrack()),
+        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+        patch.object(lastfm, "note_rate_limited") as mock_note,
+    ):
+        try:
+            out = get_track_full_info(object(), "u", "A", "T")
+        finally:
+            lastfm._rate_limit_until = 0.0
+    assert out["listeners"] == 0
+    assert out["global_playcount"] == 5
+    mock_note.assert_called_once_with()

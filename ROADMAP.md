@@ -49,10 +49,10 @@ fera jamais zéro appel avec un filtre tag actif, mais on s'en rapproche.
 
 Tranches (une petite PR chacune, rituel habituel : tests + CI verte + "go merge #N") :
 
-- **T2 — retour en direct (PR #43, en cours)** : run async + compteur/barre
+- **T2 — retour en direct (mergé #43)** : run async + compteur/barre
   sur run et preview (polling ticket), cancel preview qui arrête le serveur,
   logs `pipeline:`/`enrich cache:` visibles, états done/error/cancelled.
-- **T3 — vitesse pure** : paquets à 200, `extended=1` sur recents (loved +
+- **T3 — vitesse pure (en cours, PR à venir)** : paquets à 200, `extended=1` sur recents (loved +
   images offerts), cadence ~1s → ~0,25s avec repli auto sur erreur 29.
   Cible : cas filtré type ~300 → ~50-100 appels en moins d'une minute.
 - **T4 — cache malin** : fini le TTL qui jette tout → recents incrémentaux
