@@ -55,12 +55,16 @@ Tranches (une petite PR chacune, rituel habituel : tests + CI verte + "go merge 
 - **T3 — vitesse pure (en cours, PR à venir)** : paquets à 200, `extended=1` sur recents (loved +
   images offerts), cadence ~1s → ~0,25s avec repli auto sur erreur 29.
   Cible : cas filtré type ~300 → ~50-100 appels en moins d'une minute.
-- **T4 — cache malin** : fini le TTL qui jette tout → recents incrémentaux
-  (stocker avec date, ne recharger que le nouveau depuis `from`), fraîcheur
-  par groupe (noyau global / tags globaux / données perso) + colonne
-  `tags_fetched_at`, règle d'or (jamais filtrer sur du non-cherché), tags
-  par artiste persistants et partagés entre users. Brancher le `only=`
-  (déjà prêt et testé depuis #42) avec write-back par groupe.
+- **T4 — cache malin** : fini le précipice des 24h → fraîcheur différenciée
+  (global/tags 7j, compromis documenté ; perso revérifiée seulement si
+  rejouée depuis, loved à 7j, filet 30j), fraîcheur par groupe (noyau
+  global / tags globaux / données perso) + colonne `tags_fetched_at`,
+  règle d'or (jamais filtrer sur du non-cherché), tags par artiste
+  persistants et partagés entre users. Brancher le `only=` (déjà prêt et
+  testé depuis #42) avec write-back par groupe.
+  - T4a mergé (#46) : colonne + pacte explicite, comportement inchangé.
+  - T4b en cours : politique ci-dessus. Mesuré : 6 morceaux périmés 25h →
+    nouvelle politique 0 appel / 0,0s, ancienne 42 appels / 11,7s.
 - **T5 — retry honnête** : vraie route retry avec `scheduled_for` d'origine +
   fenêtre `from/to` ancrée (réelle grâce à T4, plus un label), états "nouvel
   essai prévu" vs "échec définitif". Le bouton Re-run actuel refait un run
