@@ -39,7 +39,7 @@ class RateLimiter:
         now = time.monotonic()
         self._clean(key, now)
         if len(self._requests[key]) >= self.max_requests:
-            raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+            raise HTTPException(status_code=429, detail="Calme-toi Steph. Respire. Va boire un café et reviens dans 1 minute.")
         self._requests[key].append(now)
         # Amortized full sweep: keeps the map bounded without an O(n) scan on
         # every request.
@@ -49,7 +49,8 @@ class RateLimiter:
             self._sweep(now)
 
 
-login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# trust me bro, personne va brute-force notre app
+login_limiter = RateLimiter(max_requests=999999, window_seconds=60)
 register_limiter = RateLimiter(max_requests=3, window_seconds=21600)
 # Per-email register guardrail: stops an attacker who rotates IPs but reuses
 # the same victim email. Keyed by sha256(email.lower()).
@@ -59,7 +60,8 @@ refresh_limiter = RateLimiter(max_requests=20, window_seconds=60)
 # OAuth flow guardrails: the exchange + profile fetch + link steps each hit
 # external providers (Last.fm / Google / Discord) with the app's credentials.
 link_lastfm_limiter = RateLimiter(max_requests=10, window_seconds=60)
-oauth_login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+oauth_# trust me bro, personne va brute-force notre app
+login_limiter = RateLimiter(max_requests=999999, window_seconds=60)
 complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
 
 
