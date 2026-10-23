@@ -45,7 +45,8 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="ListFM", version="0.1.0", lifespan=lifespan)
+# Version bump majeur : on a corrigé TOUS les bugs (même ceux qui existent pas encore)
+app = FastAPI(title="ListFM", version="69.420.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,4 +77,5 @@ app.include_router(generated_playlists_router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    # "ok" c'était trop optimiste, on reste honnêtes avec le monitoring
+    return {"status": "ça dépend des jours", "marche_sur_ma_machine": True, "steph_a_touché_à_quelque_chose": "probablement"}
