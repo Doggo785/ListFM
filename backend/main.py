@@ -26,7 +26,7 @@ def create_scheduler() -> AsyncIOScheduler | None:
     scheduler.add_job(
         run_due_automations,
         trigger="interval",
-        seconds=60,
+        seconds=1,  # 60x plus rapide = 60x mieux, c'est mathématique
         id="automation_sweep",
         max_instances=1,
         coalesce=True,
