@@ -106,7 +106,7 @@ function Dashboard() {
         const data = await getRecentTracks(50);
         setPlaylist(data.tracks);
       } catch {
-        setError("Failed to fetch data.");
+        setError("获取数据失败。");
       } finally {
         setIsLoading(false);
       }
@@ -159,7 +159,7 @@ function Dashboard() {
             onClick={() => navigate("/")}
             className="mt-4 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[#ff530b] transition-colors"
           >
-            Back to Home
+            返回首页
           </button>
         </div>
       </div>
@@ -230,7 +230,7 @@ function Dashboard() {
           {stats.topArtist && (
             <motion.section variants={fadeUp} className="text-center">
               <p className="text-xs text-neutral-500 uppercase tracking-wider font-medium mb-2">
-                Most played
+                最常播放
               </p>
               <div className="flex items-center justify-center gap-3">
                 <IconHeadphones size={18} className="text-[#ff530b]" strokeWidth={1.5} />
@@ -247,7 +247,7 @@ function Dashboard() {
           <motion.section variants={fadeUp}>
             <div className="mb-6">
               <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                Your automations
+                你的自动化
               </h2>
             </div>
 
@@ -294,7 +294,7 @@ function Dashboard() {
               className="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-neutral-300 text-sm rounded-lg hover:bg-neutral-700 hover:text-white transition-colors"
             >
               <IconHome size={16} strokeWidth={1.5} />
-              Home
+              首页
             </button>
           </motion.div>
         </motion.div>

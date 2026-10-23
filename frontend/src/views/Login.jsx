@@ -15,7 +15,7 @@ function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Login - ListFM";
+    document.title = "登录 - ListFM";
   }, []);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ function Login() {
     setError("");
 
     if (!email.trim() || !password.trim()) {
-      setError("Please enter both email and password");
+      setError("请输入邮箱和密码");
       return;
     }
 
@@ -38,7 +38,7 @@ function Login() {
       await login(email, password);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.message || "Invalid credentials. Please try again.");
+      setError(err.message || "凭据无效，请重试。");
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ function Login() {
           >
             ListFM
           </Link>
-          <p className="login-page__tagline">Welcome back</p>
+          <p className="login-page__tagline">欢迎回来</p>
         </motion.div>
 
         <motion.form
@@ -120,7 +120,7 @@ function Login() {
                 <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
                 <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
               </svg>
-              Sign in with Google
+              使用 Google 登录
             </button>
 
             <button
@@ -132,17 +132,17 @@ function Login() {
               <svg width="22" height="17" viewBox="0 0 256 199" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193A161.094 161.094 0 0 0 79.735 175.3a136.413 136.413 0 0 1-21.846-10.632 108.636 108.636 0 0 0 5.356-4.237c42.122 19.702 87.89 19.702 129.51 0a131.66 131.66 0 0 0 5.355 4.237 136.07 136.07 0 0 1-21.886 10.653c4.006 8.02 8.638 15.67 13.873 22.848 21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.804 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.014-11.805-23.014-26.18s10.148-26.2 23.014-26.2c12.867 0 23.236 11.804 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="white"/>
               </svg>
-              Sign in with Discord
+              使用 Discord 登录
             </button>
           </div>
 
           <div className="login-page__divider">
-            <span>or</span>
+            <span>或</span>
           </div>
 
           <div className="login-page__field">
             <label htmlFor="email" className="login-page__label">
-              Email
+              邮箱
             </label>
             <input
               id="email"
@@ -158,7 +158,7 @@ function Login() {
 
           <div className="login-page__field">
             <label htmlFor="password" className="login-page__label">
-              Password
+              密码
             </label>
             <div className="relative">
               <input
@@ -166,7 +166,7 @@ function Login() {
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                placeholder="请输入密码"
                 className="login-page__input pr-10"
                 autoComplete="current-password"
                 disabled={loading}
@@ -189,10 +189,10 @@ function Login() {
             {loading ? (
               <span className="login-page__button-loading">
                 <span className="login-page__spinner" />
-                Signing in...
+                登录中...
               </span>
             ) : (
-              "Sign In"
+              "登录"
             )}
           </button>
         </motion.form>
@@ -204,9 +204,9 @@ function Login() {
           transition={{ duration: 0.7, delay: 0.4 }}
         >
           <p className="login-page__hint">
-            Don't have an account?{" "}
+            还没有账户？{" "}
             <Link to="/register" className="login-page__link">
-              Create one
+              立即创建
             </Link>
           </p>
         </motion.div>

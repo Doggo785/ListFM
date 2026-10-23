@@ -85,10 +85,10 @@ function Playlists() {
         >
           <motion.header variants={fadeUp}>
             <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-              Playlists
+              歌单
             </h1>
             <p className="text-neutral-500 text-sm mt-2">
-              Your automated playlist generations
+              你的自动生成歌单
             </p>
           </motion.header>
 
@@ -100,7 +100,7 @@ function Playlists() {
                   onClick={() => refetch()}
                   className="mt-3 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[#ff530b] transition-colors"
                 >
-                  Retry
+                  重试
                 </button>
               </div>
             </motion.div>
@@ -111,13 +111,13 @@ function Playlists() {
               <div className="rounded-xl border border-neutral-800 bg-[#1a1a1a] p-8 text-center">
                 <p className="text-white font-medium mb-2">No playlists yet</p>
                 <p className="text-neutral-500 text-sm mb-4">
-                  Create your first automated playlist to get started.
+                  创建你的第一个自动化歌单吧。
                 </p>
                 <button
                   onClick={() => navigate("/playlists/new")}
                   className="px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
                 >
-                  Create a playlist
+                  创建歌单
                 </button>
               </div>
             </motion.div>

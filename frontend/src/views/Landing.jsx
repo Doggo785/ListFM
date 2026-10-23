@@ -35,8 +35,8 @@ function Landing() {
         >
           <h1 className="homepage__brand">ListFM</h1>
           <p className="homepage__tagline">
-            Your music, automated. Import your Last.fm listening history and
-            build smart playlists.
+            你的音乐，自动化。导入你的 Last.fm 收听历史，
+            创建智能歌单。
           </p>
         </motion.div>
 
@@ -55,13 +55,13 @@ function Landing() {
               onClick={() => navigate("/login")}
               className="w-full px-6 py-3 rounded-lg bg-[#FF6817] text-white font-semibold text-sm hover:bg-[#e55c14] transition-colors cursor-pointer"
             >
-              Sign In
+              登录
             </button>
             <button
               onClick={() => navigate("/register")}
               className="w-full px-6 py-3 rounded-lg border border-white/20 text-white font-semibold text-sm hover:bg-white/10 transition-colors cursor-pointer"
             >
-              Create Account
+              创建账户
             </button>
           </div>
         </motion.div>
@@ -73,7 +73,7 @@ function Landing() {
           transition={{ duration: 0.7, delay: 0.4 }}
         >
           <span>
-            Connect your Last.fm account to get started
+            连接你的 Last.fm 账户即可开始
           </span>
         </motion.div>
       </div>

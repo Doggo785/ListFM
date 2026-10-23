@@ -27,10 +27,10 @@ const getPasswordStrength = (password) => {
   
   const normalizedScore = Math.min(Math.round((score / 6) * 100), 100);
   
-  if (normalizedScore < 25) return { score: normalizedScore, label: "Weak", color: "#ef4444" };
-  if (normalizedScore < 50) return { score: normalizedScore, label: "Fair", color: "#f97316" };
-  if (normalizedScore < 75) return { score: normalizedScore, label: "Good", color: "#eab308" };
-  return { score: normalizedScore, label: "Strong", color: "#22c55e" };
+  if (normalizedScore < 25) return { score: normalizedScore, label: "弱", color: "#ef4444" };
+  if (normalizedScore < 50) return { score: normalizedScore, label: "一般", color: "#f97316" };
+  if (normalizedScore < 75) return { score: normalizedScore, label: "良好", color: "#eab308" };
+  return { score: normalizedScore, label: "强", color: "#22c55e" };
 };
 
 const fadeUp = {
@@ -66,7 +66,7 @@ function Register() {
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   useEffect(() => {
-    document.title = "Register - ListFM";
+    document.title = "注册 - ListFM";
   }, []);
 
   function validate() {
@@ -95,11 +95,11 @@ function Register() {
     } catch (err) {
       const msg = err?.message || "";
       if (msg.includes("409") || msg.toLowerCase().includes("already")) {
-        setError("An account with this email already exists");
+        setError("该邮箱已被注册");
       } else if (msg.includes("422")) {
-        setError("Invalid input. Please check your details");
+        setError("输入无效，请检查你的信息");
       } else {
-        setError("Something went wrong. Please try again");
+        setError("出了点问题，请重试");
       }
     } finally {
       setLoading(false);
@@ -122,10 +122,10 @@ function Register() {
             ListFM
           </Link>
           <h1 className="text-3xl font-bold text-white tracking-tight">
-            Create your account
+            创建你的账户
           </h1>
           <p className="text-neutral-500 text-sm mt-2">
-            Join ListFM to build automated playlists
+            加入 ListFM，创建自动化歌单
           </p>
         </motion.header>
 
@@ -159,7 +159,7 @@ function Register() {
                 <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
                 <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
               </svg>
-              Sign up with Google
+              使用 Google 注册
             </button>
 
             <button
@@ -171,7 +171,7 @@ function Register() {
               <svg width="22" height="17" viewBox="0 0 256 199" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M216.856 16.597A208.502 208.502 0 0 0 164.042 0c-2.275 4.113-4.933 9.645-6.766 14.046-19.692-2.961-39.203-2.961-58.533 0-1.832-4.4-4.55-9.933-6.846-14.046a207.809 207.809 0 0 0-52.855 16.638C5.618 67.147-3.443 116.4 1.087 164.956c22.169 16.555 43.653 26.612 64.775 33.193A161.094 161.094 0 0 0 79.735 175.3a136.413 136.413 0 0 1-21.846-10.632 108.636 108.636 0 0 0 5.356-4.237c42.122 19.702 87.89 19.702 129.51 0a131.66 131.66 0 0 0 5.355 4.237 136.07 136.07 0 0 1-21.886 10.653c4.006 8.02 8.638 15.67 13.873 22.848 21.142-6.58 42.646-16.637 64.815-33.213 5.316-56.288-9.08-105.09-38.056-148.36ZM85.474 135.095c-12.645 0-23.015-11.805-23.015-26.18s10.149-26.2 23.015-26.2c12.867 0 23.236 11.804 23.015 26.2.02 14.375-10.148 26.18-23.015 26.18Zm85.051 0c-12.645 0-23.014-11.805-23.014-26.18s10.148-26.2 23.014-26.2c12.867 0 23.236 11.804 23.015 26.2 0 14.375-10.148 26.18-23.015 26.18Z" fill="white"/>
               </svg>
-              Sign up with Discord
+              使用 Discord 注册
             </button>
 
             <div className="relative flex items-center gap-3 py-1">
@@ -186,7 +186,7 @@ function Register() {
               htmlFor="register-email"
               className="block text-xs font-medium text-neutral-400 uppercase tracking-wider"
             >
-              Email
+              邮箱
             </label>
             <div className="relative">
               <IconMail
@@ -213,7 +213,7 @@ function Register() {
               htmlFor="register-display-name"
               className="block text-xs font-medium text-neutral-400 uppercase tracking-wider"
             >
-              Display name
+              显示名称
             </label>
             <div className="relative">
               <IconUser
@@ -225,7 +225,7 @@ function Register() {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Optional"
+                placeholder="可选"
                 autoComplete="name"
                 className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
               />
@@ -237,7 +237,7 @@ function Register() {
               htmlFor="register-password"
               className="block text-xs font-medium text-neutral-400 uppercase tracking-wider"
             >
-              Password
+              密码
             </label>
             <div className="relative">
               <IconLock
@@ -252,7 +252,7 @@ function Register() {
                   setPassword(e.target.value);
                   if (error) setError("");
                 }}
-                placeholder="At least 8 characters"
+                placeholder="至少 8 个字符"
                 autoComplete="new-password"
                 className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-10 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
               />
@@ -307,7 +307,7 @@ function Register() {
               htmlFor="register-confirm-password"
               className="block text-xs font-medium text-neutral-400 uppercase tracking-wider"
             >
-              Confirm password
+              确认密码
             </label>
             <div className="relative">
               <IconLock
@@ -322,7 +322,7 @@ function Register() {
                   setConfirmPassword(e.target.value);
                   if (error) setError("");
                 }}
-                placeholder="Re-enter your password"
+                placeholder="再次输入密码"
                 autoComplete="new-password"
                 className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 pl-10 pr-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
               />
@@ -338,7 +338,7 @@ function Register() {
               {loading ? (
                 <>
                   <IconLoader2 size={16} className="animate-spin" />
-                  Creating account...
+                  正在创建账户...
                 </>
               ) : (
                 "Create account"
@@ -351,12 +351,12 @@ function Register() {
           variants={fadeUp}
           className="text-center text-sm text-neutral-500"
         >
-          Already have an account?{" "}
+          已有账户？{" "}
           <Link
             to="/login"
             className="text-[#17AEFF] hover:text-[#17AEFF]/80 transition-colors font-medium"
           >
-            Sign in
+            登录
           </Link>
         </motion.p>
       </motion.div>

@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const iconClass = "text-neutral-200 h-5 w-5 flex-shrink-0";
 
-function AppSidebar({ userLabel = "User" }) {
+function AppSidebar({ userLabel = "用户" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,25 +37,25 @@ function AppSidebar({ userLabel = "User" }) {
 
   const links = [
     {
-      label: "Home",
+      label: "首页",
       href: "/dashboard",
       icon: <IconHome className={iconClass} />,
       className: linkClass("/dashboard"),
     },
     {
-      label: "Playlists",
+      label: "歌单",
       href: "/playlists",
       icon: <IconPlaylist className={iconClass} />,
       className: linkClass("/playlists"),
     },
     {
-      label: "Stats",
+      label: "统计",
       href: null,
       icon: <IconChartBar className={iconClass} />,
       className: undefined,
     },
     {
-      label: "Profile",
+      label: "个人资料",
       href: null,
       icon: <IconUser className={iconClass} />,
       className: undefined,
@@ -104,7 +104,7 @@ function AppSidebar({ userLabel = "User" }) {
             className="mt-3 flex items-center gap-2 text-neutral-400 hover:text-red-400 transition-colors text-sm"
           >
             <IconLogout size={16} />
-            {open && <span>Log out</span>}
+            {open && <span>退出登录</span>}
           </button>
         </div>
       </SidebarBody>
