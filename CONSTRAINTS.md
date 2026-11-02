@@ -56,7 +56,7 @@ Règle non négociable rappelée : l'agent n'a JAMAIS le droit de merger, il ouv
 | SHIP (CI) | `backend-tests`, `ruff`, `mypy`, `gitleaks`, `osv-scanner`, `frontend-build`, `frontend-tests` | illimité |
 
 Toujours scoper au diff : coverage des lignes touchées, semgrep sur fichiers touchés.
-`check:fast` = ce qui tourne après un edit, `check:task` = fin de tâche, `check:full` = CI.
+`npm run check:fast` (dans `frontend/`) = ce qui tourne après un edit ; `scripts/ci-local.sh` = tous les jobs CI en local, à lancer avant chaque push (`scripts/ci-local.sh ruff mypy` pour un sous-ensemble).
 `CONSTRAINTS.md` est la source canonique ; les scripts sont des raccourcis qui doivent la refléter.
 
 ## Gardes du seuil (revue du diff, `git diff` suffit)

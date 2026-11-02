@@ -35,14 +35,13 @@ It serves on :5173.
 
 ## Quality gates
 
-Run these before opening a PR:
+Run every CI job locally before you push. Start the `listfm-db` container first:
 
 ```
-ruff check backend
-pytest backend/tests/ -q
-npm run lint
-npm run build
+scripts/ci-local.sh
 ```
+
+It prints one OK or FAIL line per job. Pass job names to run a subset, for example `scripts/ci-local.sh ruff mypy`.
 
 Ruff config lives in `ruff.toml`, zero findings required. The backend suite holds around 157 tests and takes about 80s.
 
