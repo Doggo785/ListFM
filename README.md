@@ -74,7 +74,7 @@ pip install -r backend/requirements.txt
 cd frontend && npm install && cd ..
 
 # 5. Start Postgres on port 5433 (first run creates the container)
-docker run -d --name listfm-db -p 5433:5433 \
+docker run -d --name listfm-db -p 5433:5432 \
   -e POSTGRES_USER=listfm -e POSTGRES_PASSWORD=listfm \
   -e POSTGRES_DB=listfm postgres:16
 # Later runs: docker start listfm-db
