@@ -6,7 +6,6 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 let isRefreshing = false;
 let refreshPromise = null;
 
-let _username = null;
 let _onSessionExpired = null;
 
 /**
@@ -15,22 +14,6 @@ let _onSessionExpired = null;
  */
 export function setSessionExpiredHandler(handler) {
   _onSessionExpired = handler;
-}
-
-/**
- * Cache the current user's Last.fm username.
- * Called by AuthContext when user state changes.
- * @param {string|null} username
- */
-export function setCurrentUsername(username) {
-  _username = username;
-}
-
-function requireUsername() {
-  if (!_username) {
-    throw new Error("No username available — user may not be authenticated");
-  }
-  return _username;
 }
 
 export async function request(path, options = {}) {
@@ -86,17 +69,14 @@ export async function request(path, options = {}) {
 }
 
 export async function getUserInfo() {
-  requireUsername();
   return request("/api/info");
 }
 
 export async function getRecentTracks(limit = 50) {
-  requireUsername();
   return request(`/api/recent-tracks?limit=${limit}`);
 }
 
 export async function previewAutomation(automation, progressToken) {
-  requireUsername();
   return request("/api/automations/preview", {
     method: "POST",
     body: JSON.stringify(
@@ -106,17 +86,14 @@ export async function previewAutomation(automation, progressToken) {
 }
 
 export async function getAutomations() {
-  requireUsername();
   return request("/api/automations");
 }
 
 export async function getAutomation(id) {
-  requireUsername();
   return request(`/api/automations/${id}`);
 }
 
 export async function createAutomation(automation) {
-  requireUsername();
   return request("/api/automations", {
     method: "POST",
     body: JSON.stringify(automation),
@@ -124,7 +101,6 @@ export async function createAutomation(automation) {
 }
 
 export async function updateAutomation(id, automation) {
-  requireUsername();
   return request(`/api/automations/${id}`, {
     method: "PATCH",
     body: JSON.stringify(automation),
@@ -132,19 +108,16 @@ export async function updateAutomation(id, automation) {
 }
 
 export async function deleteAutomation(id) {
-  requireUsername();
   return request(`/api/automations/${id}`, {
     method: "DELETE",
   });
 }
 
 export async function getAutomationHistory(id) {
-  requireUsername();
   return request(`/api/automations/${id}/history`);
 }
 
 export async function runAutomationNow(id, progressToken) {
-  requireUsername();
   return request(`/api/automations/${id}/run`, {
     method: "POST",
     ...(progressToken ? { body: JSON.stringify({ progress_token: progressToken }) } : {}),
@@ -152,12 +125,10 @@ export async function runAutomationNow(id, progressToken) {
 }
 
 export async function getGeneratedPlaylistTracks(playlistId) {
-  requireUsername();
   return request(`/api/generated-playlists/${playlistId}/tracks`);
 }
 
 export async function getGeneratedPlaylists() {
-  requireUsername();
   return request("/api/generated-playlists");
 }
 
@@ -183,19 +154,16 @@ export function newProgressToken() {
 }
 
 export async function getPreviewProgress(token) {
-  requireUsername();
   return request(`/api/automations/preview-progress/${token}`);
 }
 
 export async function cancelPreview(token) {
-  requireUsername();
   return request(`/api/automations/preview-progress/${token}`, {
     method: "DELETE",
   });
 }
 
 export async function getRunProgress(id, token) {
-  requireUsername();
   const query = token ? `?token=${encodeURIComponent(token)}` : "";
   return request(`/api/automations/${id}/run-progress${query}`);
 }

@@ -34,7 +34,7 @@ Lire avant d'agir :
 ## Pièges frontend
 
 - JSX sans TypeScript malgré la dépendance TS ; imports via l'alias `@/`.
-- `src/lib/api.js` est l'unique client HTTP (refresh JWT auto, cache module `_username`). Pas de second client.
+- `src/lib/api.js` est l'unique client HTTP (refresh JWT auto). Pas de second client.
 
 ## Base de données locale
 

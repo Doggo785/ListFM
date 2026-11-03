@@ -10,7 +10,6 @@ import CronEditor from "@/components/builder/CronEditor";
 
 vi.mock("@/lib/api", () => ({
   request: vi.fn(),
-  setCurrentUsername: vi.fn(),
   setSessionExpiredHandler: vi.fn(),
 }));
 
