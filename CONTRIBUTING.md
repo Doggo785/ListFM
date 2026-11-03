@@ -43,7 +43,7 @@ scripts/ci-local.sh
 
 It prints one OK or FAIL line per job. Pass job names to run a subset, for example `scripts/ci-local.sh ruff mypy`.
 
-Ruff config lives in `ruff.toml`, zero findings required. The backend suite holds around 157 tests and takes about 80s.
+Ruff config lives in `ruff.toml`, zero findings required.
 
 ## Branch workflow
 
@@ -51,7 +51,7 @@ Ruff config lives in `ruff.toml`, zero findings required. The backend suite hold
 
 Direct pushes to `dev` and `main` are blocked, branch protection applies to admins too. Merges are squashed and the branch is deleted on merge.
 
-CI must pass before merge. Required checks are backend-tests, frontend-build, and ruff.
+CI must pass before merge. Every job in `.github/workflows/ci.yml` is a required check.
 
 The PR title doubles as the commit message. Use `type(scope): summary`, lowercase imperative. Types in use are feat, fix, chore, docs, ci, refactor, style, and test.
 
@@ -83,6 +83,6 @@ Backend tests use pytest with pytest-asyncio. They call the ASGI app through htt
 
 Mock outside calls with unittest.mock.patch. Clean DB fixtures in try/finally so state never leaks between cases.
 
-Frontend has no test suite yet. `npm run lint` and `npm run build` are the gates there.
+Frontend tests use vitest, run them with `npm test` in `frontend/`.
 
 PRs need green CI. No reviewer approval is required.

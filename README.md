@@ -31,7 +31,7 @@ Planned text: "Try it via the hosted instance" + link.
 2. Create an automation. Pick a source (top tracks, recent plays, loved tracks, top artists), a period, filter rules, and a schedule. Leave the schedule empty for manual runs.
 3. Let the sweep run it on schedule, or press Run now.
 4. Each run writes a generated playlist in the app. Tracks and tags are frozen at generation time, so the list stays as it was.
-5. Check run history for dates, counts before and after filtering, duration, and errors. Failed runs retry up to 4 times with backoff. You can also re-run by hand.
+5. Check run history for dates, counts before and after filtering, duration, and errors. Failed runs retry up to 3 times with backoff (5 min, 20 min, 1 h). You can also re-run by hand.
 
 ## Features
 
@@ -43,7 +43,7 @@ Planned text: "Try it via the hosted instance" + link.
 - Generated playlists with an openable detail view and frozen snapshots.
 - Dashboard with recent tracks and listening stats: unique artists, albums, top artist. The dashboard shows the last 50 recent tracks.
 - Auth with email and password plus optional Google and Discord OAuth. JWT access and refresh tokens live in httpOnly cookies, with refresh rotation and revoke-all on login.
-- Last.fm responses are cached in the database for 24 hours, so repeat views skip extra API calls.
+- Last.fm responses are cached in the database with per-data freshness (7 days for global data and tags, 30-day safety net), so repeat runs skip extra API calls.
 
 ## Quickstart
 
@@ -130,7 +130,7 @@ npm run lint
 
 ## Stack
 
-Backend: Python 3.11+, FastAPI, Pydantic v2, PostgreSQL with asyncpg, Alembic for migrations. Frontend: React 19, Vite 8, Tailwind CSS 4, Radix UI, ESLint. CI runs on GitHub Actions (backend tests plus frontend build).
+Backend: Python 3.12, FastAPI, Pydantic v2, PostgreSQL with asyncpg, Alembic for migrations. Frontend: React 19, Vite 8, Tailwind CSS 4, Radix UI, ESLint. CI runs on GitHub Actions: tests, lint, types, secret and dependency scans.
 
 ## License
 
