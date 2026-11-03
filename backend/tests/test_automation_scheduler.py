@@ -8,7 +8,6 @@ Covers:
   (5min -> 20min -> 1h), then stay failed; newer chains supersede old ones
 """
 
-import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
@@ -18,7 +17,6 @@ from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
-from models.track import Track
 from repositories.automation_history import create_automation_history
 from services.automation_runner import MAX_ATTEMPT, run_due_automations
 from sqlalchemy import delete, func, select
@@ -418,41 +416,6 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
     finally:
         await _cleanup_user_with_automations(client, email)
         await _cleanup_user(email=other_email)
-
-
-@pytest.mark.asyncio
-async def test_manual_save_does_not_stamp_tracks_fetched(client: AsyncClient):
-    """Manual playlist save records identity only, never a fetch stamp."""
-    email = _unique_email()
-    try:
-        await _register_login_link(client, email)
-        created = await client.post("/api/automations", json=_create_body())
-        automation_id = created.json()["id"]
-        suffix = uuid.uuid4().hex[:8]
-        resp = await client.post(
-            "/api/generated-playlists",
-            json={
-                "automation_id": automation_id,
-                "source_type": "top_tracks",
-                "source_period": "3m",
-                "tracks": [{"title": f"Saved Song {suffix}", "artist": f"Saved Artist {suffix}"}],
-                "track_count": 1,
-            },
-        )
-        assert resp.status_code == 201
-        async with _TestSessionLocal() as db:
-            row = (
-                await db.execute(
-                    select(Track).where(
-                        Track.artist == f"Saved Artist {suffix}",
-                        Track.title == f"Saved Song {suffix}",
-                    )
-                )
-            ).scalar_one()
-            assert row.listeners == 0
-            assert row.last_fetched_at is None
-    finally:
-        await _cleanup_user_with_automations(client, email)
 
 
 @pytest.mark.asyncio

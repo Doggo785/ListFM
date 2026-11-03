@@ -13,14 +13,12 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 - **Socle produit** (automations → playlists générées → historique) : flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
 - **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47).
-- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63).
+- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées.
 
 ## Maintenant
 
-1. **Docs à jour** : ROADMAP, VISION, AGENTS.md, compteurs retirés des docs.
-2. **Routes mortes** : supprimer `/top-tags`, `/top-tracks`, `/loved-tracks`, `/source-tracks` (`backend/routers/users.py`), `POST` et `GET /generated-playlists/{id}`, plus `saveGeneratedPlaylist` / `getGeneratedPlaylist` de `api.js` et leurs tests. Le frontend n'en appelle aucune ; le `period` non validé (ex-VAL-PERIOD) et l'`automation_id` étranger accepté par le POST disparaissent avec elles.
-3. **`main` seul** : avancer `main` jusqu'à `dev`, mettre sur `main` la protection de `dev` (PR obligatoire, 7 checks, pas de force-push, admins inclus), Dependabot sur `main`, `dev` → `main` dans les docs et `scripts/ci-local.sh`, supprimer `dev`.
-4. **release-please** (config ci-dessus), puis merge de sa PR de release → **v0.1.0**. Retirer la ligne de statut du README à ce moment.
+1. **`main` seul** : avancer `main` jusqu'à `dev`, mettre sur `main` la protection de `dev` (PR obligatoire, 7 checks, pas de force-push, admins inclus), Dependabot sur `main`, `dev` → `main` dans les docs et `scripts/ci-local.sh`, supprimer `dev`.
+2. **release-please** (config ci-dessus), puis merge de sa PR de release → **v0.1.0**. Retirer la ligne de statut du README à ce moment.
 
 ## Avant v1.0.0
 
@@ -40,6 +38,13 @@ Bugs de l'audit du 2026-11-03, par priorité :
 12. **Code testé mais jamais appelé** : `run_automation_pipeline` (sync), `count_active_conditions` (Python), `get_user_tracks_needing_sync`, `update_last_played`, `upsert_last_played_at`, `upsert_track_tag`, `get_track_by_id`.
 13. **Session expirée** : après un refresh raté, l'UI montre des 401 au lieu de revenir au login. Remettre `user` à null.
 14. **`requireUsername()`** dans `api.js` double la vérification serveur : supprimer `_username` et ses appels.
+
+Vitesse de l'aperçu (mesuré le 2026-11-03 : 48 morceaux sans cache = 326 appels, 83 s ; le temps suit appels × 0,25 s) :
+
+15. **5 × `track.getInfo` par morceau** : listeners, playcount, userplaycount, userloved et album passent chacun par leur getter pylast, qui refait le même appel (240 appels sur 326). Un seul `track.getInfo` JSON avec `username=` comme `get_recent_tracks_extended` : 326 → ~134 appels.
+16. **Tags artiste/album redemandés** : le cache est tout-ou-rien par morceau, un nouveau morceau d'un artiste connu refait `artist.getTopTags` et `album.getTopTags`. Date de fetch par artiste et par album, appel sauté sous 7 j.
+17. **Clé API dans les logs** : les logs INFO de `httpx` impriment l'URL avec `api_key`. `logging.getLogger("httpx").setLevel(logging.WARNING)` dans `main.py`.
+18. **Profil appelé 4 fois** : `get_user_info` fait 2 `user.getInfo`, et `AppSidebar` comme `Dashboard` appellent `/api/info`. Un appel JSON côté serveur, un appel partagé côté client.
 
 Produit et hygiène :
 

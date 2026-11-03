@@ -151,19 +151,6 @@ export async function getGeneratedPlaylists() {
   return request("/api/generated-playlists");
 }
 
-export async function getGeneratedPlaylist(id) {
-  requireUsername();
-  return request(`/api/generated-playlists/${id}`);
-}
-
-export async function saveGeneratedPlaylist(playlist) {
-  requireUsername();
-  return request("/api/generated-playlists", {
-    method: "POST",
-    body: JSON.stringify(playlist),
-  });
-}
-
 let progressTokenCounter = 0;
 
 export function newProgressToken() {

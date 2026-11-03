@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getGeneratedPlaylists,
-  getGeneratedPlaylist,
   setCurrentUsername,
 } from "@/lib/api";
 
@@ -52,32 +51,5 @@ describe("getGeneratedPlaylists", () => {
     await expect(getGeneratedPlaylists()).rejects.toThrow(
       "API 403: Link your Last.fm account"
     );
-  });
-});
-
-describe("getGeneratedPlaylist", () => {
-  beforeEach(() => {
-    setCurrentUsername("testuser");
-    globalThis.fetch = vi.fn();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    setCurrentUsername(null);
-  });
-
-  it("GETs /api/generated-playlists/:id", async () => {
-    const payload = { id: "gp-1", automation_id: "auto-1", name: "Weekly" };
-    globalThis.fetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => payload,
-    });
-
-    const result = await getGeneratedPlaylist("gp-1");
-
-    expect(result).toEqual(payload);
-    const [url] = globalThis.fetch.mock.calls[0];
-    expect(url).toContain("/api/generated-playlists/gp-1");
   });
 });

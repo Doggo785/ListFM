@@ -227,13 +227,6 @@ def get_recent_tracks(
     ]
 
 
-def get_top_tags(username: str) -> list[dict]:
-    network = get_network()
-    user = network.get_user(username)
-    top_tags = user.get_top_tags(limit=10)
-    return [{"name": tag.item.name, "count": int(tag.weight)} for tag in top_tags]
-
-
 def get_top_tracks(username: str, period: str = "3m", limit: int = 50) -> list[dict]:
     network = get_network()
     user = network.get_user(username)

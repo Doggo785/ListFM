@@ -1,9 +1,7 @@
-"""Tests for the /api user-data endpoints (info, recent-tracks, top-tags,
-top-tracks, loved-tracks, source-tracks).
+"""Tests for the /api user-data endpoints (info, recent-tracks).
 
 Upstream Last.fm failures must return 502 with a generic detail that leaks no
-internal exception text; the real error goes to server logs only. The 400
-unknown-source branch of /api/source-tracks must be preserved.
+internal exception text; the real error goes to server logs only.
 """
 
 from unittest.mock import patch
@@ -34,10 +32,6 @@ async def _register_login_link(client: AsyncClient, email: str) -> None:
 _ENDPOINTS = [
     ("/api/info", "get_user_info"),
     ("/api/recent-tracks", "get_recent_tracks"),
-    ("/api/top-tags", "get_top_tags"),
-    ("/api/top-tracks", "get_top_tracks"),
-    ("/api/loved-tracks", "get_loved_tracks"),
-    ("/api/source-tracks", "get_top_tracks"),
 ]
 
 
@@ -61,15 +55,3 @@ async def test_lastfm_wserror_masked_as_502(client: AsyncClient, path: str, serv
     finally:
         await _cleanup_user(email=email)
 
-
-@pytest.mark.asyncio
-async def test_source_tracks_unknown_source_still_400(client: AsyncClient):
-    """The 400 unknown-source branch must be preserved (not masked as 502)."""
-    email = _unique_email()
-    try:
-        await _register_login_link(client, email)
-        resp = await client.get("/api/source-tracks?source=bogus_source")
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Unknown source: bogus_source"
-    finally:
-        await _cleanup_user(email=email)
