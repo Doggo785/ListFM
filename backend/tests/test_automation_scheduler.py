@@ -247,6 +247,30 @@ async def test_failed_run_is_not_rerun_by_next_sweep(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_failed_run_shows_a_generic_error_not_the_exception_text(client: AsyncClient):
+    """Internal error text stays in the logs; history gets a generic message."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+
+        with patch("services.automation_runner.is_due", return_value=True), patch(
+            "services.automation_runner.get_top_tracks",
+            side_effect=Exception("postgres://admin:hunter2@db internal detail"),
+        ):
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        history = await client.get(f"/api/automations/{created.json()['id']}/history")
+        assert history.status_code == 200
+        shown = str(history.json())
+        assert "hunter2" not in shown
+        assert "The run failed" in shown
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
 async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient):
     """GET /automations/{id}/history returns the run rows with playlist links."""
     email = _unique_email()
@@ -755,3 +779,11 @@ async def test_set_timezone_stores_valid_zone_and_rejects_unknown(client: AsyncC
         assert (await client.get("/api/auth/me")).json()["timezone"] == "Europe/Paris"
     finally:
         await _cleanup_user_with_automations(client, email)
+
+
+def test_public_error_names_rate_limits_only():
+    import pylast
+    from services.automation_runner import _public_error
+
+    assert "rate limiting" in _public_error(pylast.WSError(None, "29", "Rate limit exceeded"))
+    assert _public_error(RuntimeError("secret")) == "The run failed (Last.fm or server error)."
