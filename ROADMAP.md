@@ -34,6 +34,13 @@ Refonte du créateur de playlist (le refaire de zéro, après les bugs ci-dessus
   - L'aperçu montre le résultat serveur, combien de morceaux lus et combien gardés, et se relance explicitement.
   - Lire plus de morceaux coûte plus d'appels Last.fm : afficher l'estimation avant de lancer.
 
+Cohérence visuelle avec [Impeccable](https://github.com/pbakaus/impeccable), après le grilling du créateur :
+
+- **Système visuel écrit** : `impeccable init` écrit `PRODUCT.md`, `impeccable document` capture l'existant dans `DESIGN.md` ; l'agent les relit avant chaque changement d'UI.
+- **Revue des écrans** : `critique` puis `audit` sur le créateur refait, puis sur les autres écrans.
+- **Détecteur bloquant** : `npx impeccable detect` dans `scripts/ci-local.sh` et en CI, dans une PR à part.
+- **Garde-fou** : le mode `live` seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
+
 Produit et hygiène :
 
 - **Playlist en grand** : une playlist générée doit pouvoir s'ouvrir en plein écran.
