@@ -37,3 +37,11 @@ def test_non_localhost_host_allowed_with_cookie_secure_true():
         oauth_redirect_base="https://app.example.com",
     )
     assert settings.cookie_secure is True
+
+def test_httpx_request_urls_stay_out_of_info_logs():
+    """httpx INFO lines print the full URL, including the Last.fm api_key."""
+    import logging
+
+    import main  # noqa: F401 - importing configures logging
+
+    assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
