@@ -224,6 +224,29 @@ async def test_scheduler_failed_run_persists_no_playlist(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_failed_run_is_not_rerun_by_next_sweep(client: AsyncClient):
+    """A failed run bumps last_run: the next sweep leaves it to the retry chain."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        assert created.status_code == 201
+
+        with patch(
+            "services.automation_runner.get_top_tracks",
+            side_effect=Exception("upstream down"),
+        ):
+            await run_due_automations(session_factory=_TestSessionLocal)
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        async with _TestSessionLocal() as db:
+            history = (await db.execute(select(AutomationHistory))).scalars().all()
+            assert [(h.status, h.attempt) for h in history] == [("failed", 1)]
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
 async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient):
     """GET /automations/{id}/history returns the run rows with playlist links."""
     email = _unique_email()
