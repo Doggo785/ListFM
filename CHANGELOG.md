@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.1](https://github.com/Doggo785/ListFM/compare/v0.1.0...v0.1.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **auth:** link an OAuth login to a local account only when both emails are verified ([#87](https://github.com/Doggo785/ListFM/issues/87)) ([944f032](https://github.com/Doggo785/ListFM/commit/944f0329eec59cb5d86a6afccdd9d349c39d1c3e))
+* **enrich:** never cache defaults left by a failed Last.fm call ([#83](https://github.com/Doggo785/ListFM/issues/83)) ([d2dbdbb](https://github.com/Doggo785/ListFM/commit/d2dbdbbf270ac5ed2a9a324fe12cca732223aec6))
+* **logging:** keep the Last.fm API key out of httpx request logs ([#86](https://github.com/Doggo785/ListFM/issues/86)) ([54c76e7](https://github.com/Doggo785/ListFM/commit/54c76e794254cff58a22db93cb91e14e0a60baed))
+* **runner:** bump last_run on failed runs so the sweep stops rerunning them ([#82](https://github.com/Doggo785/ListFM/issues/82)) ([49ad064](https://github.com/Doggo785/ListFM/commit/49ad06418f9ec0f3889794237724f75429b311f2))
+
+
+### Performance Improvements
+
+* **enrich:** fetch track fields with one track.getInfo call ([#88](https://github.com/Doggo785/ListFM/issues/88)) ([d72d4a7](https://github.com/Doggo785/ListFM/commit/d72d4a735b909ac801864bf5aacc318f047f3661))
+
 ## 0.1.0 (2026-11-03)
 
 
