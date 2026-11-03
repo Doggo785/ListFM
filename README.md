@@ -2,8 +2,6 @@
 
 ![ListFM Banner](.github/assets/ListFM_readme_banner.webp)
 
-Project in active development. No hosted instance yet. Work happens on the `dev` branch. This note goes away at v0.1.0.
-
 Your Last.fm history already knows your taste. ListFM turns it into playlists, automatically.
 
 I built it because I kept replaying the same 30 tracks while years of scrobbles sat unused.
