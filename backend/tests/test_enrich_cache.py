@@ -362,4 +362,58 @@ def test_enrich_29_error_arms_backoff_and_keeps_defaults():
             lastfm._rate_limit_until = 0.0
     assert out["listeners"] == 0
     assert out["global_playcount"] == 5
+    assert out["fetch_failed"] is True
     mock_note.assert_called_once_with()
+
+
+def test_not_found_is_a_real_answer_not_a_failure():
+    """Error 6 (track not found) keeps defaults without flagging the result."""
+
+    class _UnknownTrack:
+        def _missing(self):
+            raise lastfm.pylast.WSError(None, "6", "Track not found")
+
+        get_listener_count = get_playcount = get_userplaycount = _missing
+        get_userloved = get_album = _missing
+
+    with (
+        patch("services.lastfm.pylast.Track", return_value=_UnknownTrack()),
+        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+        patch.object(lastfm, "_rate_limit_until", 0.0),
+    ):
+        out = get_track_full_info(object(), "u", "A", "T", only={"listeners", "album"})
+    assert out["listeners"] == 0
+    assert "fetch_failed" not in out
+
+
+@pytest.mark.asyncio
+async def test_failed_fetch_is_returned_but_never_cached():
+    """A flagged live result serves this run, stays out of the cache, refetches next run."""
+    user_id = await _make_user_id()
+    suffix = uuid.uuid4().hex[:8]
+    tracks = [
+        {"artist": f"Flaky Artist {suffix}", "title": f"Song {suffix} {i}"}
+        for i in range(2)
+    ]
+
+    def _live(_username, asked, *_args, **_kwargs):
+        # The second track's calls fail: defaults plus the failure flag.
+        return [
+            {**t, **_live_info(listeners=0), "fetch_failed": True}
+            if t == tracks[1]
+            else {**t, **_live_info()}
+            for t in asked
+        ]
+
+    async with _TestSessionLocal() as db:
+        with patch("services.enrich_cache.enrich_tracks", side_effect=_live):
+            out1, _ = await enrich_tracks_cached(
+                db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+            )
+            _, stats2 = await enrich_tracks_cached(
+                db, user_id=user_id, username="u", tracks=tracks, max_enrich=10
+            )
+    assert [t["title"] for t in out1] == [t["title"] for t in tracks]
+    assert all("fetch_failed" not in t for t in out1)
+    assert stats2["hits"] == 1
+    assert stats2["misses"] == 1
