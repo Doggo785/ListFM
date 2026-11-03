@@ -12,7 +12,7 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 ## Fait
 
-- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), relier un autre compte Last.fm bascule les automations et vide le cache perso, cron lu dans le fuseau de l'utilisateur, envoyé par son navigateur, recents du dashboard toujours lus en direct (la base sert de secours si Last.fm tombe), deux onglets qui rafraîchissent la session en même temps ne se déconnectent plus (grâce de 30 s après rotation), OAuth rattaché à un compte local seulement si les deux emails sont vérifiés (#87), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
+- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), relier un autre compte Last.fm bascule les automations et vide le cache perso (#90), cron lu dans le fuseau de l'utilisateur, envoyé par son navigateur (#92), recents du dashboard toujours lus en direct (la base sert de secours si Last.fm tombe) (#93), deux onglets qui rafraîchissent la session en même temps ne se déconnectent plus (grâce de 30 s après rotation) (#94), erreurs internes masquées dans l'UI (#95), session expirée renvoyée au login (#96), plus de compteur mondial pris pour tes écoutes en source top artists (#97), code mort supprimé (#98, #99), OAuth rattaché à un compte local seulement si les deux emails sont vérifiés (#87), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
 - **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47), un appel raté n'est plus mis en cache (#83), un seul `track.getInfo` par morceau (#88).
 - **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées (#67), `main` seule branche (#69), release-please et v0.1.0 (#80), clé API hors des logs (#86), CI locale en parallèle et tests backend 3× plus rapides (#85).
 
@@ -21,14 +21,6 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 Les points « Avant v1.0.0 » dans l'ordre, une PR chacun. La PR de release ouverte par release-please se merge quand l'owner le dit.
 
 ## Avant v1.0.0
-
-Bugs de l'audit du 2026-11-03, par priorité :
-
-- **Erreurs internes affichées** : `str(exc)` va dans l'historique et la progression. Message générique, détail en log.
-- **`playcount` ambigu** : en source `top_artists` il vaut le compteur mondial, pas le tien. Ne pas le remplir dans `get_top_artists_tracks`.
-- **Code testé mais jamais appelé** : `run_automation_pipeline` (sync), `count_active_conditions` (Python), `get_user_tracks_needing_sync`, `update_last_played`, `upsert_last_played_at`, `upsert_track_tag`, `get_track_by_id`.
-- **Session expirée** : après un refresh raté, l'UI montre des 401 au lieu de revenir au login. Remettre `user` à null.
-- **`requireUsername()`** dans `api.js` double la vérification serveur : supprimer `_username` et ses appels.
 
 Vitesse de l'aperçu (mesuré le 2026-11-03 : 48 morceaux sans cache = 326 appels, 83 s ; le temps suit appels × 0,25 s) :
 
