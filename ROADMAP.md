@@ -45,7 +45,7 @@ Produit et hygiène :
 - **Onglet Playlists** : il montre les playlists générées, pas les automations.
 - **Retry honnête (T5)** : vraie route de retry qui garde le `scheduled_for` d'origine et une fenêtre `from/to` ancrée, états « nouvel essai prévu » et « échec définitif ». Le bouton Re-run actuel refait un run neuf (même appel que Run now) : le rebrancher sur cette route.
 - **Scan sécu planifié** : osv-scanner chaque semaine via un `schedule` dans `ci.yml` (aujourd'hui il ne tourne que sur push et PR).
-- **Hygiène UI** : modales accessibles (role, focus, Échap), timeout et abort dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, dédoublonner le frontend (SVG OAuth, props Grainient, `SOURCE_OPTIONS`, Sidebar), trancher dark-only.
+- **Hygiène UI** : modales accessibles (role, focus, Échap), timeout et abort dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, dédoublonner le frontend (SVG OAuth, props Grainient, `SOURCE_OPTIONS`, Sidebar), trancher dark-only. Réactiver la règle ESLint `react-hooks/set-state-in-effect` (coupée en attendant la refonte du créateur, 9 effets de chargement à réécrire).
 - **Hygiène backend** : un seul contrat `filterGroups` (camel partout), borne de récursion des filtres, soft-delete en cascade, RBAC réel ou suppression du rôle.
 
 ## Plus tard (feu vert owner requis)
