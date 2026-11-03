@@ -18,41 +18,56 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 ## Maintenant
 
-Les points « Avant v1.0.0 » dans l'ordre, une PR chacun. La PR de release ouverte par release-please se merge quand l'owner le dit.
+Phase A, dans l'ordre, une PR par point. Le vocabulaire est dans `GLOSSARY.md`, les décisions structurantes dans `docs/adr/`. La PR de release ouverte par release-please se merge quand l'owner le dit, une release par phase finie et testée en vrai (0.3.0 après A, 0.4.0 après B, 0.5.0 après C).
 
 ## Avant v1.0.0
 
-Refonte du créateur de playlist (le refaire de zéro, après les bugs ci-dessus ; grilling de l'owner avant de coder) :
+Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran actuel avant la phase B ; une feature UI en attente se construit directement dans la nouvelle identité. Un bug trouvé passe en PR `fix` tout de suite (release immédiate si sécu), une idée nouvelle va dans « Plus tard ».
 
-- **Constats** : le menu promet ce que le serveur ne fait pas.
-  - La période s'affiche pour toutes les sources, mais seules `top_tracks` et `top_artists` la lisent : `recent_tracks` et `loved_tracks` prennent les derniers morceaux quoi qu'on choisisse (`dispatch_source_tracks`). « Recent tracks + 12 mois » ne lit donc que les 50 dernières écoutes.
-  - La source n'est lue qu'à hauteur de `min(maxSize, 50)` avant filtres : un filtre sélectif ne voit que 50 morceaux et rend souvent zéro.
-  - L'aperçu qui rétrécit : le navigateur refiltre des morceaux déjà filtrés par le serveur, retirer un filtre ne ramène rien. Supprimer `frontend/src/lib/filter-engine.js` (garder `countActiveConditions`).
-- **Cible** : l'utilisateur voit ce qui sera lu et a plus de liberté.
-  - Chaque source n'affiche que les réglages qu'elle lit ; `recent_tracks` lit une vraie fenêtre de dates (`time_from`/`time_to` existent déjà dans `get_recent_tracks`).
-  - Profondeur de lecture de la source et taille de playlist réglables, sans plafond caché à 50 ; couper à la taille après filtres.
-  - L'aperçu montre le résultat serveur, combien de morceaux lus et combien gardés, et se relance explicitement.
-  - Lire plus de morceaux coûte plus d'appels Last.fm : afficher l'estimation avant de lancer.
+### Phase A : fondations (sans visuel)
 
-Cohérence visuelle avec [Impeccable](https://github.com/pbakaus/impeccable), après le grilling du créateur :
+1. **Docs** : `GLOSSARY.md`, ADR 0001 et 0002, cette ROADMAP.
+2. **Synchro des écoutes** (ADR 0001) : table des écoutes, synchro complète puis incrémentale (`user.getRecentTracks` par pages de 1000, repli à 200), progression, liste des loved relue en entier. Toujours avant un run, au plus toutes les 10 min pour l'aperçu. Pendant le premier chargement, l'aperçu est partiel (bandeau) et les runs attendent la fin.
+3. **Moteur de la chaîne** (ADR 0002) : une seule source, les écoutes, puis Fenêtre → Filtres → Tri → Limites.
+   - Fenêtre comptée depuis la date prévue du run : glissante, décalée (« le même mois il y a un an »), toutes les écoutes. Pas de dates fixes.
+   - Filtres : l'existant + première écoute, artiste dans ton top N, moment d'écoute (jour, tranche horaire). Groupes ET/OU sur 2 niveaux maximum, même contrôle front et back. Un seul contrat `filterGroups` (camel partout).
+   - Tris : les plus écoutés, écoutés le plus récemment, découverts le plus récemment, au hasard (pondérable par les écoutes). Le tri choisit les morceaux gardés et fixe leur ordre.
+   - Limites : taille, maximum par artiste, maximum par album, pas de répétition sur les N dernières playlists de l'automation.
+   - Moins de morceaux que la taille : playlist plus courte, historique « 32/50 ». Zéro : run vide.
+   - Table rase des automations, playlists et historique existants (des tests), aucune migration.
+4. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage. Les tags pas encore en cache se cherchent sur clic, avec l'estimation d'appels. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
+5. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
+6. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
 
-- **Système visuel écrit** : `impeccable init` écrit `PRODUCT.md`, `impeccable document` capture l'existant dans `DESIGN.md` ; l'agent les relit avant chaque changement d'UI.
-- **Revue des écrans** : `critique` puis `audit` sur le créateur refait, puis sur les autres écrans.
-- **Détecteur bloquant** : `npx impeccable detect` dans `scripts/ci-local.sh` et en CI, dans une PR à part.
-- **Garde-fou** : le mode `live` seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
+### Phase B : identité visuelle avec [Impeccable](https://github.com/pbakaus/impeccable)
 
-Produit et hygiène :
+Une identité forte, claire et marquée, pas l'allure générique des pages faites par IA.
 
-- **Playlist en grand** : une playlist générée doit pouvoir s'ouvrir en plein écran.
-- **Onglet Playlists** : il montre les playlists générées, pas les automations.
-- **Retry honnête (T5)** : vraie route de retry qui garde le `scheduled_for` d'origine et une fenêtre `from/to` ancrée, états « nouvel essai prévu » et « échec définitif ». Le bouton Re-run actuel refait un run neuf (même appel que Run now) : le rebrancher sur cette route.
-- **Scan sécu planifié** : osv-scanner chaque semaine via un `schedule` dans `ci.yml` (aujourd'hui il ne tourne que sur push et PR).
-- **Hygiène UI** : modales accessibles (role, focus, Échap), timeout et abort dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, dédoublonner le frontend (SVG OAuth, props Grainient, `SOURCE_OPTIONS`, Sidebar), trancher dark-only. Réactiver la règle ESLint `react-hooks/set-state-in-effect` (coupée en attendant la refonte du créateur, 9 effets de chargement à réécrire).
-- **Hygiène backend** : un seul contrat `filterGroups` (camel partout), borne de récursion des filtres, soft-delete en cascade, RBAC réel ou suppression du rôle.
+1. `impeccable init` → `PRODUCT.md`. Nouvelle identité écrite dans `DESIGN.md` (pas `document`, qui décrirait l'ancien style). Trancher dark-only ici.
+2. **Tokens** (couleurs, typo, espacements, rayons, mouvement) à un seul endroit, branchés sur tout le site : toutes les pages changent de peau en une PR.
+3. **Composants de base** refaits sur ces tokens : Button, Select, modales accessibles (role, focus, Échap), Sidebar, SVG OAuth, props Grainient et `SOURCE_OPTIONS` dédoublonnés.
+4. **Détecteur bloquant** : `npx impeccable detect` dans `scripts/ci-local.sh` et en CI.
+
+Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
+
+### Phase C : écrans refaits, une PR par écran
+
+Chaque PR passe `impeccable critique` et `audit` avant le merge.
+
+1. **Créateur** : une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Supprimer `frontend/src/lib/filter-engine.js` (garder `countActiveConditions`).
+2. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran.
+3. **Historique** : états « nouvel essai prévu », « échec définitif », run vide, « 32/50 ». Le bouton Re-run passe par la route de retry de T5.
+4. **Dashboard**.
+5. **Connexion et réglages**.
+6. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
+
+### Phase D : finition
+
+Animations, `impeccable polish` et `harden` sur tout le site. Puis v1.0.0 quand l'owner le dit.
 
 ## Plus tard (feu vert owner requis)
 
-Export Spotify/YouTube, social et partage, presets, stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
+Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
 
 ## Leçons Last.fm
 
