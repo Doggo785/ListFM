@@ -1,95 +1,61 @@
-# ListFM — Roadmap (proposition à valider, 2026-09-09)
+# ListFM — Roadmap
 
-Référence cap: `VISION.md`. Ordre voulu: **fonctionnel d'abord**, P0 vital court puis boucle feature/stable (budget dette ~20% par itération). Échelle: petit VPS potes, single-worker OK, Last.fm-only à vie.
+Seul endroit où le statut est écrit. Le cap est dans `VISION.md`, la barre qualité dans `CONSTRAINTS.md`.
+Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert de l'owner.
 
-## Rappel Last.fm (vérifié 2026-09-09)
+## Versions
 
-- Pas de quota chiffré public. Doc officielle: "soyez raisonnable, ne frappez pas l'API au chargement de chaque page".
-- Pratique communauté/pylast: **~1 seconde entre appels**. Notre `enrich_tracks` actuel (~300 appels/preview en ThreadPool 5) est l'inverse de ça: c'est ce qui impose le cache + la throttle.
-- Conséquence: chaque stratégie ci-dessous vise à **réduire le nombre d'appels**, pas à les relancer plus vite en cas d'échec.
+- release-please sur `main`. On reste en **0.x.x** jusqu'à la première release propre, la **v1.0.0**.
+- `feat` → 0.(x+1).0, `fix` → 0.x.(y+1). `bump-minor-pre-major: true` garde un commit cassant (`feat!`) en 0.x.
+- La v1.0.0 se fait par un commit `Release-As: 1.0.0`, seulement quand la section « Avant v1.0.0 » est vide et que l'owner le dit.
 
-## P0 — stop-the-bleeding (✅ terminé 2026-09-23, PR #22-25 + #26)
+## Fait
 
-1. **Vue /playlists manquante** ✅ fait (#21 ; entrée de création unique #26). (`frontend/src/App.jsx` redirige vers `/` alors que create/delete/back + sidebar pointent vers `/playlists`). Créer la liste ou corriger les redirects. Sans ça, la BASE n'est pas navigable.
-2. **AuthCallback sans succès** ✅ fait (#16 + proxy `/api/*` et routage #23). (`frontend/src/views/AuthCallback.jsx` tombe toujours sur erreur). Rejouer le flux Google/Discord réel et fixer le path succès + proxy `/api/*` (aujourd'hui seul `/api/auth` est proxifié, le reste part en direct `localhost:8000` = cookies/CORS cassés en dev).
-3. **Preview durcie** ✅ fait (#24) : valider via `AutomationCreate` (plus de `body: dict` brut), passer en `async + run_in_executor`, borner `limit=Query(ge=1,le=200)`, `period: Literal`, `username` (1-64 + regex, insensible à la casse), `cron` + `output.maxSize` typés. Corriger `maxSize=0 → 50` et supporter `top_artists` partout ou 422 partout.
-4. **Auth VPS-ready** ✅ fait (#13, #14, #18 + #25 ; body sans aucun token en fixup) : migrer `python-jose` → PyJWT + claim `typ`, ne plus renvoyer `refresh` en body (cookies seuls), `delete_cookie` avec mêmes flags `secure/path`, garde 72B aussi sur `UserUpdate`, timeout `httpx` 10s + message 502 générique, `cors_origins` + méthodes explicites.
-5. **Migrations sûres** ✅ fait (#22) : supprimer la no-op `fb0adb...`, squasher/marquer la `DROP CASCADE f0e1d2...` pour ne jamais la rejouer en prod.
+- **Socle produit** (automations → playlists générées → historique) : flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
+- **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47).
+- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63).
 
-## P1 — fermer la boucle Automations → playlists → historique
+## Maintenant
 
-6. **Runner qui produit vraiment**: `run_automation` crée/maj `GeneratedPlaylist + PlaylistTracks` (aujourd'hui history seule), `GET /automations/{id}/history` + bouton Run-now + UI historique (date, avant/après filtre, erreur lisible, détail ouvrable avec tracks + tags figés).
-7. **Échecs Last.fm — validé: B avec fenêtre d'origine (2026-09-09)**:
-   Contexte owner: automatisation tous les 3 mois (playlists de saison). Si on rate un mois et qu'on relance à la main un mois plus tard, analyser 4 mois au lieu de 3 ou 3 mois décalés biaise la saison.
-   Décision: **retry borné 2-3 essais (5min → 20min → 1h) en gardant `scheduled_for` d'origine**, puis `failed` visible + bouton "Relancer avec la période d'origine".
-   *Exemple vulgarisé: si le photographe rate la photo de l'équipe en septembre, on ne prend pas l'équipe d'octobre en disant "c'est pareil" — on garde l'étiquette "photo de septembre" et on la refait vite avec les mêmes présents.*
-   Limite honnête Last.fm: les sources `top_tracks 3m/6m` sont des fenêtres **relatives** ("3 derniers mois à partir de maintenant"), pas des dates calendaires. Un retry un mois plus tard glisse forcément. Vrai correctif en 2 temps: (a) d'abord retry rapide borné pour limiter le glissement à quelques heures max, (b) plus tard si besoin saison stricte: passer les sources saisonnières en `recent_tracks` avec `from/to` ancrés à `scheduled_for` (ou cache incrémental), au lieu de `top 3m` relatif. En attendant, l'historique affiche `prévu le / exécuté le` pour rendre le décalage visible.
-8. **Cache DB 24h (validé: oui)**: réutiliser `tracks/albums/tags/user_tracks` au lieu de live-only. Plan: `get_or_create_track` + TTL 24h sur enrich (tags/artist_tags inclus pour figer l'historique), throttle ~1s entre appels Last.fm sortants, compteur de calls en logs. Effet attendu: preview + sweep + dashboard puisent dans le même stock au lieu de 300 appels à chaque fois. *Exemple: carnet de courses réutilisé 24h au lieu de retourner au marché à chaque recette.*
-9. **Dashboard 50 recents — validé: A immédiat puis B après cache (2026-09-09)**.
-10. **Durcir sweep**: commit par automation (plus de rollback global), ordre déterministe, resync `lastfm_username` au link, `scheduled_for` conservé en échec (retry B), `last_run` = heure d'exécution réelle, log structuré, `max_instances=1` documenté single-worker.
-11. **DB/obs**: pool `pool_pre_ping + timeout`, `get_db` avec rollback, handler `SQLAlchemyError` → JSON (plus de HTML 500), pins `==` + `pip-audit`, `ruff + mypy + --cov --fail-under=80` en CI.
+1. **Docs à jour** : ROADMAP, VISION, AGENTS.md, compteurs retirés des docs.
+2. **Routes mortes** : supprimer `/top-tags`, `/top-tracks`, `/loved-tracks`, `/source-tracks` (`backend/routers/users.py`), `POST` et `GET /generated-playlists/{id}`, plus `saveGeneratedPlaylist` / `getGeneratedPlaylist` de `api.js` et leurs tests. Le frontend n'en appelle aucune ; le `period` non validé (ex-VAL-PERIOD) et l'`automation_id` étranger accepté par le POST disparaissent avec elles.
+3. **`main` seul** : avancer `main` jusqu'à `dev`, mettre sur `main` la protection de `dev` (PR obligatoire, 7 checks, pas de force-push, admins inclus), Dependabot sur `main`, `dev` → `main` dans les docs et `scripts/ci-local.sh`, supprimer `dev`.
+4. **release-please** (config ci-dessus), puis merge de sa PR de release → **v0.1.0**. Retirer la ligne de statut du README à ce moment.
 
-## P2 — hygiène
+## Avant v1.0.0
 
-12. Unifier contrat `filterGroups` camel partout (ou snake documenté), vérifier `track_count`/`automation_id` ownership, cascade soft-delete, RBAC ou suppression du rôle, dédupliquer frontend (SVG OAuth, Grainient props, SOURCE_OPTIONS, Sidebar), trancher dark-only, a11y modals (role/focus/Escape), timeout/abort côté `api.js`, `isValidCron` stricte partagée front/back, borne récursion filtres.
+Bugs de l'audit du 2026-11-03, par priorité :
 
-## P3 — vitesse (perf Last.fm, ouverte 2026-09-29)
+1. **Échec en boucle** : un run raté ne met pas `last_run` à jour, le sweep le relance chaque minute en tentative 1 et les retries ne partent jamais (`services/automation_runner.py`, `_mark_failure`).
+2. **Cache empoisonné** : un appel Last.fm raté garde sa valeur par défaut (0, aucun tag, pas loved) et `_write_back` la stocke fraîche 7 jours. Ne stocker que les champs réellement obtenus.
+3. **Prise de compte** : la connexion Google/Discord se rattache à un compte local au même email même si ce compte n'a jamais vérifié son email (`repositories/users.py`). Exiger `user.email_verified`.
+4. **Changement de compte Last.fm** : `link-lastfm` laisse l'ancien `lastfm_username` sur les automations et l'ancien cache perso (`user_tracks`) en place.
+5. **Aperçu qui rétrécit** : le navigateur refiltre des morceaux déjà filtrés par le serveur ; retirer un filtre ne ramène rien. Afficher le résultat serveur et proposer de relancer l'aperçu ; supprimer alors `frontend/src/lib/filter-engine.js` (garder `countActiveConditions`).
+6. **Taille ignorée** : `min(maxSize, 50)` plafonne à 50 et la source n'est lue qu'à hauteur de la taille avant filtres. Couper à `maxSize` après filtres, lire une source plus large quand un filtre est actif.
+7. **Cron en UTC** : l'UI affiche « 08:00 » sans fuseau, le serveur lit en UTC. Fuseau configurable (`Europe/Paris`) au scheduler et à la validation.
+8. **Récents figés** : le dashboard sert les récents en base tant que la dernière écoute a moins de 24 h. Juger la fraîcheur sur l'heure de la dernière lecture Last.fm.
+9. **Deux onglets déconnectent** : un refresh concurrent du même jeton est pris pour un vol et révoque la famille. Tolérer 30 s après rotation.
+10. **Erreurs internes affichées** : `str(exc)` va dans l'historique et la progression. Message générique, détail en log.
+11. **`playcount` ambigu** : en source `top_artists` il vaut le compteur mondial, pas le tien. Ne pas le remplir dans `get_top_artists_tracks`.
+12. **Code testé mais jamais appelé** : `run_automation_pipeline` (sync), `count_active_conditions` (Python), `get_user_tracks_needing_sync`, `update_last_played`, `upsert_last_played_at`, `upsert_track_tag`, `get_track_by_id`.
+13. **Session expirée** : après un refresh raté, l'UI montre des 401 au lieu de revenir au login. Remettre `user` à null.
+14. **`requireUsername()`** dans `api.js` double la vérification serveur : supprimer `_username` et ses appels.
 
-Constat owner (test manuel) : preview avec filtres de ~4 min pour 50 morceaux
-(~300 appels Last.fm : jusqu'à 7 par morceau + ~1s d'attente entre appels),
-spinner aveugle, cancel sans effet visible. Tranche 1 mergée (#42) : skip
-enrich quand les filtres n'en ont pas besoin (cas "dsf" sans filtres : ~300 → ~1 appel).
+Produit et hygiène :
 
-Leçons de `felhag/lastfm-stats-web` (étudié 2026-10-02, voir notes ci-dessous) :
-gros paquets (1000/page), jamais de détails morceau par morceau (stats
-calculées en local), tags par artiste en arrière-plan, stockage local +
-reprise incrémentale (ne recharger que le nouveau). Eux font des stats
-(comptages locaux) ; nous on filtre (besoin des champs filtrés) : on ne
-fera jamais zéro appel avec un filtre tag actif, mais on s'en rapproche.
+- **Playlist en grand** : une playlist générée doit pouvoir s'ouvrir en plein écran.
+- **Onglet Playlists** : il montre les playlists générées, pas les automations.
+- **Retry honnête (T5)** : vraie route de retry qui garde le `scheduled_for` d'origine et une fenêtre `from/to` ancrée, états « nouvel essai prévu » et « échec définitif ». Le bouton Re-run actuel refait un run neuf (même appel que Run now) : le rebrancher sur cette route.
+- **Scan sécu planifié** : osv-scanner chaque semaine via un `schedule` dans `ci.yml` (aujourd'hui il ne tourne que sur push et PR).
+- **Hygiène UI** : modales accessibles (role, focus, Échap), timeout et abort dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, dédoublonner le frontend (SVG OAuth, props Grainient, `SOURCE_OPTIONS`, Sidebar), trancher dark-only.
+- **Hygiène backend** : un seul contrat `filterGroups` (camel partout), borne de récursion des filtres, soft-delete en cascade, RBAC réel ou suppression du rôle.
 
-Tranches (une petite PR chacune, rituel habituel : tests + CI verte + "go merge #N") :
+## Plus tard (feu vert owner requis)
 
-- **T2 — retour en direct (mergé #43)** : run async + compteur/barre
-  sur run et preview (polling ticket), cancel preview qui arrête le serveur,
-  logs `pipeline:`/`enrich cache:` visibles, états done/error/cancelled.
-- **T3 — vitesse pure (en cours, PR à venir)** : paquets à 200, `extended=1` sur recents (loved +
-  images offerts), cadence ~1s → ~0,25s avec repli auto sur erreur 29.
-  Cible : cas filtré type ~300 → ~50-100 appels en moins d'une minute.
-- **T4 — cache malin** : fini le précipice des 24h → fraîcheur différenciée
-  (global/tags 7j, compromis documenté ; perso revérifiée seulement si
-  rejouée depuis, loved à 7j, filet 30j), fraîcheur par groupe (noyau
-  global / tags globaux / données perso) + colonne `tags_fetched_at`,
-  règle d'or (jamais filtrer sur du non-cherché), tags par artiste
-  persistants et partagés entre users. Brancher le `only=` (déjà prêt et
-  testé depuis #42) avec write-back par groupe.
-  - T4a mergé (#46) : colonne + pacte explicite, comportement inchangé.
-  - T4b en cours : politique ci-dessus. Mesuré : 6 morceaux périmés 25h →
-    nouvelle politique 0 appel / 0,0s, ancienne 42 appels / 11,7s.
-- **T5 — retry honnête** : vraie route retry avec `scheduled_for` d'origine +
-  fenêtre `from/to` ancrée (réelle grâce à T4, plus un label), états "nouvel
-  essai prévu" vs "échec définitif". Le bouton Re-run actuel refait un run
-  neuf (même appel que Run now) : à rebrancher sur cette route.
-- **T6 — alertes auto (promesse en suspens)** : `dependabot.yml` (màj hebdo)
-  + scan `osv-scanner` planifié, pour ne plus découvrir les failles par
-  hasard (cf. `fast-uri`, `brace-expansion` tombés en pleine PR).
+Export Spotify/YouTube, social et partage, presets, stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
 
-Règle : ne jamais casser le réchauffement du cache des runs répétés pour
-gagner sur un run isolé (leçon de #42 : le partiel sans write-back coûtait
-plus cher sur 30 jours). Mesurer avant/après sur "dsf" à chaque tranche.
+## Leçons Last.fm
 
-## Explicitement après
-
-Export Spotify/YouTube, social/partage, presets, multi-provider. Ne pas attaquer sans feu vert.
-
-## Notes owner (2026-09-09, à travailler plus tard)
-
-- **Onglet Playlists = playlists générées, pas automations**: retour owner après test — la liste actuelle (automations) est OK pour l'instant, mais à terme l'onglet doit montrer les playlists générées par les automations. Ne pas refaire maintenant, garder en tête pour la boucle produit P1 (item 6).
-- **BUG preview charge à l'infini (automation de test "dsf")**: diagnostiqué 2026-09-09, pas fixé. Mesure repro: `dispatch` 50 tracks en 2.9s, `enrich` 50 tracks en **139.2s** (total 142s) — `get_track_full_info` fait jusqu'à 6 appels Last.fm par track (listeners, playcount, userplaycount, userloved, artist tags, album+tags) avec `ThreadPoolExecutor(max_workers=5)`, et le frontend n'a aucun timeout (`api.js` sans AbortController) donc spinner de 2.5+ min = perçu infini. Pistes: cache DB 24h P1 (vrai fix, validé 2026-09-09 — pas de hotfix, on attend l'implémentation propre). Automation "dsf": source `recent_tracks`, filtres vides.
-
-## Validations owner (2026-09-09, figées)
-
-- Retry: **B borné avec `scheduled_for` d'origine** (pas A seul). Relance manuelle = même période d'origine.
-- Dashboard: **A immédiat puis B après cache**.
-- Cache 24h avec tags figés pour historique ouvrable: **oui**.
-- Domaine/HTTPS repoussé, préparer `COOKIE_SECURE` + CORS strict: **oui**.
-
+- Pas de quota public, la doc demande d'être raisonnable : chaque changement vise **moins d'appels**, pas des appels plus rapides.
+- Un filtre ne s'applique jamais sur une donnée qui n'a pas été cherchée.
+- Garder le réchauffement du cache des runs répétés, même si un run isolé y perd : le partiel sans write-back de #42 coûtait plus cher sur 30 jours. Mesurer avant/après sur l'automation de test « dsf ».

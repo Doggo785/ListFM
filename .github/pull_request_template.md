@@ -9,7 +9,6 @@
 
 ## Test plan
 
-- [ ] `ruff check backend` passes with no findings on ruff 0.16.8
-- [ ] `pytest backend/tests/ -q` passes, all 157 tests
-- [ ] CI shows green for backend-tests, frontend-build, and ruff
+- [ ] `scripts/ci-local.sh` passes before push
+- [ ] CI is green on every job
 - [ ] Title uses `type(scope): summary` in lowercase imperative

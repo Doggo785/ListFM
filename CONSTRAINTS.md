@@ -1,9 +1,10 @@
 # Constraints — ListFM
 
-Last reviewed: 2026-09-27 (solo + agents, voir `PLAN-git-github-conventions.md`).
+Last reviewed: 2026-11-03 (solo + agents).
 Lire avant d'écrire du code. Ne jamais affaiblir ce fichier pour faire passer un changement.
 Mode : **Block** — tout échec du socle ou d'une dimension enforced bloque la tâche.
-Règle non négociable rappelée : l'agent n'a JAMAIS le droit de merger, il ouvre la PR et attend l'owner.
+Règle non négociable : l'agent ne merge jamais de lui-même. Il ouvre la PR, fait passer la CI et attend l'owner.
+Seule exception : un « go merge #N » de l'owner citant la PR. L'agent squash-merge alors, vérifie que la branche distante est supprimée et supprime la branche locale.
 
 ## Socle (toujours enforced, sans setup)
 
@@ -28,8 +29,8 @@ Règle non négociable rappelée : l'agent n'a JAMAIS le droit de merger, il ouv
 | Lint frontend | 0 erreur, 0 warning. Raison : coût nul, `eslint . --max-warnings 0` vert aujourd'hui. | `npx eslint . --max-warnings 0` (dans `frontend/`, alias `npm run check:fast`) | every edit, CI job `frontend-build` (step Lint) |
 | Types backend | 0 erreur mypy. Raison : volume purgé (10 erreurs → 0 le 2026-09-27), un gate strict immédiat empêche le nouveau code de s'appuyer sur des types faux. | `mypy backend --ignore-missing-imports` (pin `mypy==2.3.1`) | every edit, task end, CI job `mypy` |
 | Build frontend | Vert. Raison : filet syntax/bundling ; pas de `tsc` car projet JS sans `tsconfig` (voir Mesuré). | `npm run build` (dans `frontend/`) | task end, CI job `frontend-build` (step Build) |
-| Tests backend | Suite verte (159 tests). Raison : preuve de non-régression sur auth JWT/cookies + Last.fm. | `python -m pytest backend/tests/ -q` (DB `listfm-db:5433` en local, service Postgres en CI) | task end (~45 s, budget 90 s), CI job `backend-tests` |
-| Tests frontend | Suite verte (7 tests, vitest). Raison : même filet côté UI, inexistant en CI jusqu'au 2026-09-27. | `npx vitest run` (dans `frontend/`, après `npm ci`) | task end, CI job `frontend-tests` |
+| Tests backend | Suite verte. Raison : preuve de non-régression sur auth JWT/cookies + Last.fm. | `python -m pytest backend/tests/ -q` (DB `listfm-db:5433` en local, service Postgres en CI) | task end (budget 90 s), CI job `backend-tests` |
+| Tests frontend | Suite verte (vitest). Raison : même filet côté UI, inexistant en CI jusqu'au 2026-09-27. | `npx vitest run` (dans `frontend/`, après `npm ci`) | task end, CI job `frontend-tests` |
 | Coverage diff backend | ≥ 80 % des lignes modifiées. Raison : force un test sur le nouveau code sans exiger 80 % sur un héritage. Vérifié : 100 % sur le diff du PR de verrouillage. | `pytest --cov=backend --cov-report=xml` + `diff-cover coverage.xml --compare-branch=origin/dev --fail-under=80` | task end (scope = diff), CI job `backend-tests` |
 | Coverage diff frontend | ≥ 80 % des lignes modifiées. Raison : idem, côté UI où la couverture globale est quasi nulle. | `vitest run --coverage --coverage.reporter=cobertura` + `diff-cover coverage/cobertura-coverage.xml --compare-branch=origin/dev --fail-under=80` (dans `frontend/`) | task end (scope = diff), CI job `frontend-tests` |
 | Secrets | 0 leak. Raison : JWT + tokens Last.fm ; externe, l'agent ne peut pas négocier avec. Vérifié : 229 commits, 0 leak. | `gitleaks detect --redact --no-banner --source .` | every edit, CI job `gitleaks` |
@@ -39,8 +40,8 @@ Règle non négociable rappelée : l'agent n'a JAMAIS le droit de merger, il ouv
 
 | Métrique | Aujourd'hui | Direction |
 |----------|-------------|-----------|
-| Coverage projet backend | **93 %** (mesuré 2026-09-27, 159 tests) | ne pas régresser (tolérance 0,5 %) |
-| Coverage projet frontend | **1,58 %** (mesuré 2026-09-27, 7 tests) | ne pas régresser ; la cible diff ≥ 80 % fait monter ce chiffre PR par PR |
+| Coverage projet backend | **93 %** (mesuré 2026-09-27) | ne pas régresser (tolérance 0,5 %) |
+| Coverage projet frontend | **1,58 %** (mesuré 2026-09-27) | ne pas régresser ; la cible diff ≥ 80 % fait monter ce chiffre PR par PR |
 | Types frontend (`tsc`) | N/A — projet JS, pas de `tsconfig` ; filet actuel = `vite build` | activer `tsc --noEmit` uniquement si migration TS |
 | Bundle JS | `dist/assets/index-*.js` **785 kB** (gzip 243 kB, warning Vite > 500 kB) | ne pas grossir ; code-splitting à étudier |
 | Sécu code (semgrep) | non installé | envisagé plus tard (`p/default` + `p/owasp-top-ten` sur fichiers du diff) |
