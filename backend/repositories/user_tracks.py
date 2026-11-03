@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from models.album import Album
 from models.track import Track
 from models.user_track import UserTrack
-from sqlalchemy import desc, func, select, tuple_
+from sqlalchemy import delete, desc, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -251,3 +251,8 @@ async def bulk_store_recent_plays(
     )
     await db.execute(stmt)
     await db.flush()
+
+
+async def delete_user_tracks(db: AsyncSession, user_id: str) -> None:
+    """Drop a user's personal cache (play counts, loved, last played)."""
+    await db.execute(delete(UserTrack).where(UserTrack.user_id == user_id))

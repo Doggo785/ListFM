@@ -8,10 +8,11 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 - release-please sur `main`. On reste en **0.x.x** jusqu'à la première release propre, la **v1.0.0**.
 - `feat` → 0.(x+1).0, `fix` → 0.x.(y+1). `bump-minor-pre-major: true` garde un commit cassant (`feat!`) en 0.x.
 - La v1.0.0 se fait par un commit `Release-As: 1.0.0`, seulement quand la section « Avant v1.0.0 » est vide et que l'owner le dit.
+- Quand publier : la PR de release se merge par lot cohérent (un bloc de la ROADMAP fini et testé en vrai), tout de suite si elle porte un correctif de sécurité. L'agent peut la merger seul quand ses checks sont verts, son changelog juste et le changement testé en vrai.
 
 ## Fait
 
-- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), OAuth rattaché à un compte local seulement si les deux emails sont vérifiés (#87), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
+- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), relier un autre compte Last.fm bascule les automations et vide le cache perso, OAuth rattaché à un compte local seulement si les deux emails sont vérifiés (#87), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
 - **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47), un appel raté n'est plus mis en cache (#83), un seul `track.getInfo` par morceau (#88).
 - **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées (#67), `main` seule branche (#69), release-please et v0.1.0 (#80), clé API hors des logs (#86), CI locale en parallèle et tests backend 3× plus rapides (#85).
 
@@ -23,7 +24,6 @@ Les points « Avant v1.0.0 » dans l'ordre, une PR chacun. La PR de release ouve
 
 Bugs de l'audit du 2026-11-03, par priorité :
 
-- **Changement de compte Last.fm** : `link-lastfm` laisse l'ancien `lastfm_username` sur les automations et l'ancien cache perso (`user_tracks`) en place.
 - **Cron en UTC** : l'UI affiche « 08:00 » sans fuseau, le serveur lit en UTC. Fuseau configurable (`Europe/Paris`) au scheduler et à la validation.
 - **Récents figés** : le dashboard sert les récents en base tant que la dernière écoute a moins de 24 h. Juger la fraîcheur sur l'heure de la dernière lecture Last.fm.
 - **Deux onglets déconnectent** : un refresh concurrent du même jeton est pris pour un vol et révoque la famille. Tolérer 30 s après rotation.

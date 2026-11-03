@@ -12,9 +12,12 @@ from httpx import ASGITransport, AsyncClient
 from httpx_oauth.clients.discord import DiscordOAuth2
 from httpx_oauth.clients.google import GoogleOAuth2
 from models.auth_provider import AuthProvider
+from models.automation import Automation
 from models.refresh_token import RefreshToken
 from models.user import User
-from sqlalchemy import select
+from repositories.tracks import get_or_create_track
+from repositories.user_tracks import get_user_track, upsert_user_track
+from sqlalchemy import delete, select
 
 from .conftest import (
     _cleanup_user,
@@ -670,6 +673,58 @@ async def test_link_lastfm_valid(client: AsyncClient):
         assert data["username"] == "testuser123"
         assert data["image"] == "https://example.com/img.jpg"
     finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_relink_other_lastfm_account_moves_automations_and_drops_personal_cache(
+    client: AsyncClient,
+):
+    """Automations follow the new account; the old account's play data is gone."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+        user_id = _get_user_id_from_cookies(client)
+
+        async def _link(name: str) -> None:
+            info = {"username": name, "image": None}
+            with patch("routers.auth_oauth.get_user_info", return_value=info):
+                resp = await client.post("/api/auth/link-lastfm", json={"username": name})
+            assert resp.status_code == 200
+
+        await _link("old_account")
+        created = await client.post(
+            "/api/automations",
+            json={
+                "name": "Relink",
+                "source": {"type": "top_tracks", "period": "3m"},
+                "cron": "0 0 1 * *",
+                "filter_groups": [],
+                "output": {"maxSize": 10},
+                "enabled": True,
+            },
+        )
+        assert created.status_code == 201
+        async with _TestSessionLocal() as db:
+            track = await get_or_create_track(db, f"Song {uuid.uuid4().hex}", "Artist")
+            await upsert_user_track(db, user_id, track.id, user_playcount=99)
+            await db.commit()
+
+        await _link("old_account")  # same account: personal cache kept
+        async with _TestSessionLocal() as db:
+            assert await get_user_track(db, user_id, track.id) is not None
+
+        await _link("new_account")
+        async with _TestSessionLocal() as db:
+            automation = (
+                await db.execute(select(Automation).where(Automation.id == created.json()["id"]))
+            ).scalar_one()
+            assert automation.lastfm_username == "new_account"
+            assert await get_user_track(db, user_id, track.id) is None
+    finally:
+        async with _TestSessionLocal() as db:
+            await db.execute(delete(Automation).where(Automation.user_id == user_id))
+            await db.commit()
         await _cleanup_user(email=email)
 
 
