@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/Doggo785/ListFM/compare/v0.2.0...v0.2.1) (2026-11-03)
+
+
+### Performance Improvements
+
+* **enrich:** reuse known artist and album tags across tracks ([#102](https://github.com/Doggo785/ListFM/issues/102)) ([5f98c28](https://github.com/Doggo785/ListFM/commit/5f98c287b07d3290ac636f419f2775e65afa3135))
+* **profile:** fetch the Last.fm profile once per page load ([#103](https://github.com/Doggo785/ListFM/issues/103)) ([2c4d887](https://github.com/Doggo785/ListFM/commit/2c4d88797cc2344b53d9b812c68160e29f494246))
+
 ## [0.2.0](https://github.com/Doggo785/ListFM/compare/v0.1.1...v0.2.0) (2026-11-03)
 
 
