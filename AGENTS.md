@@ -22,7 +22,7 @@ Lire avant d'agir :
 - `services/lastfm.py` est du `pylast` synchrone : l'appeler via `asyncio.to_thread` (routers) ou `run_in_executor` (runner), jamais directement dans du code async.
 - Les appels d'enrichissement passent par `_throttled_call` (cadence `LASTFM_MIN_INTERVAL`, repli sur l'erreur 29). Les tests patchent l'intervalle à 0.
 - Le moteur de filtres existe en deux copies de même sémantique : `frontend/src/lib/filter-engine.js` (aperçu instantané) et `backend/services/filter_engine.py` (preview et sweep). Un opérateur ajouté va dans les deux.
-- Cache enrich (`services/enrich_cache.py`) : fraîcheur par groupe de données. Un filtre ne lit jamais un champ qui n'a pas été cherché ; chaque fetch partiel réécrit son groupe en base.
+- Cache enrich (`services/enrich_cache.py`) : fraîcheur par groupe de données. Un filtre ne lit jamais un champ qui n'a pas été cherché ; chaque fetch partiel réécrit son groupe en base. Les tags d'artiste et d'album sont préchargés depuis la base (`artists.tags_fetched_at`, `albums.tags_fetched_at`) ; seuls ceux obtenus en direct sont réécrits et redatés.
 - Les repositories ne commitent pas : l'appelant commit, et rattrape `SQLAlchemyError` avec un rollback.
 - Soft-delete par `deleted_at` sur `User`, `Automation`, `GeneratedPlaylist` : chaque requête filtre `deleted_at IS NULL`.
 - Les modèles ne déclarent aucun `relationship()` ; les jointures sont des `select().join()` explicites.

@@ -1,7 +1,9 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+from models.album import Album
 from models.album_tag import AlbumTag
+from models.artist import Artist
 from models.artist_tag import ArtistTag
 from models.tag import Tag
 from models.track_tag import TrackTag
@@ -130,3 +132,67 @@ async def upsert_artist_tag(
     result = await db.execute(stmt)
     await db.flush()
     return result.scalar_one()
+
+
+async def get_fresh_tag_caches(
+    db: AsyncSession, artists: set[str], ttl: timedelta
+) -> dict[str, dict[str, list[dict]]]:
+    """Known tags of these artists and their albums, fetched within ``ttl``.
+
+    Shaped like enrich_tracks' tag_caches: lowercased "artist" and
+    "artist|album" keys. Empty lists are real answers (fetched, no tags).
+    """
+    caches: dict[str, dict[str, list[dict]]] = {"artist": {}, "album": {}}
+    if not artists:
+        return caches
+    since = datetime.now(UTC) - ttl
+    fresh_artists = (
+        await db.execute(
+            select(Artist.name).where(
+                Artist.name.in_(artists), Artist.tags_fetched_at >= since
+            )
+        )
+    ).scalars().all()
+    for name in fresh_artists:
+        caches["artist"][name.strip().lower()] = []
+    if fresh_artists:
+        rows = await db.execute(
+            select(ArtistTag.artist, Tag.name, ArtistTag.weight)
+            .join(Tag, Tag.id == ArtistTag.tag_id)
+            .where(ArtistTag.artist.in_(fresh_artists))
+        )
+        for artist, name, weight in rows.all():
+            caches["artist"][artist.strip().lower()].append({"name": name, "count": weight})
+
+    albums = (
+        await db.execute(
+            select(Album).where(Album.artist.in_(artists), Album.tags_fetched_at >= since)
+        )
+    ).scalars().all()
+    album_keys = {
+        a.id: f"{a.artist.strip().lower()}|{a.title.strip().lower()}" for a in albums
+    }
+    for key in album_keys.values():
+        caches["album"][key] = []
+    if album_keys:
+        rows = await db.execute(
+            select(AlbumTag.album_id, Tag.name, AlbumTag.weight)
+            .join(Tag, Tag.id == AlbumTag.tag_id)
+            .where(AlbumTag.album_id.in_(album_keys))
+        )
+        for album_id, name, weight in rows.all():
+            caches["album"][album_keys[album_id]].append({"name": name, "count": weight})
+    return caches
+
+
+async def mark_artist_tags_fetched(db: AsyncSession, artists: set[str]) -> None:
+    """Stamp these artists' tags as freshly fetched. Caller commits."""
+    if not artists:
+        return
+    now = datetime.now(UTC)
+    stmt = insert(Artist).values([{"name": a, "tags_fetched_at": now} for a in artists])
+    await db.execute(
+        stmt.on_conflict_do_update(
+            index_elements=["name"], set_={"tags_fetched_at": stmt.excluded.tags_fetched_at}
+        )
+    )

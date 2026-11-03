@@ -404,3 +404,60 @@ async def test_failed_fetch_is_returned_but_never_cached():
     assert all("fetch_failed" not in t for t in out1)
     assert stats2["hits"] == 1
     assert stats2["misses"] == 1
+
+
+@pytest.mark.asyncio
+async def test_known_artist_and_album_tags_are_reused_until_stale():
+    """A new track by a known artist skips artist.getTopTags and album.getTopTags."""
+    from types import SimpleNamespace
+
+    from models.album import Album
+    from models.artist import Artist
+
+    user_id = await _make_user_id()
+    suffix = uuid.uuid4().hex[:8]
+    artist = f"Tagged Artist {suffix}"
+    calls = {"artist": 0, "album": 0}
+
+    def _tags(kind):
+        def get_top_tags(limit=None):
+            calls[kind] += 1
+            return [SimpleNamespace(item=SimpleNamespace(name=f"{kind}-tag"), weight=100)]
+
+        return SimpleNamespace(get_top_tags=get_top_tags)
+
+    network = SimpleNamespace(
+        get_artist=lambda name: _tags("artist"),
+        get_album=lambda artist_name, title: _tags("album"),
+    )
+    info = {"listeners": "1", "playcount": "1", "album": {"title": f"Album {suffix}"}}
+
+    async def _run(title):
+        async with _TestSessionLocal() as db:
+            out, _ = await enrich_tracks_cached(
+                db, user_id=user_id, username="u",
+                tracks=[{"artist": artist, "title": title}], max_enrich=5,
+            )
+            await db.commit()
+        return out[0]
+
+    with (
+        patch.object(lastfm, "get_network", return_value=network),
+        patch.object(lastfm, "_track_info", return_value=info),
+        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+    ):
+        await _run("first")
+        assert calls == {"artist": 1, "album": 1}
+
+        second = await _run("second")
+        assert calls == {"artist": 1, "album": 1}
+        assert second["artist_tags"] == [{"name": "artist-tag", "count": 100}]
+        assert second["album_tags"] == [{"name": "album-tag", "count": 100}]
+
+        async with _TestSessionLocal() as db:
+            old = datetime.now(UTC) - timedelta(days=8)
+            await db.execute(update(Artist).where(Artist.name == artist).values(tags_fetched_at=old))
+            await db.execute(update(Album).where(Album.artist == artist).values(tags_fetched_at=old))
+            await db.commit()
+        await _run("third")
+        assert calls == {"artist": 2, "album": 2}

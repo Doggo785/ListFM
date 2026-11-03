@@ -446,11 +446,14 @@ def enrich_tracks(
     max_enrich: int = 50,
     only: set[str] | None = None,
     progress_key: str | None = None,
+    tag_caches: dict | None = None,
 ) -> list[dict]:
+    """Enrich tracks live. ``tag_caches`` ({"artist": {...}, "album": {...}})
+    may be preloaded with known tags; keys fetched live are added to it."""
     network = get_network()
     to_enrich = tracks[:max_enrich]
     tail = tracks[max_enrich:]
-    tag_caches: dict = {}
+    tag_caches = tag_caches if tag_caches is not None else {}
     cache_lock = threading.Lock()
 
     def _enrich_one(track):
