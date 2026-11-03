@@ -11,9 +11,9 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 ## Fait
 
-- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
-- **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47), un appel raté n'est plus mis en cache (#83).
-- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées (#67), `main` seule branche (#69), release-please et v0.1.0 (#80).
+- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), OAuth rattaché à un compte local seulement si les deux emails sont vérifiés (#87), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
+- **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47), un appel raté n'est plus mis en cache (#83), un seul `track.getInfo` par morceau (#88).
+- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées (#67), `main` seule branche (#69), release-please et v0.1.0 (#80), clé API hors des logs (#86), CI locale en parallèle et tests backend 3× plus rapides (#85).
 
 ## Maintenant
 
@@ -23,25 +23,32 @@ Les points « Avant v1.0.0 » dans l'ordre, une PR chacun. La PR de release ouve
 
 Bugs de l'audit du 2026-11-03, par priorité :
 
-3. **Prise de compte** : la connexion Google/Discord se rattache à un compte local au même email même si ce compte n'a jamais vérifié son email (`repositories/users.py`). Exiger `user.email_verified`.
-4. **Changement de compte Last.fm** : `link-lastfm` laisse l'ancien `lastfm_username` sur les automations et l'ancien cache perso (`user_tracks`) en place.
-5. **Aperçu qui rétrécit** : le navigateur refiltre des morceaux déjà filtrés par le serveur ; retirer un filtre ne ramène rien. Afficher le résultat serveur et proposer de relancer l'aperçu ; supprimer alors `frontend/src/lib/filter-engine.js` (garder `countActiveConditions`).
-6. **Taille ignorée** : `min(maxSize, 50)` plafonne à 50 et la source n'est lue qu'à hauteur de la taille avant filtres. Couper à `maxSize` après filtres, lire une source plus large quand un filtre est actif.
-7. **Cron en UTC** : l'UI affiche « 08:00 » sans fuseau, le serveur lit en UTC. Fuseau configurable (`Europe/Paris`) au scheduler et à la validation.
-8. **Récents figés** : le dashboard sert les récents en base tant que la dernière écoute a moins de 24 h. Juger la fraîcheur sur l'heure de la dernière lecture Last.fm.
-9. **Deux onglets déconnectent** : un refresh concurrent du même jeton est pris pour un vol et révoque la famille. Tolérer 30 s après rotation.
-10. **Erreurs internes affichées** : `str(exc)` va dans l'historique et la progression. Message générique, détail en log.
-11. **`playcount` ambigu** : en source `top_artists` il vaut le compteur mondial, pas le tien. Ne pas le remplir dans `get_top_artists_tracks`.
-12. **Code testé mais jamais appelé** : `run_automation_pipeline` (sync), `count_active_conditions` (Python), `get_user_tracks_needing_sync`, `update_last_played`, `upsert_last_played_at`, `upsert_track_tag`, `get_track_by_id`.
-13. **Session expirée** : après un refresh raté, l'UI montre des 401 au lieu de revenir au login. Remettre `user` à null.
-14. **`requireUsername()`** dans `api.js` double la vérification serveur : supprimer `_username` et ses appels.
+- **Changement de compte Last.fm** : `link-lastfm` laisse l'ancien `lastfm_username` sur les automations et l'ancien cache perso (`user_tracks`) en place.
+- **Cron en UTC** : l'UI affiche « 08:00 » sans fuseau, le serveur lit en UTC. Fuseau configurable (`Europe/Paris`) au scheduler et à la validation.
+- **Récents figés** : le dashboard sert les récents en base tant que la dernière écoute a moins de 24 h. Juger la fraîcheur sur l'heure de la dernière lecture Last.fm.
+- **Deux onglets déconnectent** : un refresh concurrent du même jeton est pris pour un vol et révoque la famille. Tolérer 30 s après rotation.
+- **Erreurs internes affichées** : `str(exc)` va dans l'historique et la progression. Message générique, détail en log.
+- **`playcount` ambigu** : en source `top_artists` il vaut le compteur mondial, pas le tien. Ne pas le remplir dans `get_top_artists_tracks`.
+- **Code testé mais jamais appelé** : `run_automation_pipeline` (sync), `count_active_conditions` (Python), `get_user_tracks_needing_sync`, `update_last_played`, `upsert_last_played_at`, `upsert_track_tag`, `get_track_by_id`.
+- **Session expirée** : après un refresh raté, l'UI montre des 401 au lieu de revenir au login. Remettre `user` à null.
+- **`requireUsername()`** dans `api.js` double la vérification serveur : supprimer `_username` et ses appels.
 
 Vitesse de l'aperçu (mesuré le 2026-11-03 : 48 morceaux sans cache = 326 appels, 83 s ; le temps suit appels × 0,25 s) :
 
-15. **5 × `track.getInfo` par morceau** : listeners, playcount, userplaycount, userloved et album passent chacun par leur getter pylast, qui refait le même appel (240 appels sur 326). Un seul `track.getInfo` JSON avec `username=` comme `get_recent_tracks_extended` : 326 → ~134 appels.
-16. **Tags artiste/album redemandés** : le cache est tout-ou-rien par morceau, un nouveau morceau d'un artiste connu refait `artist.getTopTags` et `album.getTopTags`. Date de fetch par artiste et par album, appel sauté sous 7 j.
-17. **Clé API dans les logs** : les logs INFO de `httpx` impriment l'URL avec `api_key`. `logging.getLogger("httpx").setLevel(logging.WARNING)` dans `main.py`.
-18. **Profil appelé 4 fois** : `get_user_info` fait 2 `user.getInfo`, et `AppSidebar` comme `Dashboard` appellent `/api/info`. Un appel JSON côté serveur, un appel partagé côté client.
+- **Tags artiste/album redemandés** : le cache est tout-ou-rien par morceau, un nouveau morceau d'un artiste connu refait `artist.getTopTags` et `album.getTopTags`. Date de fetch par artiste et par album, appel sauté sous 7 j.
+- **Profil appelé 4 fois** : `get_user_info` fait 2 `user.getInfo`, et `AppSidebar` comme `Dashboard` appellent `/api/info`. Un appel JSON côté serveur, un appel partagé côté client.
+
+Refonte du créateur de playlist (le refaire de zéro, après les bugs ci-dessus ; grilling de l'owner avant de coder) :
+
+- **Constats** : le menu promet ce que le serveur ne fait pas.
+  - La période s'affiche pour toutes les sources, mais seules `top_tracks` et `top_artists` la lisent : `recent_tracks` et `loved_tracks` prennent les derniers morceaux quoi qu'on choisisse (`dispatch_source_tracks`). « Recent tracks + 12 mois » ne lit donc que les 50 dernières écoutes.
+  - La source n'est lue qu'à hauteur de `min(maxSize, 50)` avant filtres : un filtre sélectif ne voit que 50 morceaux et rend souvent zéro.
+  - L'aperçu qui rétrécit : le navigateur refiltre des morceaux déjà filtrés par le serveur, retirer un filtre ne ramène rien. Supprimer `frontend/src/lib/filter-engine.js` (garder `countActiveConditions`).
+- **Cible** : l'utilisateur voit ce qui sera lu et a plus de liberté.
+  - Chaque source n'affiche que les réglages qu'elle lit ; `recent_tracks` lit une vraie fenêtre de dates (`time_from`/`time_to` existent déjà dans `get_recent_tracks`).
+  - Profondeur de lecture de la source et taille de playlist réglables, sans plafond caché à 50 ; couper à la taille après filtres.
+  - L'aperçu montre le résultat serveur, combien de morceaux lus et combien gardés, et se relance explicitement.
+  - Lire plus de morceaux coûte plus d'appels Last.fm : afficher l'estimation avant de lancer.
 
 Produit et hygiène :
 
