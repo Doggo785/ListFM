@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.0](https://github.com/Doggo785/ListFM/compare/v0.1.1...v0.2.0) (2026-11-03)
+
+
+### Features
+
+* **automations:** run cron schedules in the user's timezone ([#92](https://github.com/Doggo785/ListFM/issues/92)) ([f433b18](https://github.com/Doggo785/ListFM/commit/f433b185e0d08290c20ce02da8ab62790992bc02))
+
+
+### Bug Fixes
+
+* **auth:** move automations and drop personal cache when relinking Last.fm ([#90](https://github.com/Doggo785/ListFM/issues/90)) ([8798578](https://github.com/Doggo785/ListFM/commit/87985785f8cd2237b63086beac2bbe4efeb2defb))
+* **auth:** send the user back to login when the session expires ([#96](https://github.com/Doggo785/ListFM/issues/96)) ([c4f85d9](https://github.com/Doggo785/ListFM/commit/c4f85d94434da23e384ded51f95461df3bd5f0f9))
+* **auth:** stop logging out two tabs that refresh at the same time ([#94](https://github.com/Doggo785/ListFM/issues/94)) ([4d6be53](https://github.com/Doggo785/ListFM/commit/4d6be53c99c583f350f9793d6cdee013a9acfe93))
+* **dashboard:** always fetch recent tracks live ([#93](https://github.com/Doggo785/ListFM/issues/93)) ([e4fc3ff](https://github.com/Doggo785/ListFM/commit/e4fc3ff3556302b6e5d8d0d421a2e44f73efbabf))
+* **runner:** show a generic run error instead of the exception text ([#95](https://github.com/Doggo785/ListFM/issues/95)) ([044fa0e](https://github.com/Doggo785/ListFM/commit/044fa0ea33747defa84ee8b86b5ed426ba711a65))
+* **sources:** stop passing the worldwide count as your plays for top artists ([#97](https://github.com/Doggo785/ListFM/issues/97)) ([f19b1c4](https://github.com/Doggo785/ListFM/commit/f19b1c4fdfbf8b653a54dccf5c4f1bfaecee3047))
+
 ## [0.1.1](https://github.com/Doggo785/ListFM/compare/v0.1.0...v0.1.1) (2026-11-03)
 
 
