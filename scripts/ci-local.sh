@@ -20,11 +20,11 @@ ruff_job()      { uvx ruff@0.16.8 check backend; }
 # CI installs mypy alone (no project deps); mirror that, or results differ.
 mypy_job()      { uvx --python 3.12 mypy@2.3.1 backend --ignore-missing-imports; }
 backend_job()   { "$VENV/python" -m pytest backend/tests/ -q --cov=backend --cov-report=xml:coverage.xml &&
-                  "$VENV/diff-cover" coverage.xml --compare-branch=origin/dev --fail-under=80; }
+                  "$VENV/diff-cover" coverage.xml --compare-branch=origin/main --fail-under=80; }
 # shortcut: reuses existing node_modules instead of `npm ci`; run `npm ci` after lockfile changes.
 fbuild_job()    { (cd frontend && npm run check:fast && npm run build); }
 ftests_job()    { (cd frontend && npx vitest run --coverage --coverage.reporter=cobertura --coverage.reporter=text &&
-                  "$VENV/diff-cover" coverage/cobertura-coverage.xml --compare-branch=origin/dev --fail-under=80); }
+                  "$VENV/diff-cover" coverage/cobertura-coverage.xml --compare-branch=origin/main --fail-under=80); }
 
 run() {
   local name=$1 fn=$2 start=$SECONDS
@@ -43,7 +43,7 @@ declare -A JOBS=(
 )
 ORDER=(gitleaks osv ruff mypy frontend-build frontend-tests backend-tests)
 
-git fetch -q origin dev || echo "warn: git fetch failed, diff-cover compares against a stale origin/dev"
+git fetch -q origin main || echo "warn: git fetch failed, diff-cover compares against a stale origin/main"
 for job in "${@:-${ORDER[@]}}"; do
   [[ -n ${JOBS[$job]:-} ]] || { echo "unknown job: $job (jobs: ${ORDER[*]})"; exit 2; }
   run "$job" "${JOBS[$job]}"

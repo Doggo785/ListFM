@@ -47,9 +47,9 @@ Ruff config lives in `ruff.toml`, zero findings required.
 
 ## Branch workflow
 
-`dev` is the integration branch, `main` is the release snapshot. Open every PR against `dev`.
+`main` is the only long-lived branch. Open every PR against `main`; release-please cuts versions from it.
 
-Direct pushes to `dev` and `main` are blocked, branch protection applies to admins too. Merges are squashed and the branch is deleted on merge.
+Direct pushes to `main` are blocked, branch protection applies to admins too. Merges are squashed and the branch is deleted on merge.
 
 CI must pass before merge. Every job in `.github/workflows/ci.yml` is a required check.
 

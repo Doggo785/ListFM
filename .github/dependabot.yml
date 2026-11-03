@@ -11,7 +11,7 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
-    target-branch: "dev"
+    target-branch: "main"
     directory: "/frontend"
     schedule:
       interval: "weekly"
@@ -25,7 +25,7 @@ updates:
     open-pull-requests-limit: 5
     labels: ["dependencies"]
   - package-ecosystem: "pip"
-    target-branch: "dev"
+    target-branch: "main"
     directory: "/backend"
     schedule:
       interval: "weekly"
@@ -39,7 +39,7 @@ updates:
     open-pull-requests-limit: 5
     labels: ["dependencies"]
   - package-ecosystem: "github-actions"
-    target-branch: "dev"
+    target-branch: "main"
     directory: "/"
     schedule:
       interval: "weekly"
