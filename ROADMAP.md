@@ -11,8 +11,8 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 ## Fait
 
-- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle, flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
-- **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47).
+- **Socle produit** (automations → playlists générées → historique) : un run raté ne repart plus en boucle (#82), flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
+- **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47), un appel raté n'est plus mis en cache (#83).
 - **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées (#67), `main` seule branche (#69), release-please et v0.1.0 (#80).
 
 ## Maintenant
@@ -23,7 +23,6 @@ Les points « Avant v1.0.0 » dans l'ordre, une PR chacun. La PR de release ouve
 
 Bugs de l'audit du 2026-11-03, par priorité :
 
-2. **Cache empoisonné** : un appel Last.fm raté garde sa valeur par défaut (0, aucun tag, pas loved) et `_write_back` la stocke fraîche 7 jours. Ne stocker que les champs réellement obtenus.
 3. **Prise de compte** : la connexion Google/Discord se rattache à un compte local au même email même si ce compte n'a jamais vérifié son email (`repositories/users.py`). Exiger `user.email_verified`.
 4. **Changement de compte Last.fm** : `link-lastfm` laisse l'ancien `lastfm_username` sur les automations et l'ancien cache perso (`user_tracks`) en place.
 5. **Aperçu qui rétrécit** : le navigateur refiltre des morceaux déjà filtrés par le serveur ; retirer un filtre ne ramène rien. Afficher le résultat serveur et proposer de relancer l'aperçu ; supprimer alors `frontend/src/lib/filter-engine.js` (garder `countActiveConditions`).
