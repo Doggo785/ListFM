@@ -39,6 +39,13 @@ Bugs de l'audit du 2026-11-03, par priorité :
 13. **Session expirée** : après un refresh raté, l'UI montre des 401 au lieu de revenir au login. Remettre `user` à null.
 14. **`requireUsername()`** dans `api.js` double la vérification serveur : supprimer `_username` et ses appels.
 
+Vitesse de l'aperçu (mesuré le 2026-11-03 : 48 morceaux sans cache = 326 appels, 83 s ; le temps suit appels × 0,25 s) :
+
+15. **5 × `track.getInfo` par morceau** : listeners, playcount, userplaycount, userloved et album passent chacun par leur getter pylast, qui refait le même appel (240 appels sur 326). Un seul `track.getInfo` JSON avec `username=` comme `get_recent_tracks_extended` : 326 → ~134 appels.
+16. **Tags artiste/album redemandés** : le cache est tout-ou-rien par morceau, un nouveau morceau d'un artiste connu refait `artist.getTopTags` et `album.getTopTags`. Date de fetch par artiste et par album, appel sauté sous 7 j.
+17. **Clé API dans les logs** : les logs INFO de `httpx` impriment l'URL avec `api_key`. `logging.getLogger("httpx").setLevel(logging.WARNING)` dans `main.py`.
+18. **Profil appelé 4 fois** : `get_user_info` fait 2 `user.getInfo`, et `AppSidebar` comme `Dashboard` appellent `/api/info`. Un appel JSON côté serveur, un appel partagé côté client.
+
 Produit et hygiène :
 
 - **Playlist en grand** : une playlist générée doit pouvoir s'ouvrir en plein écran.
