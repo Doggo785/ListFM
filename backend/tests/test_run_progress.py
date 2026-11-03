@@ -368,7 +368,7 @@ async def test_run_progress_failed_and_running_fallbacks(client: AsyncClient):
         failed = await client.get(f"/api/automations/{automation_id}/run-progress")
         assert failed.status_code == 200
         assert failed.json()["stage"] == "error"
-        assert "lastfm down" in failed.json()["error"]
+        assert failed.json()["error"] == "The run failed (Last.fm or server error)."
         async with _TestSessionLocal() as db:
             await create_automation_history(
                 db, automation_id=automation_id, status="running"

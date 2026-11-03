@@ -35,6 +35,7 @@ from services.lastfm import (
     get_recent_tracks,
     get_top_artists_tracks,
     get_top_tracks,
+    is_rate_limit_error,
 )
 from services.progress import store as progress_store
 from sqlalchemy import func, select
@@ -301,6 +302,13 @@ async def _mark_success(db: AsyncSession, history, result: dict, automation: Aut
     await db.flush()
 
 
+def _public_error(exc: Exception) -> str:
+    """Message shown in history and progress; the raw error goes to the logs only."""
+    if is_rate_limit_error(exc):
+        return "Last.fm is rate limiting requests. Try again in a few minutes."
+    return "The run failed (Last.fm or server error)."
+
+
 async def _mark_failure(
     db: AsyncSession, history, exc: Exception, automation: Automation
 ) -> None:
@@ -310,7 +318,7 @@ async def _mark_failure(
     automation as attempt 1 every tick.
     """
     history.status = "failed"
-    history.error_message = str(exc)[:2000]
+    history.error_message = _public_error(exc)
     history.completed_at = datetime.now(UTC)
     automation.last_run = datetime.now(UTC)
     await db.flush()
@@ -360,10 +368,11 @@ async def run_automation(
             max_tracks=automation.output_max_size,
             progress_key=progress_key,
         )
-    except Exception as exc:  # noqa: BLE001 - record any pipeline failure
+    except Exception as exc:
+        logger.exception("run failed for automation %s", automation.id)
         await _mark_failure(db, history, exc, automation)
         if progress_key is not None:
-            progress_store.finish(progress_key, error=str(exc)[:500])
+            progress_store.finish(progress_key, error=_public_error(exc))
         return history
 
     playlist = await _persist_result_playlist(db, automation, result)
