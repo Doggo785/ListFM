@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
 import AppSidebar from "./components/ui/AppSidebar";
 import ScrollToTop from "./components/elements/ScrollToTop";
+import SyncBanner from "./components/elements/SyncBanner";
 import Landing from "./views/Landing";
 import Login from "./views/Login";
 import Register from "./views/Register";
@@ -30,6 +31,7 @@ function App() {
           <AppSidebar />
         )}
         <div className="min-w-0 flex-1">
+          {showSidebar && <SyncBanner />}
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
