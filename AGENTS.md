@@ -7,6 +7,7 @@ Lire avant d'agir :
 - `ROADMAP.md` : le statut, et la seule liste de ce qu'on fait ensuite.
 - `CONSTRAINTS.md` avant d'écrire du code : la barre qualité, les checks, la règle de merge.
 - `CONTRIBUTING.md` : setup, workflow de branche, conventions de code.
+- `GLOSSARY.md` : le vocabulaire du domaine ; `docs/adr/` : les décisions structurantes et leur pourquoi.
 
 ## Travailler avec l'owner
 
