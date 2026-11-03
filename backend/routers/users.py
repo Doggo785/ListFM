@@ -1,11 +1,9 @@
 import asyncio
 import logging
-from datetime import UTC, datetime
 
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, Query
 from models.user import User
-from repositories.tracks import CACHE_TTL
 from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tracks
 from routers.deps import get_current_active_user, get_current_user_lastfm_username
 from schemas import RecentTracksResponse, Track, UserInfo
@@ -41,37 +39,28 @@ async def user_recent_tracks(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Recents are always fetched live (one Last.fm call); stored plays are
+    only the fallback when Last.fm is down."""
     try:
-        stored = await get_recent_user_tracks(db, current_user.id, limit)
-        if stored and _stored_recents_fresh(stored):
-            logger.info("recent-tracks: db (%d rows)", len(stored))
-            return RecentTracksResponse(
-                tracks=[Track(title=t["title"], artist=t["artist"], album=t["album"]) for t in stored]
-            )
-        # Live fetch is a single Last.fm call; run it off the loop.
+        # Single Last.fm call; run it off the loop.
         tracks = await asyncio.to_thread(get_recent_tracks, username, limit)
-        await _store_recent_tracks(db, current_user.id, tracks)
-        try:
-            await db.commit()
-        except SQLAlchemyError:
-            # The dashboard must never break on a cache persist failure:
-            # degrade to live data and log loudly.
-            await db.rollback()
-            logger.warning("recent-tracks: cache store failed, serving live", exc_info=True)
-        return RecentTracksResponse(tracks=[Track(**t) for t in tracks])
-    except HTTPException:
-        raise
-    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
+    except Exception as e:  # noqa: BLE001 -- deliberate boundary: log, fall back, never leak upstream internals
         logger.error("Last.fm API error: %s", e)
-        raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
-
-
-def _stored_recents_fresh(stored: list[dict]) -> bool:
-    """Stored recents are servable when the newest play is within the TTL."""
-    newest = stored[0].get("played_at")
-    return newest is not None and newest >= (
-        datetime.now(UTC) - CACHE_TTL
-    )
+        stored = await get_recent_user_tracks(db, current_user.id, limit)
+        if not stored:
+            raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
+        logger.info("recent-tracks: Last.fm down, serving %d stored plays", len(stored))
+        return RecentTracksResponse(
+            tracks=[Track(title=t["title"], artist=t["artist"], album=t["album"]) for t in stored]
+        )
+    await _store_recent_tracks(db, current_user.id, tracks)
+    try:
+        await db.commit()
+    except SQLAlchemyError:
+        # The dashboard must never break on a store failure: serve live data.
+        await db.rollback()
+        logger.warning("recent-tracks: store failed, serving live", exc_info=True)
+    return RecentTracksResponse(tracks=[Track(**t) for t in tracks])
 
 
 async def _store_recent_tracks(db: AsyncSession, user_id: str, tracks: list[dict]) -> None:

@@ -1,4 +1,4 @@
-"""P1-8 (8d): dashboard recents served from cache with TTL gating.
+"""Dashboard recents: always live, stored plays as the Last.fm-down fallback.
 
 The live Last.fm layer is mocked (patch routers.users.get_recent_tracks);
 DB rows use the throwaway listfm_test database (autouse truncate).
@@ -49,59 +49,49 @@ def _live_tracks(suffix: str, base_epoch: int) -> list[dict]:
 
 
 @pytest.mark.asyncio
-async def test_recents_live_then_served_from_db(client: AsyncClient):
-    """First load fetches live and stores; second load serves from DB."""
+async def test_recents_always_live(client: AsyncClient):
+    """Every load asks Last.fm: plays made since the last load show up."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
-        suffix = uuid.uuid4().hex[:8]
         now = int(time.time())
+        first_suffix, next_suffix = uuid.uuid4().hex[:8], uuid.uuid4().hex[:8]
         with patch(
-            "routers.users.get_recent_tracks", return_value=_live_tracks(suffix, now)
-        ) as mock_live:
+            "routers.users.get_recent_tracks", return_value=_live_tracks(first_suffix, now)
+        ):
             first = await client.get("/api/recent-tracks?limit=50")
-            assert first.status_code == 200
-            assert [(t["title"], t["artist"]) for t in first.json()["tracks"]] == [
-                (f"Recent Song {suffix} A", f"Recent Artist {suffix}"),
-                (f"Recent Song {suffix} B", f"Recent Artist {suffix}"),
-            ]
-            mock_live.side_effect = Exception("must not be called")
+        assert first.status_code == 200
+        with patch(
+            "routers.users.get_recent_tracks",
+            return_value=_live_tracks(next_suffix, now + 60),
+        ):
             second = await client.get("/api/recent-tracks?limit=50")
-            assert second.status_code == 200
-            assert second.json() == first.json()
+        assert second.status_code == 200
+        assert second.json()["tracks"][0]["title"] == f"Recent Song {next_suffix} A"
     finally:
         await _cleanup_user(email=email)
 
 
 @pytest.mark.asyncio
-async def test_recents_stale_refetches_live(client: AsyncClient):
-    """Stored plays older than the TTL trigger a live refetch."""
+async def test_recents_fall_back_to_stored_plays_when_lastfm_fails(client: AsyncClient):
+    """Last.fm down: serve the stored plays instead of an error."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
         suffix = uuid.uuid4().hex[:8]
-        now = int(time.time())
-        with patch(
-            "routers.users.get_recent_tracks", return_value=_live_tracks(suffix, now)
-        ):
-            resp = await client.get("/api/recent-tracks?limit=50")
-            assert resp.status_code == 200
-        async with _TestSessionLocal() as db:
-            await db.execute(
-                update(UserTrack).values(
-                    last_played_at=datetime.now(UTC) - timedelta(hours=25)
-                )
-            )
-            await db.commit()
-        fresh_suffix = uuid.uuid4().hex[:8]
         with patch(
             "routers.users.get_recent_tracks",
-            return_value=_live_tracks(fresh_suffix, now),
-        ) as mock_live:
-            resp = await client.get("/api/recent-tracks?limit=50")
-            assert resp.status_code == 200
-            assert mock_live.call_count == 1
-            assert resp.json()["tracks"][0]["title"] == f"Recent Song {fresh_suffix} A"
+            return_value=_live_tracks(suffix, int(time.time())),
+        ):
+            first = await client.get("/api/recent-tracks?limit=50")
+        assert first.status_code == 200
+        with patch("routers.users.get_recent_tracks", side_effect=Exception("down")):
+            fallback = await client.get("/api/recent-tracks?limit=50")
+        assert fallback.status_code == 200
+        assert [t["title"] for t in fallback.json()["tracks"]] == [
+            f"Recent Song {suffix} A",
+            f"Recent Song {suffix} B",
+        ]
     finally:
         await _cleanup_user(email=email)
 
