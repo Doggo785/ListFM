@@ -1,0 +1,4 @@
+[run]
+# SQLAlchemy async runs DB calls in greenlets; without this, coverage on
+# Python 3.12 (CI) loses lines after an awaited DB call.
+concurrency = greenlet, thread
