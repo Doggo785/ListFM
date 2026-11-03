@@ -1,0 +1,56 @@
+// @vitest-environment jsdom
+import React, { act } from "react";
+// Custom createRoot rendering (no testing library): tell React act() is supported.
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+import { createRoot } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { request } from "@/lib/api";
+import { AuthProvider } from "@/contexts/AuthContext";
+import CronEditor from "@/components/builder/CronEditor";
+
+vi.mock("@/lib/api", () => ({
+  request: vi.fn(),
+  setCurrentUsername: vi.fn(),
+}));
+
+async function render(element) {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  await act(async () => {
+    createRoot(container).render(element);
+  });
+  return container;
+}
+
+beforeEach(() => {
+  vi.spyOn(Intl, "DateTimeFormat").mockReturnValue({
+    resolvedOptions: () => ({ timeZone: "Europe/Paris" }),
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  request.mockReset();
+});
+
+describe("browser timezone", () => {
+  it("sends the browser zone when the server has another one", async () => {
+    request.mockResolvedValue({ timezone: "UTC" });
+    await render(<AuthProvider>x</AuthProvider>);
+    expect(request).toHaveBeenCalledWith("/api/auth/me/timezone", {
+      method: "PUT",
+      body: JSON.stringify({ timezone: "Europe/Paris" }),
+    });
+  });
+
+  it("sends nothing when the zones already match", async () => {
+    request.mockResolvedValue({ timezone: "Europe/Paris" });
+    await render(<AuthProvider>x</AuthProvider>);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the zone next to the schedule", async () => {
+    const container = await render(<CronEditor value="0 8 * * *" onChange={() => {}} />);
+    expect(container.textContent).toContain("(Europe/Paris)");
+  });
+});

@@ -14,12 +14,14 @@ import asyncio
 import functools
 import logging
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
 from database import async_session
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
+from models.user import User
 from repositories.automation_history import create_automation_history
 from repositories.automations import get_automations_by_ids
 from repositories.generated_playlists import create_generated_playlist
@@ -197,18 +199,22 @@ async def get_enabled_automations(db: AsyncSession) -> list[Automation]:
     return list(result.scalars().all())
 
 
-def is_due(automation: Automation, now: datetime | None = None) -> bool:
+def is_due(
+    automation: Automation, now: datetime | None = None, timezone: str = "UTC"
+) -> bool:
     """Return True when the automation's cron schedule says it should run now.
 
-    An automation that has never run (``last_run`` is None) is due immediately.
+    The cron is read in ``timezone`` (the owner's zone): "0 8 * * *" means
+    08:00 on their clock. An automation that has never run (``last_run`` is
+    None) is due immediately.
     """
     now = now or datetime.now(UTC)
     cron = getattr(automation, "cron", None)
     if not cron:
         return False
     try:
-        trigger = CronTrigger.from_crontab(cron, timezone=UTC)
-    except ValueError:
+        trigger = CronTrigger.from_crontab(cron, timezone=ZoneInfo(timezone))
+    except (ValueError, ZoneInfoNotFoundError):
         return False
     last_run = getattr(automation, "last_run", None)
     if last_run is None:
@@ -528,8 +534,19 @@ async def run_due_automations(session_factory=async_session) -> None:
     async with session_factory() as db:
         now = datetime.now(UTC)
         automations = await get_enabled_automations(db)
+        zones = dict(
+            (
+                await db.execute(
+                    select(User.id, User.timezone).where(
+                        User.id.in_({a.user_id for a in automations})
+                    )
+                )
+            ).all()
+        )
         due_jobs = [
-            (a.id, now, 1) for a in automations if is_due(a, now)
+            (a.id, now, 1)
+            for a in automations
+            if is_due(a, now, zones.get(a.user_id, "UTC"))
         ]
         try:
             retryable = await get_retryable_failures(db, now)

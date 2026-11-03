@@ -1,6 +1,7 @@
 import re
 from datetime import UTC, datetime
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
 from filter_types import FilterGroups
@@ -70,6 +71,19 @@ class UserUpdate(PasswordValidatorMixin, BaseModel):
     email: str | None = None
     password: str | None = None
     display_name: str | None = None
+
+
+class TimezoneUpdate(BaseModel):
+    timezone: str
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_zone(cls, v: str) -> str:
+        try:
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError("Unknown timezone") from exc
+        return v
 
 
 class LinkLastfmRequest(BaseModel):
