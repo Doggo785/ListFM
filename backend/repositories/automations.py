@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 from models.automation import Automation
 from schemas import AutomationCreate, AutomationUpdate
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -117,3 +117,14 @@ async def delete_automation(db: AsyncSession, automation_id: str, user_id: str) 
     automation.deleted_at = datetime.now(UTC)
     await db.flush()
     return True
+
+
+async def set_automations_lastfm_username(
+    db: AsyncSession, user_id: str, lastfm_username: str
+) -> None:
+    """Point every live automation of a user at their newly linked Last.fm account."""
+    await db.execute(
+        update(Automation)
+        .where(Automation.user_id == user_id, Automation.deleted_at.is_(None))
+        .values(lastfm_username=lastfm_username)
+    )

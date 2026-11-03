@@ -16,10 +16,12 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
 from models.auth_provider import AuthProvider
 from models.user import User
+from repositories.automations import set_automations_lastfm_username
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     revoke_all_user_refresh_tokens,
 )
+from repositories.user_tracks import delete_user_tracks
 from repositories.users import (
     get_lastfm_provider,
     get_or_create_user_from_discord,
@@ -365,6 +367,11 @@ async def link_lastfm(
 
     existing_provider = await get_lastfm_provider(db, current_user.id)
     if existing_provider is not None:
+        if existing_provider.provider_user_id != username:
+            # Another Last.fm account: automations must run on it, and the
+            # old account's play counts and loved flags must not leak in.
+            await set_automations_lastfm_username(db, current_user.id, username)
+            await delete_user_tracks(db, current_user.id)
         await db.delete(existing_provider)
         await db.flush()
 
