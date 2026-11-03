@@ -6,23 +6,12 @@ import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
 import { useAutomations } from "@/hooks/useAutomations";
 import {
-  SOURCE_TYPE_LABELS,
-  PERIOD_OPTIONS,
+  describeAutomation,
   describeCron,
   isValidCron,
 } from "@/lib/automation-rules";
 import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
 import { fadeUp, stagger } from "@/lib/animation";
-
-function buildSourceLine(auto) {
-  const source =
-    SOURCE_TYPE_LABELS[auto.source?.type] || auto.source?.type || "Unknown source";
-  const period =
-    PERIOD_OPTIONS.find((p) => p.value === auto.source?.period)?.label ||
-    auto.source?.period ||
-    "";
-  return period ? `${source} · ${period}` : source;
-}
 
 function buildSchedule(auto) {
   if (isValidCron(auto.cron)) {
@@ -39,7 +28,7 @@ function buildCountdown(auto, count) {
       : count === 1
         ? "1 playlist generated"
         : `${count} playlists generated`;
-  return `${generated} · ${buildSourceLine(auto)} · ${buildSchedule(auto)}`;
+  return `${generated} · ${describeAutomation(auto)} · ${buildSchedule(auto)}`;
 }
 
 function buildCard(auto, count) {

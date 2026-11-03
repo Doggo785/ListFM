@@ -18,7 +18,7 @@ export function buildAutomationCardBase(auto) {
   return {
     id: auto.id,
     title: name,
-    image: getPlaylistImageSrc(name, auto.source?.type),
+    image: getPlaylistImageSrc(name, auto.sort),
     glowColor: `radial-gradient(circle, ${color1}55 0%, transparent 70%)`,
   };
 }

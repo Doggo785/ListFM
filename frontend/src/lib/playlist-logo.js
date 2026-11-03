@@ -1,5 +1,5 @@
-import { SOURCE_TYPES } from "@/lib/automation-rules";
-import { IconBolt, IconClock, IconHeart, IconUsers } from "@tabler/icons-react";
+import { SORT_OPTIONS } from "@/lib/automation-rules";
+import { IconBolt } from "@tabler/icons-react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -18,12 +18,6 @@ export const GRADIENTS = [
   ["#0ea5e9", "#6366f1"],
 ];
 
-const ICONS = {
-  [SOURCE_TYPES.TOP_TRACKS]: IconBolt,
-  [SOURCE_TYPES.RECENT_TRACKS]: IconClock,
-  [SOURCE_TYPES.LOVED_TRACKS]: IconHeart,
-  [SOURCE_TYPES.TOP_ARTISTS]: IconUsers,
-};
 
 export function hashName(name) {
   let hash = 0;
@@ -33,11 +27,11 @@ export function hashName(name) {
   return Math.abs(hash);
 }
 
-export function getPlaylistImageSrc(name, sourceType) {
+export function getPlaylistImageSrc(name, sort) {
   const hash = hashName(name);
   const [color1, color2] = GRADIENTS[hash % GRADIENTS.length];
   const gradId = `g${hash}`;
-  const Icon = ICONS[sourceType] || IconBolt;
+  const Icon = SORT_OPTIONS.find((o) => o.value === sort)?.icon || IconBolt;
   const iconMarkup = renderToStaticMarkup(
     createElement(Icon, { size: 60, stroke: 1.5, color: "white", opacity: "0.9" })
   );

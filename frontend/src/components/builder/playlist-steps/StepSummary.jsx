@@ -1,17 +1,14 @@
 import {
-  SOURCE_TYPE_LABELS,
-  PERIOD_OPTIONS,
+  SORT_OPTIONS,
   isValidCron,
+  windowOption,
   describeCron,
 } from "@/lib/automation-rules";
 import { countActiveConditions } from "@/lib/filter-engine";
 
 export function StepSummary({ data }) {
-  const sourceLabel =
-    SOURCE_TYPE_LABELS[data.source.type] || data.source.type;
-  const periodLabel =
-    PERIOD_OPTIONS.find((p) => p.value === data.source.period)?.label ||
-    data.source.period;
+  const sortLabel = SORT_OPTIONS.find((o) => o.value === data.sort)?.label ?? data.sort;
+  const windowLabel = windowOption(data.window)?.label ?? "Custom window";
   const filterCount = countActiveConditions(data.filterGroups);
   const isCronValid = isValidCron(data.cron);
   const filterLabel = filterCount > 0 ? `${filterCount} condition${filterCount > 1 ? "s" : ""}` : "None";
@@ -46,13 +43,13 @@ export function StepSummary({ data }) {
           <div className="grid grid-cols-3 divide-x divide-neutral-700">
             <div className="p-5">
               <div className="text-xs font-medium text-neutral-500 uppercase tracking-wider mb-2">
-                Source
+                Listens
               </div>
               <div className="text-sm font-semibold text-white">
-                {sourceLabel}
+                {sortLabel}
               </div>
               <div className="text-xs text-neutral-400 mt-0.5">
-                {periodLabel}
+                {windowLabel}
               </div>
             </div>
             <div className="p-5">
