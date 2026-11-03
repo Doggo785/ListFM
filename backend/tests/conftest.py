@@ -45,16 +45,17 @@ _test_engine = create_async_engine(
 )
 _TestSessionLocal = async_sessionmaker(_test_engine, class_=AsyncSession, expire_on_commit=False)
 
-# Tables the suite writes to. CASCADE pulls in FK-referencing tables (e.g.
-# user_tracks) without needing them listed or ordered.
+# Tables the suite writes to, children before parents (FK order). DELETE on
+# near-empty tables costs ~1 ms; TRUNCATE costs ~170 ms per test.
 _TEST_TABLES = (
-    "users",
-    "auth_providers",
-    "refresh_tokens",
-    "automations",
+    "user_tracks",
+    "playlist_tracks",
     "automation_history",
     "generated_playlists",
-    "playlist_tracks",
+    "automations",
+    "refresh_tokens",
+    "auth_providers",
+    "users",
 )
 
 
@@ -73,9 +74,8 @@ async def _override_get_db():
 async def _cleanup_db():
     """Clean all test data and rate limiter state before each test.
 
-    Truncate runs once before the test (single round-trip instead of 7 DELETEs
-    per pass). The next test's pre-test truncate wipes the same tables, so no
-    post-test pass is needed.
+    Runs once before the test; the next test's pre-test pass wipes the same
+    tables, so no post-test pass is needed.
     """
     for limiter in (
         login_limiter,
@@ -88,7 +88,8 @@ async def _cleanup_db():
     ):
         limiter.reset()
     async with _TestSessionLocal() as db:
-        await db.execute(text(f"TRUNCATE {', '.join(_TEST_TABLES)} RESTART IDENTITY CASCADE"))
+        for table in _TEST_TABLES:
+            await db.execute(text(f"DELETE FROM {table}"))
         await db.commit()
     yield
     # pytest-asyncio runs each test on a fresh event loop; pooled connections
