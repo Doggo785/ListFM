@@ -10,8 +10,9 @@ Lire avant d'agir :
 
 ## Travailler avec l'owner
 
-- Parler en français. Expliquer un point technique avec une image vulgarisée d'une phrase.
+- Parler en français à l'owner. Expliquer un point technique avec une image vulgarisée d'une phrase.
 - Une PR par changement, commits Conventional Commits atomiques.
+- Commits et PR en anglais : titre `type(scope): summary`, corps `Summary` / `Changes` / `Test plan` comme les PR mergées. Aucun lien de session ni ligne d'attribution.
 - `scripts/ci-local.sh` passe vert avant chaque push, même pour une PR de docs.
 - Merge seulement sur « go merge #N » citant la PR (détail dans `CONSTRAINTS.md`).
 - Suivre seulement les jobs GitHub Actions d'une PR ; Codacy n'est pas un check requis, ne pas l'attendre.
