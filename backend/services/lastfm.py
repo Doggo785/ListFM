@@ -14,14 +14,6 @@ from services.progress import PipelineCancelled, store as progress_store
 
 logger = logging.getLogger(__name__)
 
-PERIOD_MAP = {
-    "7d": pylast.PERIOD_7DAYS,
-    "1m": pylast.PERIOD_1MONTH,
-    "3m": pylast.PERIOD_3MONTHS,
-    "6m": pylast.PERIOD_6MONTHS,
-    "12m": pylast.PERIOD_12MONTHS,
-    "overall": pylast.PERIOD_OVERALL,
-}
 
 # Outbound Last.fm etiquette: ~4 calls/sec max, process-wide (the enrich
 # ThreadPool shares one gate). Observed ceiling is ~5/sec with error 29
@@ -297,60 +289,10 @@ def get_recent_tracks(
     ]
 
 
-def get_top_tracks(username: str, period: str = "3m", limit: int = 50) -> list[dict]:
-    network = get_network()
-    user = network.get_user(username)
-    pylast_period = PERIOD_MAP.get(period, pylast.PERIOD_OVERALL)
-    top_tracks = user.get_top_tracks(period=pylast_period, limit=limit)
-    return [
-        {
-            "title": t.item.title,
-            "artist": t.item.artist.name if t.item.artist else "Unknown Artist",
-            "playcount": t.weight,
-            "rank": i + 1,
-        }
-        for i, t in enumerate(top_tracks)
-    ]
 
 
-def get_top_artists_tracks(username: str, period: str = "3m", limit: int = 50) -> list[dict]:
-    network = get_network()
-    user = network.get_user(username)
-    pylast_period = PERIOD_MAP.get(period, pylast.PERIOD_OVERALL)
-    top_artists = user.get_top_artists(period=pylast_period, limit=10)
-    per_artist_limit = max(limit // max(len(top_artists), 1), 5)
-    tracks = []
-    for artist_item in top_artists:
-        try:
-            artist = network.get_artist(artist_item.item.name)
-            top_tracks = artist.get_top_tracks(limit=per_artist_limit)
-            # No "playcount": the artist's top-track weight is the worldwide
-            # count, and the field means the user's own plays in the period.
-            for t in top_tracks:
-                tracks.append({
-                    "title": t.item.title,
-                    "artist": t.item.artist.name if t.item.artist else artist_item.item.name,
-                })
-        except Exception:
-            logger.debug("get_top_tracks: skipping artist after error", exc_info=True)
-            continue
-        if len(tracks) >= limit:
-            break
-    return tracks[:limit]
 
 
-def get_loved_tracks(username: str, limit: int = 50) -> list[dict]:
-    network = get_network()
-    user = network.get_user(username)
-    loved = user.get_loved_tracks(limit=limit)
-    return [
-        {
-            "title": t.track.title,
-            "artist": t.track.artist.name if t.track.artist else "Unknown Artist",
-            "userloved": True,
-        }
-        for t in loved
-    ]
 
 
 def _normalize_tags(raw_tags: list[dict]) -> list[dict]:
@@ -546,12 +488,3 @@ def enrich_tracks(
     return [r for r in enriched_order if r is not None] + tail
 
 
-def deduplicate(raw_tracks: list[dict]) -> list[dict]:
-    seen: set[str] = set()
-    unique = []
-    for track in raw_tracks:
-        key = f"{track['artist'].strip().lower()}|{track['title'].strip().lower()}"
-        if key not in seen:
-            seen.add(key)
-            unique.append(track)
-    return unique
