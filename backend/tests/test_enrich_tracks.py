@@ -51,3 +51,27 @@ def test_enrich_tracks_falls_back_to_raw_track_on_failure():
     assert out[0] == {"artist": "A", "title": "one", "listeners": 7}
     assert out[1] == {"artist": "B", "title": "two", "fetch_failed": True}
     assert out[2] == {"artist": "C", "title": "three", "listeners": 7}
+
+
+def test_top_artists_tracks_carry_no_worldwide_playcount():
+    """The artist's top-track weight is global; it must not pose as the user's plays."""
+    from types import SimpleNamespace
+
+    from services import lastfm
+
+    track = SimpleNamespace(
+        item=SimpleNamespace(title="Song", artist=SimpleNamespace(name="Band")),
+        weight=1_000_000,
+    )
+    artist = SimpleNamespace(get_top_tracks=lambda limit: [track])
+    network = SimpleNamespace(
+        get_user=lambda name: SimpleNamespace(
+            get_top_artists=lambda period, limit: [
+                SimpleNamespace(item=SimpleNamespace(name="Band"))
+            ]
+        ),
+        get_artist=lambda name: artist,
+    )
+    with patch.object(lastfm, "get_network", return_value=network):
+        out = lastfm.get_top_artists_tracks("u", "3m", limit=5)
+    assert out == [{"title": "Song", "artist": "Band"}]

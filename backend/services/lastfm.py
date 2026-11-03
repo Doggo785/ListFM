@@ -280,11 +280,12 @@ def get_top_artists_tracks(username: str, period: str = "3m", limit: int = 50) -
         try:
             artist = network.get_artist(artist_item.item.name)
             top_tracks = artist.get_top_tracks(limit=per_artist_limit)
+            # No "playcount": the artist's top-track weight is the worldwide
+            # count, and the field means the user's own plays in the period.
             for t in top_tracks:
                 tracks.append({
                     "title": t.item.title,
                     "artist": t.item.artist.name if t.item.artist else artist_item.item.name,
-                    "playcount": t.weight,
                 })
         except Exception:
             logger.debug("get_top_tracks: skipping artist after error", exc_info=True)
