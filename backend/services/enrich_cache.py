@@ -34,7 +34,12 @@ from models.tag import Tag
 from models.track import Track
 from models.user_track import UserTrack
 from repositories.albums import get_or_create_album
-from repositories.tags import upsert_album_tag, upsert_artist_tag
+from repositories.tags import (
+    get_fresh_tag_caches,
+    mark_artist_tags_fetched,
+    upsert_album_tag,
+    upsert_artist_tag,
+)
 from repositories.tracks import CACHE_TTL, get_or_create_track
 from repositories.user_tracks import upsert_user_track
 from services.lastfm import enrich_tracks, epoch_to_datetime, get_lastfm_call_count
@@ -203,10 +208,22 @@ async def _read_cached_tracks(
 
 
 async def _write_back(
-    db: AsyncSession, *, user_id: str, base_tracks: list[dict], enriched_tracks: list[dict]
+    db: AsyncSession,
+    *,
+    user_id: str,
+    base_tracks: list[dict],
+    enriched_tracks: list[dict],
+    known: dict[str, dict[str, list[dict]]] | None = None,
 ) -> None:
-    """Persist live enrich results (core, tags, user data). Caller commits."""
+    """Persist live enrich results (core, tags, user data). Caller commits.
+
+    Artist and album tags listed in ``known`` came from the DB, not from
+    Last.fm: they are neither rewritten nor re-stamped, so their 7-day clock
+    keeps running from the real fetch.
+    """
     now = datetime.now(UTC)
+    known = known or {"artist": {}, "album": {}}
+    fetched_artists: set[str] = set()
     for base, info in zip(base_tracks, enriched_tracks):
         artist = base.get("artist", "")
         title = base.get("title", "")
@@ -214,8 +231,11 @@ async def _write_back(
         if info.get("album"):
             album = await get_or_create_album(db, info["album"], artist)
             album_id = album.id
-            for tag in info.get("album_tags") or []:
-                await upsert_album_tag(db, album_id, tag["name"], tag["count"])
+            album_key = f"{artist.strip().lower()}|{info['album'].strip().lower()}"
+            if album_key not in known["album"]:
+                for tag in info.get("album_tags") or []:
+                    await upsert_album_tag(db, album_id, tag["name"], tag["count"])
+                album.tags_fetched_at = now
         track = await get_or_create_track(
             db,
             title,
@@ -238,8 +258,10 @@ async def _write_back(
         track.last_fetched_at = now
         track.tags_fetched_at = now
         await db.flush()
-        for tag in info.get("artist_tags") or []:
-            await upsert_artist_tag(db, artist, tag["name"], tag["count"])
+        if artist.strip().lower() not in known["artist"]:
+            for tag in info.get("artist_tags") or []:
+                await upsert_artist_tag(db, artist, tag["name"], tag["count"])
+            fetched_artists.add(artist)
         await upsert_user_track(
             db,
             user_id,
@@ -248,6 +270,8 @@ async def _write_back(
             userloved=bool(info.get("userloved", False)),
             last_played_at=epoch_to_datetime(base.get("timestamp")),
         )
+
+    await mark_artist_tags_fetched(db, fetched_artists)
 
 
 async def enrich_tracks_cached(
@@ -268,6 +292,11 @@ async def enrich_tracks_cached(
     stats = {"hits": len(to_enrich) - len(miss_idx), "misses": len(miss_idx), "lastfm_calls": 0}
     if miss_idx:
         miss_tracks = [to_enrich[i] for i in miss_idx]
+        # Tags already known for these artists/albums skip their live calls.
+        known = await get_fresh_tag_caches(
+            db, {t.get("artist", "") for t in miss_tracks}, GLOBAL_TTL
+        )
+        tag_caches = {"artist": dict(known["artist"]), "album": dict(known["album"])}
         before = get_lastfm_call_count()
         loop = asyncio.get_running_loop()
         live = await loop.run_in_executor(
@@ -279,6 +308,7 @@ async def enrich_tracks_cached(
                 len(miss_tracks),
                 only=None,
                 progress_key=progress_key,
+                tag_caches=tag_caches,
             ),
         )
         stats["lastfm_calls"] = get_lastfm_call_count() - before
@@ -290,6 +320,7 @@ async def enrich_tracks_cached(
             user_id=user_id,
             base_tracks=[miss_tracks[i] for i in ok],
             enriched_tracks=[live[i] for i in ok],
+            known=known,
         )
         for i, enriched in zip(miss_idx, live):
             cached[i] = enriched

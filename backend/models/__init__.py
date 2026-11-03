@@ -1,5 +1,6 @@
 from models.album import Album
 from models.album_tag import AlbumTag
+from models.artist import Artist
 from models.artist_tag import ArtistTag
 from models.auth_provider import AuthProvider
 from models.automation import Automation
@@ -16,6 +17,7 @@ from models.user_track import UserTrack
 __all__ = [
     "Album",
     "AlbumTag",
+    "Artist",
     "ArtistTag",
     "AuthProvider",
     "Automation",

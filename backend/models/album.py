@@ -13,4 +13,6 @@ class Album(Base):
     title: Mapped[str] = mapped_column(String(500))
     artist: Mapped[str] = mapped_column(String(500))
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # cache invalidation
+    # When album_tags were last fetched from Last.fm (None = never).
+    tags_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
