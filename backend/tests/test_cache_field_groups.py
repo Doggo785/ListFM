@@ -41,7 +41,7 @@ def _groups():
 async def _run_once(db, user_id, base, live):
     with (
         patch(
-            "services.automation_runner.dispatch_source_tracks",
+            "services.automation_runner.get_window_tracks",
             return_value=[dict(base)],
         ),
         patch("services.enrich_cache.enrich_tracks", return_value=[live]),
@@ -50,8 +50,8 @@ async def _run_once(db, user_id, base, live):
             db,
             user_id=user_id,
             username="u",
-            source_type="recent_tracks",
-            period="3m",
+            window={"length": None},
+            sort="most_played",
             filter_groups=_groups(),
             max_tracks=50,
         )
@@ -100,7 +100,7 @@ async def test_stale_tags_force_refetch_then_hit():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch(
@@ -111,8 +111,8 @@ async def test_stale_tags_force_refetch_then_hit():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -122,7 +122,7 @@ async def test_stale_tags_force_refetch_then_hit():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch(
@@ -134,8 +134,8 @@ async def test_stale_tags_force_refetch_then_hit():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -188,7 +188,7 @@ async def test_fresh_row_still_serves_without_live_calls():
         ).one()
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch(
@@ -200,8 +200,8 @@ async def test_fresh_row_still_serves_without_live_calls():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )

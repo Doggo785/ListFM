@@ -55,7 +55,7 @@ def _create_body() -> dict:
     return {
         "name": "Scheduled playlist",
         "description": "test",
-        "source": {"type": "top_tracks", "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "0 0 1 * *",
         "filter_groups": [],
         "output": {"maxSize": 50},
@@ -105,7 +105,7 @@ async def test_scheduler_tick_runs_due_automation(client: AsyncClient):
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with patch("services.automation_runner.is_due", return_value=True), patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -164,7 +164,7 @@ async def test_scheduler_run_persists_playlist_and_links_history(client: AsyncCl
             {"artist": "Artist B", "title": "Song B"},
         ]
         with patch("services.automation_runner.is_due", return_value=True), patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -207,7 +207,7 @@ async def test_scheduler_failed_run_persists_no_playlist(client: AsyncClient):
         assert created.status_code == 201
 
         with patch("services.automation_runner.is_due", return_value=True), patch(
-            "services.automation_runner.get_top_tracks",
+            "services.automation_runner.get_window_tracks",
             side_effect=Exception("upstream down"),
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -233,7 +233,7 @@ async def test_failed_run_is_not_rerun_by_next_sweep(client: AsyncClient):
         assert created.status_code == 201
 
         with patch(
-            "services.automation_runner.get_top_tracks",
+            "services.automation_runner.get_window_tracks",
             side_effect=Exception("upstream down"),
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -256,7 +256,7 @@ async def test_failed_run_shows_a_generic_error_not_the_exception_text(client: A
         assert created.status_code == 201
 
         with patch("services.automation_runner.is_due", return_value=True), patch(
-            "services.automation_runner.get_top_tracks",
+            "services.automation_runner.get_window_tracks",
             side_effect=Exception("postgres://admin:hunter2@db internal detail"),
         ):
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -282,7 +282,7 @@ async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with patch("services.automation_runner.is_due", return_value=True), patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -344,7 +344,7 @@ async def test_run_now_triggers_manual_run(client: AsyncClient):
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -401,7 +401,7 @@ async def test_playlist_tracks_endpoint_returns_ordered_tracks(client: AsyncClie
             {"artist": "Artist B", "title": "Song B"},
         ]
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -436,7 +436,7 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -486,7 +486,7 @@ async def test_run_now_concurrent_returns_409_then_succeeds(client: AsyncClient)
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
@@ -543,7 +543,7 @@ def _sweep_patches(tracks: list[dict]):
     """is_due off (phase 1 never fires); live source + enrich mocked."""
     return (
         patch("services.automation_runner.is_due", return_value=False),
-        patch("services.automation_runner.get_top_tracks", return_value=tracks),
+        patch("services.automation_runner.get_window_tracks", return_value=tracks),
         patch(
             "services.enrich_cache.enrich_tracks",
             side_effect=lambda u, t, max_enrich=50, **kwargs: t,
@@ -707,7 +707,7 @@ async def test_sweep_skips_when_lock_held(client: AsyncClient):
             with patch(
                 "services.automation_runner.is_due", return_value=True
             ), patch(
-                "services.automation_runner.get_top_tracks", return_value=tracks
+                "services.automation_runner.get_window_tracks", return_value=tracks
             ), patch(
                 "services.enrich_cache.enrich_tracks",
                 side_effect=lambda u, t, max_enrich=50, **kwargs: t,
@@ -734,7 +734,7 @@ async def test_run_now_starts_fresh_chain(client: AsyncClient):
 
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks",
             side_effect=lambda u, t, max_enrich=50, **kwargs: t,

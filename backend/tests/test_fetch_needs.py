@@ -57,8 +57,9 @@ def test_needed_fields_dispatch_only():
 
 
 def test_needed_fields_each_mapping():
-    assert needed_fields([{"conditions": [_cond("userplaycount")]}]) == {"userplaycount"}
-    assert needed_fields([{"conditions": [_cond("userloved")]}]) == {"userloved"}
+    # Read from the stored listens: no enrichment.
+    assert needed_fields([{"conditions": [_cond("userplaycount")]}]) == set()
+    assert needed_fields([{"conditions": [_cond("userloved")]}]) == set()
     assert needed_fields([{"conditions": [_cond("global_playcount")]}]) == {
         "global_playcount"
     }
@@ -86,7 +87,7 @@ def test_needed_fields_nested_groups_and_models():
         ],
         groups=[inner],
     )
-    assert needed_fields([outer]) == {"userloved", "listeners"}
+    assert needed_fields([outer]) == {"listeners"}
 
 
 def test_needed_fields_unknown_field_falls_back_full():
@@ -182,7 +183,7 @@ async def test_loved_only_filter_skips_enrich_on_extended_tracks():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks", return_value=tracks
+                "services.automation_runner.get_window_tracks", return_value=tracks
             ),
             patch("services.automation_runner.enrich_tracks_cached") as mock_cached,
         ):
@@ -190,8 +191,8 @@ async def test_loved_only_filter_skips_enrich_on_extended_tracks():
                 db,
                 user_id="u1",
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=groups,
                 max_tracks=50,
             )
@@ -223,7 +224,7 @@ async def test_cached_pipeline_empty_filters_writes_nothing():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=tracks,
             ),
             patch("services.automation_runner.enrich_tracks_cached") as mock_cached,
@@ -232,8 +233,8 @@ async def test_cached_pipeline_empty_filters_writes_nothing():
                 db,
                 user_id="u1",
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=[],
                 max_tracks=50,
             )
@@ -261,7 +262,7 @@ async def test_write_back_stores_dispatch_image():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=live),
@@ -270,8 +271,8 @@ async def test_write_back_stores_dispatch_image():
                 db,
                 user_id=f"u-{suffix}",
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=groups,
                 max_tracks=50,
             )
@@ -291,7 +292,7 @@ async def test_cached_pipeline_nonempty_needs_still_warms_cache():
     skips the live layer. (Per-group warming arrives with per-group
     freshness in a later tranche.)
     """
-    groups = [{"conditions": [_cond("userplaycount")]}]
+    groups = [{"conditions": [_cond("listeners")]}]
     suffix = uuid.uuid4().hex[:8]
     base = {"artist": f"A {suffix}", "title": f"T {suffix}"}
     live = [{**base, **_live_info()}]
@@ -301,7 +302,7 @@ async def test_cached_pipeline_nonempty_needs_still_warms_cache():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=live),
@@ -310,8 +311,8 @@ async def test_cached_pipeline_nonempty_needs_still_warms_cache():
                 db,
                 user_id="u1",
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=groups,
                 max_tracks=50,
             )
@@ -320,8 +321,8 @@ async def test_cached_pipeline_nonempty_needs_still_warms_cache():
                 db,
                 user_id="u1",
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=groups,
                 max_tracks=50,
             )

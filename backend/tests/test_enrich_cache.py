@@ -245,17 +245,17 @@ async def test_pipeline_cached_reports_cache_stats():
     live = [{**tracks[0], **_live_info()}]
     # Non-empty needs: the full fetch + write-back path (empty needs skip
     # the live layer by design, so warming is pinned here, not on []).
-    groups = [{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}]
+    groups = [{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}]
     async with _TestSessionLocal() as db:
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch("services.enrich_cache.enrich_tracks", return_value=live):
             first = await run_automation_pipeline_cached(
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="top_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=groups,
                 max_tracks=10,
             )
@@ -265,8 +265,8 @@ async def test_pipeline_cached_reports_cache_stats():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="top_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=groups,
                 max_tracks=10,
             )

@@ -52,7 +52,7 @@ async def _warm(base, live, user_id):
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]),
@@ -61,8 +61,8 @@ async def _warm(base, live, user_id):
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -99,7 +99,7 @@ async def _run_hit_or_miss(user_id, base, live):
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch(
@@ -111,8 +111,8 @@ async def _run_hit_or_miss(user_id, base, live):
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -145,7 +145,7 @@ async def test_eight_day_old_globals_miss():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]),
@@ -154,8 +154,8 @@ async def test_eight_day_old_globals_miss():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -201,7 +201,7 @@ async def test_replayed_track_refreshes():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]) as mock_live,
@@ -210,8 +210,8 @@ async def test_replayed_track_refreshes():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -239,7 +239,7 @@ async def test_stale_loved_forces_refetch():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]) as mock_live,
@@ -248,8 +248,8 @@ async def test_stale_loved_forces_refetch():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -292,7 +292,7 @@ async def test_safety_net_catches_real_hole():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]),
@@ -301,8 +301,8 @@ async def test_safety_net_catches_real_hole():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -330,7 +330,7 @@ async def test_unknown_last_play_never_trusted():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]) as mock_live,
@@ -339,8 +339,8 @@ async def test_unknown_last_play_never_trusted():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )
@@ -373,7 +373,7 @@ async def test_missing_user_row_misses():
     async with _TestSessionLocal() as db:
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=[live]),
@@ -382,8 +382,8 @@ async def test_missing_user_row_misses():
                 db,
                 user_id=user_id,
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_groups(),
                 max_tracks=50,
             )

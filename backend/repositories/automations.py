@@ -62,8 +62,8 @@ async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str
         lastfm_username=lastfm_username,
         name=data.name,
         description=data.description,
-        source_type=data.source.type,
-        source_period=data.source.period,
+        window=data.window.model_dump(mode="json"),
+        sort=data.sort,
         cron=data.cron,
         filter_groups=data.filter_groups,
         output_max_size=data.output.maxSize,
@@ -89,10 +89,10 @@ async def update_automation(
         return None
 
     update_data = data.model_dump(exclude_unset=True)
-    if "source" in update_data and update_data["source"] is not None:
-        source = update_data.pop("source")
-        update_data["source_type"] = source["type"]
-        update_data["source_period"] = source["period"]
+    if update_data.get("window") is None:
+        update_data.pop("window", None)
+    if update_data.get("sort") is None:
+        update_data.pop("sort", None)
     if "output" in update_data and update_data["output"] is not None:
         output = update_data.pop("output")
         update_data["output_max_size"] = output.get("maxSize", automation.output_max_size)

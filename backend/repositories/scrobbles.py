@@ -1,9 +1,10 @@
 from datetime import datetime
 
 from models.scrobble import Scrobble
+from models.track import Track
 from models.user_track import UserTrack
 from repositories.user_tracks import bulk_store_recent_plays, ensure_tracks
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,3 +58,48 @@ async def replace_loved(db: AsyncSession, user_id: str, loved: list[tuple[str, s
 async def delete_scrobbles(db: AsyncSession, user_id: str) -> None:
     """Drop a user's listening history (relinking another Last.fm account)."""
     await db.execute(delete(Scrobble).where(Scrobble.user_id == user_id))
+
+
+async def get_window_tracks(
+    db: AsyncSession, user_id: str, start: datetime | None, end: datetime
+) -> list[dict]:
+    """One row per track played in [start, end), with the user's local stats.
+
+    ``playcount`` and ``timestamp`` (last play) are read inside the window;
+    ``userplaycount`` and ``first_played`` cover every stored listen.
+    """
+    in_window = Scrobble.played_at < end
+    if start is not None:
+        in_window = and_(in_window, Scrobble.played_at >= start)
+    plays = func.count().filter(in_window)
+    rows = await db.execute(
+        select(
+            Track.title,
+            Track.artist,
+            plays.label("plays"),
+            func.count().label("all_plays"),
+            func.min(Scrobble.played_at).label("first_played"),
+            func.max(Scrobble.played_at).filter(in_window).label("last_played"),
+            func.coalesce(UserTrack.userloved, False).label("loved"),
+        )
+        .join(Track, Track.id == Scrobble.track_id)
+        .outerjoin(
+            UserTrack,
+            and_(UserTrack.user_id == Scrobble.user_id, UserTrack.track_id == Scrobble.track_id),
+        )
+        .where(Scrobble.user_id == user_id)
+        .group_by(Track.id, Track.title, Track.artist, UserTrack.userloved)
+        .having(plays > 0)
+    )
+    return [
+        {
+            "title": row.title,
+            "artist": row.artist,
+            "playcount": row.plays,
+            "userplaycount": row.all_plays,
+            "userloved": row.loved,
+            "timestamp": int(row.last_played.timestamp()),
+            "first_played": int(row.first_played.timestamp()),
+        }
+        for row in rows
+    ]

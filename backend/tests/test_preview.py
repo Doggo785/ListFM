@@ -38,10 +38,11 @@ async def _register_login_link(client: AsyncClient, email: str) -> None:
     assert link.status_code == 200
 
 
-def _preview_body(source_type: str, **automation_overrides) -> dict:
+def _preview_body(sort: str = "most_played", **automation_overrides) -> dict:
     automation = {
         "name": "preview",
-        "source": {"type": source_type, "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}},
+        "sort": sort,
         "output": {"maxSize": 5},
     }
     automation.update(automation_overrides)
@@ -49,14 +50,14 @@ def _preview_body(source_type: str, **automation_overrides) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_preview_unknown_source_returns_422(client: AsyncClient):
-    """An unsupported source type must return 422 (schema validation)."""
+async def test_preview_unknown_sort_returns_422(client: AsyncClient):
+    """An unsupported sort must return 422 (schema validation)."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
         resp = await client.post(
             "/api/automations/preview",
-            json=_preview_body("bogus_source"),
+            json=_preview_body("bogus_sort"),
         )
         assert resp.status_code == 422
     finally:
@@ -64,15 +65,15 @@ async def test_preview_unknown_source_returns_422(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_preview_invalid_period_returns_422(client: AsyncClient):
-    """An unsupported period must return 422 (schema validation)."""
+async def test_preview_invalid_window_returns_422(client: AsyncClient):
+    """A window unit or amount outside the schema must return 422."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
-        body = _preview_body("top_tracks")
-        body["automation"]["source"]["period"] = "fortnight"
-        resp = await client.post("/api/automations/preview", json=body)
-        assert resp.status_code == 422
+        for length in ({"amount": 2, "unit": "fortnight"}, {"amount": 0, "unit": "day"}):
+            body = _preview_body(window={"length": length})
+            resp = await client.post("/api/automations/preview", json=body)
+            assert resp.status_code == 422
     finally:
         await _cleanup_user(email=email)
 
@@ -84,7 +85,7 @@ async def test_preview_max_size_bounds_return_422(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         for bad in (-1, 201, 10000):
-            body = _preview_body("top_tracks")
+            body = _preview_body()
             body["automation"]["output"] = {"maxSize": bad}
             resp = await client.post("/api/automations/preview", json=body)
             assert resp.status_code == 422, f"maxSize={bad} should be rejected"
@@ -103,9 +104,9 @@ async def test_preview_max_size_zero_means_default(client: AsyncClient):
             {"artist": "Artist B", "title": "Song B"},
             {"artist": "Artist C", "title": "Song C"},
         ]
-        body = _preview_body("top_tracks")
+        body = _preview_body()
         body["automation"]["output"] = {"maxSize": 0}
-        with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks), patch(
             "services.enrich_cache.enrich_tracks", return_value=tracks
         ):
             resp = await client.post("/api/automations/preview", json=body)
@@ -123,7 +124,7 @@ async def test_preview_invalid_cron_returns_422(client: AsyncClient):
         await _register_login_link(client, email)
         resp = await client.post(
             "/api/automations/preview",
-            json=_preview_body("top_tracks", cron="not a cron"),
+            json=_preview_body(cron="not a cron"),
         )
         assert resp.status_code == 422
     finally:
@@ -136,7 +137,7 @@ async def test_preview_missing_name_returns_422(client: AsyncClient):
     email = _unique_email()
     try:
         await _register_login_link(client, email)
-        body = _preview_body("top_tracks")
+        body = _preview_body()
         del body["automation"]["name"]
         resp = await client.post("/api/automations/preview", json=body)
         assert resp.status_code == 422
@@ -151,12 +152,12 @@ async def test_preview_upstream_failure_returns_502(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         with patch(
-            "services.automation_runner.get_top_tracks",
+            "services.automation_runner.get_window_tracks",
             side_effect=Exception("secret internal traceback"),
         ):
             resp = await client.post(
                 "/api/automations/preview",
-                json=_preview_body("top_tracks"),
+                json=_preview_body(),
             )
         assert resp.status_code == 502
         detail = resp.json()["detail"]
@@ -179,7 +180,7 @@ async def test_preview_second_identical_run_hits_cache(client: AsyncClient):
         body = {
             "automation": {
                 "name": "preview",
-                "source": {"type": "top_tracks", "period": "3m"},
+                "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
                 "output": {"maxSize": 5},
                 # Non-empty needs: warming is pinned on the full fetch path
                 # (empty needs skip the live layer by design).
@@ -190,7 +191,7 @@ async def test_preview_second_identical_run_hits_cache(client: AsyncClient):
                         "conditions": [
                             {
                                 "id": "c1",
-                                "field": "userplaycount",
+                                "field": "listeners",
                                 "operator": "gte",
                                 "value": 0,
                                 "valueMax": None,
@@ -204,7 +205,7 @@ async def test_preview_second_identical_run_hits_cache(client: AsyncClient):
             }
         }
         with patch(
-            "services.automation_runner.get_top_tracks", return_value=tracks
+            "services.automation_runner.get_window_tracks", return_value=tracks
         ), patch(
             "services.enrich_cache.enrich_tracks", return_value=tracks
         ) as mock_enrich:
@@ -232,12 +233,12 @@ async def test_preview_second_identical_run_hits_cache(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         with patch(
-            "services.automation_runner.get_top_tracks",
+            "services.automation_runner.get_window_tracks",
             side_effect=Exception("secret internal traceback"),
         ):
             resp = await client.post(
                 "/api/automations/preview",
-                json=_preview_body("top_tracks"),
+                json=_preview_body(),
             )
         assert resp.status_code == 502
         detail = resp.json()["detail"]
@@ -257,12 +258,12 @@ async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
             {"artist": "Artist A", "title": "Song A"},
             {"artist": "Artist B", "title": "Song B"},
         ]
-        with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks), patch(
             "services.enrich_cache.enrich_tracks", return_value=tracks
         ):
             resp = await client.post(
                 "/api/automations/preview",
-                json=_preview_body("top_tracks"),
+                json=_preview_body(),
             )
         assert resp.status_code == 200
         data = resp.json()
@@ -286,7 +287,7 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
         body = {
             "automation": {
                 "name": "preview",
-                "source": {"type": "top_tracks", "period": "3m"},
+                "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
                 "output": {"maxSize": 50},
                 "filterGroups": [
                     {
@@ -308,7 +309,7 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
                 ],
             }
         }
-        with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks), patch(
             "services.enrich_cache.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
         ):
             resp = await client.post(

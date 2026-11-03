@@ -72,7 +72,7 @@ async def test_sweep_commits_per_automation(client):
 
         with (
             patch.object(automation_runner, "is_due", return_value=True),
-            patch.object(automation_runner, "get_top_tracks", return_value=tracks),
+            patch.object(automation_runner, "get_window_tracks", return_value=tracks),
             patch(
                 "services.enrich_cache.enrich_tracks",
                 side_effect=lambda u, t, max_enrich=50, **kwargs: t,
@@ -126,7 +126,7 @@ async def test_sweep_isolates_run_failure(client):
 
         with (
             patch.object(automation_runner, "is_due", return_value=True),
-            patch.object(automation_runner, "get_top_tracks", return_value=tracks),
+            patch.object(automation_runner, "get_window_tracks", return_value=tracks),
             patch(
                 "services.enrich_cache.enrich_tracks",
                 side_effect=lambda u, t, max_enrich=50, **kwargs: t,
@@ -247,7 +247,7 @@ async def test_retries_run_oldest_season_first(client):
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with (
             patch.object(automation_runner, "is_due", return_value=False),
-            patch.object(automation_runner, "get_top_tracks", return_value=tracks),
+            patch.object(automation_runner, "get_window_tracks", return_value=tracks),
             patch(
                 "services.enrich_cache.enrich_tracks",
                 side_effect=lambda u, t, max_enrich=50, **kwargs: t,

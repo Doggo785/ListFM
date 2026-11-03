@@ -196,9 +196,29 @@ class ErrorResponse(BaseModel):
     error: str
 
 
-class AutomationSource(BaseModel):
-    type: Literal["top_tracks", "recent_tracks", "loved_tracks", "top_artists"]
-    period: Literal["7d", "1m", "3m", "6m", "12m", "overall"]
+class WindowSpan(BaseModel):
+    amount: int = Field(ge=1, le=1000)
+    unit: Literal["day", "week", "month", "year"]
+
+
+class AutomationWindow(BaseModel):
+    """Which listens an automation reads (GLOSSARY: Fenêtre).
+
+    Counted back from the run's scheduled time: ``ago`` shifts the end
+    ("a year ago"), ``length`` is the span before it. No length = every
+    listen up to the end.
+    """
+
+    length: WindowSpan | None = None
+    ago: WindowSpan | None = None
+
+
+def _default_window() -> AutomationWindow:
+    return AutomationWindow(length=WindowSpan(amount=3, unit="month"))
+
+
+# GLOSSARY: Tri. random_weighted favors tracks played more in the window.
+SortKey = Literal["most_played", "last_played", "first_played", "random", "random_weighted"]
 
 
 class AutomationOutput(BaseModel):
@@ -215,7 +235,8 @@ class AutomationOutput(BaseModel):
 class AutomationCreate(BaseModel):
     name: str
     description: str = ""
-    source: AutomationSource
+    window: AutomationWindow = Field(default_factory=_default_window)
+    sort: SortKey = "most_played"
     cron: str = Field(default="", max_length=100)
     filter_groups: FilterGroups = Field(default_factory=list, alias="filterGroups")
     output: AutomationOutput = Field(default_factory=AutomationOutput)
@@ -269,7 +290,8 @@ class RunRequest(BaseModel):
 class AutomationUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    source: AutomationSource | None = None
+    window: AutomationWindow | None = None
+    sort: SortKey | None = None
     cron: str | None = Field(default=None, max_length=100)
     filter_groups: FilterGroups | None = Field(default=None, alias="filterGroups")
     output: AutomationOutput | None = None
@@ -289,7 +311,8 @@ class AutomationRead(BaseModel):
     lastfm_username: str
     name: str
     description: str | None = None
-    source: AutomationSource
+    window: AutomationWindow
+    sort: SortKey
     cron: str | None = None
     filter_groups: FilterGroups = Field(alias="filterGroups")
     output: dict
@@ -303,15 +326,16 @@ class AutomationRead(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def flatten_orm(cls, values):
-        """Auto-restructure flat DB columns (source_type/source_period/output_max_size) into nested schema."""
-        if hasattr(values, "source_type"):
+        """Auto-restructure the flat output_max_size DB column into the nested schema."""
+        if hasattr(values, "output_max_size"):
             return {
                 "id": values.id,
                 "user_id": values.user_id,
                 "lastfm_username": values.lastfm_username,
                 "name": values.name,
                 "description": values.description,
-                "source": {"type": values.source_type, "period": values.source_period},
+                "window": values.window,
+                "sort": values.sort,
                 "cron": values.cron,
                 "filter_groups": values.filter_groups or [],
                 "output": {"maxSize": values.output_max_size},
@@ -327,8 +351,6 @@ class GeneratedPlaylistCreate(BaseModel):
     automation_id: str | None = None
     name: str | None = None
     description: str | None = None
-    source_type: Literal["top_tracks", "recent_tracks", "loved_tracks", "top_artists"]
-    source_period: Literal["7d", "1m", "3m", "6m", "12m", "overall"]
     tracks: list[Track]
     track_count: int
     filter_groups: list[dict] | None = None

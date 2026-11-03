@@ -50,7 +50,7 @@ def _automation_body(filter_groups: list) -> dict:
     return {
         "name": "Progress playlist",
         "description": "test",
-        "source": {"type": "top_tracks", "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "0 0 1 * *",
         "filterGroups": filter_groups,
         "output": {"maxSize": 50},
@@ -73,7 +73,7 @@ def _live_info(artist: str, title: str) -> dict:
 
 
 def _userplaycount_groups() -> list:
-    return [{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}]
+    return [{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}]
 
 
 @pytest.mark.asyncio
@@ -90,7 +90,7 @@ async def test_pipeline_reports_progress_to_store():
         progress_store.start(key)
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=live),
@@ -99,8 +99,8 @@ async def test_pipeline_reports_progress_to_store():
                 db,
                 user_id=f"u-{suffix}",
                 username="u",
-                source_type="recent_tracks",
-                period="3m",
+                window={"length": None},
+                sort="most_played",
                 filter_groups=_userplaycount_groups(),
                 max_tracks=50,
                 progress_key=key,
@@ -201,7 +201,7 @@ async def test_preview_with_token_reports_done(client: AsyncClient):
         }
         with (
             patch(
-                "services.automation_runner.dispatch_source_tracks",
+                "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
             patch("services.enrich_cache.enrich_tracks", return_value=live),
@@ -273,7 +273,7 @@ async def test_run_progress_live_then_db_fallback(client: AsyncClient):
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with (
             patch(
-                "services.automation_runner.get_top_tracks", return_value=tracks
+                "services.automation_runner.get_window_tracks", return_value=tracks
             ),
             patch(
                 "services.enrich_cache.enrich_tracks",
@@ -304,7 +304,7 @@ async def test_run_with_token_reports_on_ticket(client: AsyncClient):
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with (
             patch(
-                "services.automation_runner.get_top_tracks", return_value=tracks
+                "services.automation_runner.get_window_tracks", return_value=tracks
             ),
             patch(
                 "services.enrich_cache.enrich_tracks",
@@ -354,7 +354,7 @@ async def test_run_progress_failed_and_running_fallbacks(client: AsyncClient):
         tracks = [{"artist": "Artist A", "title": "Song A"}]
         with (
             patch(
-                "services.automation_runner.get_top_tracks", return_value=tracks
+                "services.automation_runner.get_window_tracks", return_value=tracks
             ),
             patch(
                 "services.automation_runner.run_automation_pipeline_cached",
@@ -444,7 +444,7 @@ async def test_pipeline_reports_live_counts():
         async with _TestSessionLocal() as db:
             with (
                 patch(
-                    "services.automation_runner.dispatch_source_tracks",
+                    "services.automation_runner.get_window_tracks",
                     return_value=[dict(t) for t in tracks],
                 ),
                 patch("services.lastfm.get_network", return_value=object()),
@@ -457,9 +457,9 @@ async def test_pipeline_reports_live_counts():
                     db,
                     user_id=f"u-{suffix}",
                     username="u",
-                    source_type="recent_tracks",
-                    period="3m",
-                    filter_groups=[{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}],
+                    window={"length": None},
+                    sort="most_played",
+                    filter_groups=[{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}],
                     max_tracks=50,
                     progress_key=key,
                 )
@@ -509,7 +509,7 @@ async def test_pipeline_cancel_aborts_midrun():
         async with _TestSessionLocal() as db:
             with (
                 patch(
-                    "services.automation_runner.dispatch_source_tracks",
+                    "services.automation_runner.get_window_tracks",
                     return_value=[dict(t) for t in tracks],
                 ),
                 patch("services.lastfm.get_network", return_value=object()),
@@ -520,9 +520,9 @@ async def test_pipeline_cancel_aborts_midrun():
                     db,
                     user_id=f"u-{suffix}",
                     username="u",
-                    source_type="recent_tracks",
-                    period="3m",
-                    filter_groups=[{"conditions": [{"field": "userplaycount", "operator": "gt", "value": 1}]}],
+                    window={"length": None},
+                    sort="most_played",
+                    filter_groups=[{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}],
                     max_tracks=50,
                     progress_key=key,
                 )

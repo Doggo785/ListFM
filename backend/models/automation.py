@@ -3,6 +3,7 @@ from datetime import datetime
 from database import Base
 from filter_types import FilterGroup, FilterGroupListJSONB
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -14,8 +15,8 @@ class Automation(Base):
     lastfm_username: Mapped[str] = mapped_column(String(255))  # snapshot at creation time
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
-    source_type: Mapped[str] = mapped_column(String(50))  # top_tracks, recent_tracks, loved_tracks, top_artists
-    source_period: Mapped[str] = mapped_column(String(20))  # 7d, 1m, 3m, 6m, 12m, overall
+    window: Mapped[dict] = mapped_column(JSONB)  # schemas.AutomationWindow (ADR 0002)
+    sort: Mapped[str] = mapped_column(String(30))  # schemas.SortKey
     cron: Mapped[str | None] = mapped_column(String(100), nullable=True)
     filter_groups: Mapped[list[FilterGroup]] = mapped_column(FilterGroupListJSONB, default=list)  # Recursive filter tree as JSONB
     output_max_size: Mapped[int] = mapped_column(Integer, default=50)

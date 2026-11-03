@@ -28,7 +28,6 @@ from schemas import (
     RunRequest,
 )
 from services.automation_runner import (
-    UnsupportedSourceTypeError,
     run_automation,
     run_automation_pipeline_cached,
 )
@@ -78,8 +77,8 @@ async def preview_automation(
             db,
             user_id=current_user.id,
             username=username,
-            source_type=automation.source.type,
-            period=automation.source.period,
+            window=automation.window.model_dump(),
+            sort=automation.sort,
             filter_groups=automation.filter_groups,
             max_tracks=automation.output.maxSize,
             progress_key=progress_key,
@@ -98,8 +97,6 @@ async def preview_automation(
             "lastfm_calls": 0,
             "cancelled": True,
         }
-    except UnsupportedSourceTypeError:
-        raise HTTPException(status_code=422, detail="Unsupported source type")
     except HTTPException:
         raise
     except Exception:  # noqa: BLE001 -- any upstream failure becomes a clean 502
@@ -168,7 +165,7 @@ async def run_progress(
     if not rows:
         raise HTTPException(status_code=404, detail="No runs yet")
     latest = rows[0]
-    if latest.status == "completed":
+    if latest.status in ("completed", "empty"):
         done = latest.tracks_after_filter or 0
         return ProgressRead(stage="done", done=done, total=done)
     if latest.status == "failed":

@@ -61,7 +61,7 @@ def _create_body(filter_groups: list) -> dict:
     return {
         "name": "Filtered playlist",
         "description": "test",
-        "source": {"type": "top_tracks", "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "",
         "filter_groups": filter_groups,
         "output": {"maxSize": 50},
@@ -234,7 +234,7 @@ def _frontend_payload(filter_groups: list) -> dict:
         "id": "00000000-0000-0000-0000-000000000000",
         "name": "Filtered playlist",
         "description": "test",
-        "source": {"type": "top_tracks", "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "",
         "filterGroups": filter_groups,
         "output": {"maxSize": 50},
