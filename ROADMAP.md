@@ -13,12 +13,11 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 - **Socle produit** (automations → playlists générées → historique) : flows cassés et sécu bloquante (#13–#26), runner qui produit des playlists et un historique lisible (#20, #27), retry borné qui garde le `scheduled_for` d'origine (#30), sweep avec commit par automation, pool DB et erreurs DB en JSON (#39), recents du dashboard étiquetés « aperçu partiel » (#41).
 - **Vitesse Last.fm** : enrich sauté quand les filtres n'en ont pas besoin (#42), progression en direct et cancel réel (#43), paquets de 200 et cadence 0,25 s avec repli sur l'erreur 29 (#45), cache à fraîcheur différenciée par groupe de données (#46, #47).
-- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées.
+- **Hygiène du repo** : ruff, mypy, gitleaks, osv-scanner et diff-cover bloquants en CI, Dependabot, `scripts/ci-local.sh` (#34–#63), docs remises à plat (#66), routes mortes supprimées (#67), `main` seule branche.
 
 ## Maintenant
 
-1. **`main` seul** : avancer `main` jusqu'à `dev`, mettre sur `main` la protection de `dev` (PR obligatoire, 7 checks, pas de force-push, admins inclus), Dependabot sur `main`, `dev` → `main` dans les docs et `scripts/ci-local.sh`, supprimer `dev`.
-2. **release-please** (config ci-dessus), puis merge de sa PR de release → **v0.1.0**. Retirer la ligne de statut du README à ce moment.
+1. **release-please** (config ci-dessus), puis merge de sa PR de release → **v0.1.0**. Retirer la ligne de statut du README à ce moment.
 
 ## Avant v1.0.0
 
