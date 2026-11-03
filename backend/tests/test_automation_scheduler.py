@@ -722,3 +722,36 @@ async def test_run_now_starts_fresh_chain(client: AsyncClient):
         assert entry["scheduled_for"] is not None
     finally:
         await _cleanup_user_with_automations(client, email)
+
+def test_is_due_reads_cron_in_owner_timezone():
+    """08:00 means 08:00 on the owner's clock, not 08:00 UTC."""
+    from types import SimpleNamespace
+
+    from services.automation_runner import is_due
+
+    # Last run yesterday evening; now is 08:30 Paris = 07:30 UTC, so the
+    # 08:00 Paris tick has passed and the 08:00 UTC one has not.
+    automation = SimpleNamespace(
+        cron="0 8 * * *", last_run=datetime(2026, 11, 2, 20, 0, tzinfo=UTC)
+    )
+    now = datetime(2026, 11, 3, 7, 30, tzinfo=UTC)
+    assert is_due(automation, now, "Europe/Paris") is True
+    assert is_due(automation, now, "UTC") is False
+
+
+@pytest.mark.asyncio
+async def test_set_timezone_stores_valid_zone_and_rejects_unknown(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        assert (await client.get("/api/auth/me")).json()["timezone"] == "UTC"
+
+        ok = await client.put("/api/auth/me/timezone", json={"timezone": "Europe/Paris"})
+        assert ok.status_code == 200
+        assert (await client.get("/api/auth/me")).json()["timezone"] == "Europe/Paris"
+
+        bad = await client.put("/api/auth/me/timezone", json={"timezone": "Mars/Olympus"})
+        assert bad.status_code == 422
+        assert (await client.get("/api/auth/me")).json()["timezone"] == "Europe/Paris"
+    finally:
+        await _cleanup_user_with_automations(client, email)

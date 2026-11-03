@@ -96,7 +96,9 @@ export default function CronEditor({ value, onChange }) {
           <>
             {description && (
               <div className="rounded-xl border border-[#ff530b]/20 bg-[#ff530b]/5 px-4 py-3 text-center">
-                <span className="text-sm font-medium text-[#ff530b]">{description}</span>
+                <span className="text-sm font-medium text-[#ff530b]">
+                  {description} ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+                </span>
               </div>
             )}
 

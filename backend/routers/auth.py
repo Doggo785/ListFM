@@ -18,7 +18,7 @@ from routers.deps import (
     get_current_active_user,
     set_auth_cookies,
 )
-from schemas import TokenResponse, UserCreate, UserLogin
+from schemas import TimezoneUpdate, TokenResponse, UserCreate, UserLogin
 from services.auth import (
     create_access_token,
     create_refresh_token,
@@ -235,4 +235,21 @@ async def me(
         "role": current_user.role,
         "lastfm_username": lastfm_username,
         "is_lastfm_linked": lastfm_username is not None,
+        "timezone": current_user.timezone,
     }
+
+
+@router.put("/me/timezone")
+async def set_timezone(
+    body: TimezoneUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store the zone the user's cron schedules are read in."""
+    current_user.timezone = body.timezone
+    try:
+        await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save timezone")
+    return {"timezone": body.timezone}

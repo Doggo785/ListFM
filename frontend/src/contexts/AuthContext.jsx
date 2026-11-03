@@ -12,6 +12,14 @@ export function AuthProvider({ children }) {
       const data = await request("/api/auth/me");
       setUser(data);
       setCurrentUsername(data.lastfm_username || null);
+      // Cron schedules run in the user's zone: keep it in sync with this browser.
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (timezone && data.timezone !== timezone) {
+        request("/api/auth/me/timezone", {
+          method: "PUT",
+          body: JSON.stringify({ timezone }),
+        }).catch(() => {});
+      }
     } catch {
       setUser(null);
       setCurrentUsername(null);

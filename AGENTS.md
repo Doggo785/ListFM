@@ -38,4 +38,4 @@ Lire avant d'agir :
 
 ## Base de données locale
 
-Postgres en Docker, conteneur `listfm-db` sur le port **5433**, bases `listfm` (dev) et `listfm_test` (tests). Après un reboot : `docker start listfm-db`. Une erreur de connexion en test vient d'abord d'un conteneur arrêté.
+Postgres en Docker, conteneur `listfm-db` sur le port **5433**, bases `listfm` (dev) et `listfm_test` (tests). Après un reboot : `docker start listfm-db`. Après une nouvelle migration, migrer aussi la base de test : `DATABASE_URL=postgresql+asyncpg://listfm:listfm@localhost:5433/listfm_test alembic upgrade head` (depuis `backend/`) ; `ci-local.sh` ne le fait pas. Une erreur de connexion en test vient d'abord d'un conteneur arrêté.
