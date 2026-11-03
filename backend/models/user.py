@@ -18,4 +18,8 @@ class User(Base):
     timezone: Mapped[str] = mapped_column(String(64), default="UTC", server_default="UTC")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    # Listening history sync (ADR 0001): last finished sync, and the end of
+    # the first full load (runs wait for it).
+    scrobbles_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scrobbles_complete_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # soft delete

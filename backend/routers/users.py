@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from models.user import User
 from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tracks
 from routers.deps import get_current_active_user, get_current_user_lastfm_username
-from schemas import RecentTracksResponse, Track, UserInfo
+from schemas import RecentTracksResponse, ScrobbleSyncStatus, Track, UserInfo
 from services.lastfm import (
     epoch_to_datetime,
     get_recent_tracks,
     get_user_info,
 )
+from services.progress import store as progress_store
+from services.scrobble_sync import is_fresh, progress_key, start_scrobble_sync
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,3 +75,32 @@ async def _store_recent_tracks(db: AsyncSession, user_id: str, tracks: list[dict
             for track in tracks
         ],
     )
+
+
+def _sync_status(user: User) -> ScrobbleSyncStatus:
+    progress = progress_store.read(progress_key(user.id))
+    return ScrobbleSyncStatus(
+        stage=progress.stage if progress else None,
+        done=progress.done if progress else 0,
+        total=progress.total if progress else 0,
+        error=progress.error if progress else None,
+        complete=user.scrobbles_complete_at is not None,
+        synced_at=user.scrobbles_synced_at,
+    )
+
+
+@router.get("/scrobbles/sync", response_model=ScrobbleSyncStatus)
+async def scrobble_sync_status(current_user: User = Depends(get_current_active_user)):
+    """Listening history sync status, for the progress bar and the partial-data banner."""
+    return _sync_status(current_user)
+
+
+@router.post("/scrobbles/sync", response_model=ScrobbleSyncStatus, status_code=202)
+async def start_sync(
+    username: str = Depends(get_current_user_lastfm_username),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Start a sync, unless one ran in the last minutes or is already running."""
+    if not is_fresh(current_user):
+        start_scrobble_sync(current_user.id, username)
+    return _sync_status(current_user)

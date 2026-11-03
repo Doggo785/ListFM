@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -10,6 +11,7 @@ from database import get_db
 from httpx import ASGITransport, AsyncClient
 from models.auth_provider import AuthProvider
 from models.refresh_token import RefreshToken
+from models.scrobble import Scrobble
 from models.user import User
 from models.user_track import UserTrack
 from services.rate_limit import (
@@ -48,6 +50,7 @@ _TestSessionLocal = async_sessionmaker(_test_engine, class_=AsyncSession, expire
 # Tables the suite writes to, children before parents (FK order). DELETE on
 # near-empty tables costs ~1 ms; TRUNCATE costs ~170 ms per test.
 _TEST_TABLES = (
+    "scrobbles",
     "user_tracks",
     "playlist_tracks",
     "automation_history",
@@ -100,6 +103,16 @@ async def _cleanup_db():
 
 
 @pytest.fixture(autouse=True)
+def _no_background_sync():
+    """Linking Last.fm starts a real sync on the app's own database: stub it.
+
+    Tests that check the trigger read the yielded mock.
+    """
+    with patch("routers.auth_oauth.start_scrobble_sync") as start:
+        yield start
+
+
+@pytest.fixture(autouse=True)
 def _fast_bcrypt():
     """Speed up password hashing in tests.
 
@@ -134,6 +147,7 @@ async def _cleanup_user(email: str | None = None, user_id: str | None = None) ->
             return
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == uid))
         await db.execute(delete(AuthProvider).where(AuthProvider.user_id == uid))
+        await db.execute(delete(Scrobble).where(Scrobble.user_id == uid))
         await db.execute(delete(UserTrack).where(UserTrack.user_id == uid))
         await db.execute(delete(User).where(User.id == uid))
         await db.commit()
