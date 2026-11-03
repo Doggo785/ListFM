@@ -44,8 +44,14 @@ declare -A JOBS=(
 ORDER=(gitleaks osv ruff mypy frontend-build frontend-tests backend-tests)
 
 git fetch -q origin main || echo "warn: git fetch failed, diff-cover compares against a stale origin/main"
+# Jobs are independent: run them in parallel, print results in order.
 for job in "${@:-${ORDER[@]}}"; do
   [[ -n ${JOBS[$job]:-} ]] || { echo "unknown job: $job (jobs: ${ORDER[*]})"; exit 2; }
-  run "$job" "${JOBS[$job]}"
+  run "$job" "${JOBS[$job]}" >"$LOGS/$job.status" &
+done
+wait
+for job in "${@:-${ORDER[@]}}"; do
+  cat "$LOGS/$job.status"
+  grep -q '^FAIL' "$LOGS/$job.status" && failed=1
 done
 exit $failed
