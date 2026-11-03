@@ -1,4 +1,4 @@
-import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/components/ui/PlaylistLogo";
+import { getPlaylistImageSrc, GRADIENTS, hashName } from "@/lib/playlist-logo";
 
 export const CARD_DEFAULTS = {
   containerHeight: "420px",

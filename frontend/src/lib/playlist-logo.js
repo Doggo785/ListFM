@@ -1,5 +1,6 @@
 import { SOURCE_TYPES } from "@/lib/automation-rules";
 import { IconBolt, IconClock, IconHeart, IconUsers } from "@tabler/icons-react";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 export const GRADIENTS = [
@@ -38,7 +39,7 @@ export function getPlaylistImageSrc(name, sourceType) {
   const gradId = `g${hash}`;
   const Icon = ICONS[sourceType] || IconBolt;
   const iconMarkup = renderToStaticMarkup(
-    <Icon size={60} stroke={1.5} color="white" opacity="0.9" />
+    createElement(Icon, { size: 60, stroke: 1.5, color: "white", opacity: "0.9" })
   );
 
   const svg = `<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
