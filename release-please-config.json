@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.release-please.xyz/schema.json",
+  "bootstrap-sha": "1086687baba726fc095dfebe23e530afd29b661b",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "include-component-in-tag": false,
+      "include-v-in-tag": true,
+      "bump-minor-pre-major": true,
+      "changelog-type": "default"
+    }
+  }
+}
