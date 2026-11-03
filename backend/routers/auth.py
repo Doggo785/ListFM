@@ -1,10 +1,11 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from config import get_settings
 from database import get_db
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
+from models.refresh_token import RefreshToken
 from models.user import User
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
@@ -135,6 +136,27 @@ async def login(
     return _build_token_response()
 
 
+# Two tabs refreshing at once send the same token; the loser of the race
+# arrives just after rotation. Within this window it gets a sibling token
+# instead of being treated as theft (which would log both tabs out).
+REFRESH_REUSE_GRACE = timedelta(seconds=30)
+
+
+async def _in_rotation_grace(db: AsyncSession, token: RefreshToken) -> bool:
+    """True when the token was rotated away moments ago and its replacement is live.
+
+    Logout and family revocation never set ``replaced_by``, so they get no grace.
+    """
+    if token.replaced_by is None:
+        return False
+    replacement = await db.get(RefreshToken, token.replaced_by)
+    return (
+        replacement is not None
+        and not replacement.revoked
+        and replacement.created_at >= datetime.now(UTC) - REFRESH_REUSE_GRACE
+    )
+
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
     request: Request,
@@ -161,7 +183,7 @@ async def refresh(
     if stored_token is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    if stored_token.revoked:
+    if stored_token.revoked and not await _in_rotation_grace(db, stored_token):
         # Token reuse detected — revoke entire family to prevent stolen token usage
         await revoke_refresh_token_family(db, stored_token.family)
         try:

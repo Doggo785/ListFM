@@ -1,4 +1,6 @@
 import hashlib
+from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -101,7 +103,9 @@ async def test_refresh_revoked_token_returns_401(client: AsyncClient):
             transport=ASGITransport(app=client._transport.app), base_url="http://test"
         ) as fresh:
             fresh.cookies.set("refresh_token", old_refresh)
-            resp = await fresh.post("/api/auth/refresh")
+            # Past the two-tabs grace window: a real replay.
+            with patch("routers.auth.REFRESH_REUSE_GRACE", timedelta(0)):
+                resp = await fresh.post("/api/auth/refresh")
             assert resp.status_code == 401
     finally:
         await _cleanup_user(email=email)
@@ -128,7 +132,9 @@ async def test_refresh_reuse_revokes_entire_family(client: AsyncClient):
             transport=ASGITransport(app=client._transport.app), base_url="http://test"
         ) as fresh:
             fresh.cookies.set("refresh_token", old_refresh)
-            resp = await fresh.post("/api/auth/refresh")
+            # Past the two-tabs grace window: a real replay.
+            with patch("routers.auth.REFRESH_REUSE_GRACE", timedelta(0)):
+                resp = await fresh.post("/api/auth/refresh")
             assert resp.status_code == 401
 
         old_hash = hashlib.sha256(old_refresh.encode()).hexdigest()
@@ -150,6 +156,49 @@ async def test_refresh_reuse_revokes_entire_family(client: AsyncClient):
             assert revoked_flags == {True}, (
                 f"Entire family must be revoked after reuse, got revoked flags {revoked_flags}"
             )
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_refresh_from_two_tabs_keeps_both_logged_in(client: AsyncClient):
+    """The same token presented again right after rotation is a race, not theft."""
+    email = _unique_email()
+    try:
+        await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        shared_refresh = client.cookies.get("refresh_token")
+
+        assert (await client.post("/api/auth/refresh")).status_code == 200  # tab A
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as tab_b:
+            tab_b.cookies.set("refresh_token", shared_refresh)
+            assert (await tab_b.post("/api/auth/refresh")).status_code == 200
+            assert (await tab_b.post("/api/auth/refresh")).status_code == 200
+        assert (await client.post("/api/auth/refresh")).status_code == 200  # tab A still in
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_refresh_after_logout_gets_no_grace(client: AsyncClient):
+    """A token revoked by logout stays dead even seconds later."""
+    email = _unique_email()
+    try:
+        await client.post(
+            "/api/auth/register",
+            json={"email": email, "password": "StrongP@ss1!"},
+        )
+        token = client.cookies.get("refresh_token")
+        assert (await client.post("/api/auth/logout")).status_code == 200
+        async with AsyncClient(
+            transport=ASGITransport(app=client._transport.app), base_url="http://test"
+        ) as replay:
+            replay.cookies.set("refresh_token", token)
+            assert (await replay.post("/api/auth/refresh")).status_code == 401
     finally:
         await _cleanup_user(email=email)
 
