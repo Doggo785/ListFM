@@ -1,18 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getGeneratedPlaylists,
-  setCurrentUsername,
 } from "@/lib/api";
 
 describe("getGeneratedPlaylists", () => {
   beforeEach(() => {
-    setCurrentUsername("testuser");
     globalThis.fetch = vi.fn();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    setCurrentUsername(null);
   });
 
   it("GETs /api/generated-playlists with credentials", async () => {
@@ -33,12 +30,6 @@ describe("getGeneratedPlaylists", () => {
     expect(url).toContain("/api/generated-playlists");
     expect(options.credentials).toBe("include");
     expect(options.headers["Content-Type"]).toBe("application/json");
-  });
-
-  it("throws when no username is set", async () => {
-    setCurrentUsername(null);
-    await expect(getGeneratedPlaylists()).rejects.toThrow(/No username/);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("surfaces API error detail", async () => {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { request, setCurrentUsername, setSessionExpiredHandler } from "../lib/api.js";
+import { request, setSessionExpiredHandler } from "../lib/api.js";
 
 const AuthContext = createContext(null);
 
@@ -11,7 +11,6 @@ export function AuthProvider({ children }) {
     try {
       const data = await request("/api/auth/me");
       setUser(data);
-      setCurrentUsername(data.lastfm_username || null);
       // Cron schedules run in the user's zone: keep it in sync with this browser.
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (timezone && data.timezone !== timezone) {
@@ -22,7 +21,6 @@ export function AuthProvider({ children }) {
       }
     } catch {
       setUser(null);
-      setCurrentUsername(null);
     } finally {
       setLoading(false);
     }
@@ -37,7 +35,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setSessionExpiredHandler(() => {
       setUser(null);
-      setCurrentUsername(null);
     });
     return () => setSessionExpiredHandler(null);
   }, []);
@@ -61,7 +58,6 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     await request("/api/auth/logout", { method: "POST" });
     setUser(null);
-    setCurrentUsername(null);
   }, []);
 
   const linkLastfm = useCallback(async (username) => {
@@ -75,13 +71,11 @@ export function AuthProvider({ children }) {
     setUser((prev) =>
       prev ? { ...prev, lastfm_username: username, is_lastfm_linked: true } : prev
     );
-    setCurrentUsername(username);
     // Refresh session with actual server data — failure is non-fatal
     // because we already optimistically applied the linking above
     try {
       const data = await request("/api/auth/me");
       setUser(data);
-      setCurrentUsername(data.lastfm_username || null);
     } catch {
       // Session fetch failed, but the linking itself succeeded on the backend.
       // Optimistic state keeps the user correctly identified as linked.

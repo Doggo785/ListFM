@@ -7,7 +7,6 @@ import {
   pollProgress,
   previewAutomation,
   runAutomationNow,
-  setCurrentUsername,
 } from "@/lib/api";
 
 describe("newProgressToken", () => {
@@ -23,14 +22,12 @@ describe("newProgressToken", () => {
 
 describe("progress endpoints", () => {
   beforeEach(() => {
-    setCurrentUsername("testuser");
     globalThis.fetch = vi.fn();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    setCurrentUsername(null);
   });
 
   it("previewAutomation sends the token when given", async () => {
