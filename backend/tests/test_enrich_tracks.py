@@ -49,5 +49,5 @@ def test_enrich_tracks_falls_back_to_raw_track_on_failure():
     ):
         out = enrich_tracks("user", _TRACKS, max_enrich=3)
     assert out[0] == {"artist": "A", "title": "one", "listeners": 7}
-    assert out[1] == {"artist": "B", "title": "two"}
+    assert out[1] == {"artist": "B", "title": "two", "fetch_failed": True}
     assert out[2] == {"artist": "C", "title": "three", "listeners": 7}

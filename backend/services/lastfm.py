@@ -335,6 +335,17 @@ def get_track_full_info(
         if progress_key is not None:
             progress_store.bump_calls(progress_key)
 
+    def _failed(exc: Exception) -> None:
+        """Log a failed call; flag the result unless Last.fm said "not found".
+
+        A flagged result is never written to the cache (its defaults are not
+        real data). Error 6 is a real answer: caching it saves the calls.
+        """
+        _note_possible_rate_limit(exc)
+        logger.debug("get_track_full_info: enrichment call failed", exc_info=exc)
+        if str(getattr(exc, "status", "") or "") != "6":
+            result["fetch_failed"] = True
+
     try:
         track = pylast.Track(artist, title, network, username=username)
     except Exception:  # noqa: BLE001 -- unconstructable track: return the empty result
@@ -344,33 +355,29 @@ def get_track_full_info(
         try:
             _gated()
             result["listeners"] = track.get_listener_count()
-        except Exception as exc:
-            _note_possible_rate_limit(exc)
-            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
+            _failed(exc)
 
     if _want("global_playcount"):
         try:
             _gated()
             result["global_playcount"] = track.get_playcount()
-        except Exception as exc:
-            _note_possible_rate_limit(exc)
-            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
+            _failed(exc)
 
     if _want("userplaycount"):
         try:
             _gated()
             result["userplaycount"] = track.get_userplaycount() or 0
-        except Exception as exc:
-            _note_possible_rate_limit(exc)
-            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
+            _failed(exc)
 
     if _want("userloved"):
         try:
             _gated()
             result["userloved"] = bool(track.get_userloved())
-        except Exception as exc:
-            _note_possible_rate_limit(exc)
-            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
+            _failed(exc)
 
     caches = tag_caches if tag_caches is not None else {}
     artist_cache = caches.setdefault("artist", {})
@@ -393,9 +400,8 @@ def get_track_full_info(
                     ]
                     result["artist_tags"] = _normalize_tags(raw_tags)
                     artist_cache[artist_key] = result["artist_tags"]
-        except Exception as exc:
-            _note_possible_rate_limit(exc)
-            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
+            _failed(exc)
 
     if _want("album") or _want("album_tags"):
         try:
@@ -419,12 +425,11 @@ def get_track_full_info(
                                     if int(t.weight) > 0
                                 ]
                                 result["album_tags"] = _normalize_tags(raw_tags)
-                            except Exception:  # noqa: BLE001 -- one bad album keeps the rest
-                                result["album_tags"] = []
-                            album_cache[album_key] = result["album_tags"]
-        except Exception as exc:
-            _note_possible_rate_limit(exc)
-            logger.debug("get_track_full_info: enrichment call failed", exc_info=True)
+                                album_cache[album_key] = result["album_tags"]
+                            except Exception as exc:  # noqa: BLE001 -- one bad album keeps the rest
+                                _failed(exc)
+        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
+            _failed(exc)
 
     return result
 
@@ -479,7 +484,7 @@ def enrich_tracks(
                     pending.cancel()
                 raise
             except Exception:  # noqa: BLE001 -- failed enrichment falls back to the raw track
-                enriched_order[idx] = to_enrich[idx]
+                enriched_order[idx] = {**to_enrich[idx], "fetch_failed": True}
             else:
                 completed += 1
                 if progress_key is not None:

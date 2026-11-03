@@ -282,7 +282,15 @@ async def enrich_tracks_cached(
             ),
         )
         stats["lastfm_calls"] = get_lastfm_call_count() - before
-        await _write_back(db, user_id=user_id, base_tracks=miss_tracks, enriched_tracks=live)
+        # A failed call left defaults (0, no tags), not data: keep it out of
+        # the cache so the next run refetches it.
+        ok = [i for i, t in enumerate(live) if not t.pop("fetch_failed", False)]
+        await _write_back(
+            db,
+            user_id=user_id,
+            base_tracks=[miss_tracks[i] for i in ok],
+            enriched_tracks=[live[i] for i in ok],
+        )
         for i, enriched in zip(miss_idx, live):
             cached[i] = enriched
     logger.info(
