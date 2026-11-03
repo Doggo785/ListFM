@@ -8,6 +8,7 @@ from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from models.refresh_token import RefreshToken
+from models.scrobble import Scrobble
 from models.tag import Tag
 from models.track import Track
 from models.track_tag import TrackTag
@@ -25,6 +26,7 @@ __all__ = [
     "GeneratedPlaylist",
     "PlaylistTrack",
     "RefreshToken",
+    "Scrobble",
     "Tag",
     "Track",
     "TrackTag",

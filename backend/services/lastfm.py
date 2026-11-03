@@ -224,6 +224,52 @@ def _lastfm_json(method: str, **params: str) -> dict:
     return data
 
 
+def _as_list(nodes) -> list:
+    """Last.fm returns a bare object instead of a one-item list."""
+    if isinstance(nodes, dict):
+        return [nodes]
+    return nodes if isinstance(nodes, list) else []
+
+
+def get_scrobble_page(
+    username: str, page: int, limit: int, time_from: int | None, time_to: int
+) -> tuple[list[tuple[str, str, int]], int]:
+    """One page of dated listens as (title, artist, uts), plus the page count.
+
+    Pages run newest first, so the last page holds the oldest listens. The
+    now-playing entry has no date and is skipped. Raises pylast.WSError on a
+    Last.fm error body (29 = rate limited).
+    """
+    params = {"user": username, "page": str(page), "limit": str(limit), "to": str(time_to)}
+    if time_from is not None:
+        params["from"] = str(time_from)
+    _throttled_call()
+    data = _lastfm_json("user.getRecentTracks", **params)["recenttracks"]
+    listens = []
+    for node in _as_list(data.get("track")):
+        artist = node.get("artist", {})
+        artist_name = artist.get("#text") if isinstance(artist, dict) else artist
+        uts = (node.get("date") or {}).get("uts")
+        if node.get("name") and artist_name and uts:
+            listens.append((node["name"], artist_name, int(uts)))
+    return listens, int(data["@attr"]["totalPages"])
+
+
+def get_loved_page(username: str, page: int, limit: int) -> tuple[list[tuple[str, str]], int]:
+    """One page of loved tracks as (title, artist), plus the page count."""
+    _throttled_call()
+    data = _lastfm_json(
+        "user.getLovedTracks", user=username, page=str(page), limit=str(limit)
+    )["lovedtracks"]
+    loved = []
+    for node in _as_list(data.get("track")):
+        artist = node.get("artist", {})
+        artist_name = artist.get("name") if isinstance(artist, dict) else artist
+        if node.get("name") and artist_name:
+            loved.append((node["name"], artist_name))
+    return loved, int(data["@attr"]["totalPages"])
+
+
 def _track_info(username: str, artist: str, title: str) -> dict:
     """One track.getInfo with the user's play count and loved flag.
 

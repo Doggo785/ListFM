@@ -239,6 +239,17 @@ class PreviewRequest(BaseModel):
     progress_token: str | None = Field(default=None, max_length=64)
 
 
+class ScrobbleSyncStatus(BaseModel):
+    """Listening history sync: live progress, and whether the first full load is done."""
+
+    stage: str | None = None
+    done: int = 0
+    total: int = 0
+    error: str | None = None
+    complete: bool
+    synced_at: datetime | None = None
+
+
 class ProgressRead(BaseModel):
     """Live progress snapshot for a run or preview ticket."""
 

@@ -90,6 +90,35 @@ async def _tracks_by_key(
     return {(t.artist, t.title): t for t in existing.scalars().all()}
 
 
+async def ensure_tracks(
+    db: AsyncSession, pairs: list[tuple[str, str]]
+) -> dict[tuple[str, str], Track]:
+    """Map (artist, title) pairs to track rows, creating the missing ones."""
+    by_key = await _tracks_by_key(db, pairs)
+    missing = [p for p in pairs if p not in by_key]
+    if missing:
+        now = datetime.now(UTC)
+        await db.execute(
+            insert(Track)
+            .values(
+                [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "title": title,
+                        "artist": artist,
+                        "last_fetched_at": None,
+                        "created_at": now,
+                    }
+                    for artist, title in missing
+                ]
+            )
+            .on_conflict_do_nothing(index_elements=["artist", "title"])
+        )
+        await db.flush()
+        by_key = await _tracks_by_key(db, pairs)
+    return by_key
+
+
 async def bulk_store_recent_plays(
     db: AsyncSession,
     user_id: str,
@@ -114,29 +143,7 @@ async def bulk_store_recent_plays(
     if not dated:
         return
 
-    pairs = list(dated)
-    by_key = await _tracks_by_key(db, pairs)
-    missing = [p for p in pairs if p not in by_key]
-    if missing:
-        now = datetime.now(UTC)
-        await db.execute(
-            insert(Track)
-            .values(
-                [
-                    {
-                        "id": str(uuid.uuid4()),
-                        "title": title,
-                        "artist": artist,
-                        "last_fetched_at": None,
-                        "created_at": now,
-                    }
-                    for artist, title in missing
-                ]
-            )
-            .on_conflict_do_nothing(index_elements=["artist", "title"])
-        )
-        await db.flush()
-        by_key = await _tracks_by_key(db, pairs)
+    by_key = await ensure_tracks(db, list(dated))
 
     now = datetime.now(UTC)
     stmt = insert(UserTrack).values(

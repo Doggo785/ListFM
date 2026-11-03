@@ -21,6 +21,7 @@ from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     revoke_all_user_refresh_tokens,
 )
+from repositories.scrobbles import delete_scrobbles
 from repositories.user_tracks import delete_user_tracks
 from repositories.users import (
     get_lastfm_provider,
@@ -40,6 +41,7 @@ from services.rate_limit import (
     oauth_login_limiter,
     rate_limit,
 )
+from services.scrobble_sync import start_scrobble_sync
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -372,6 +374,9 @@ async def link_lastfm(
             # old account's play counts and loved flags must not leak in.
             await set_automations_lastfm_username(db, current_user.id, username)
             await delete_user_tracks(db, current_user.id)
+            await delete_scrobbles(db, current_user.id)
+            current_user.scrobbles_synced_at = None
+            current_user.scrobbles_complete_at = None
         await db.delete(existing_provider)
         await db.flush()
 
@@ -397,6 +402,7 @@ async def link_lastfm(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to link Last.fm account")
 
+    start_scrobble_sync(current_user.id, username)
     return LinkLastfmResponse(username=username, image=info.get("image"))
 
 
