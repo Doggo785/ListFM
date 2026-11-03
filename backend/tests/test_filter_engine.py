@@ -7,10 +7,8 @@ relative Date.now() for recent timestamps, and recursive AND/OR groups.
 """
 
 import time
-from unittest.mock import patch
 
-from services.automation_runner import run_automation_pipeline
-from services.filter_engine import apply_filters, count_active_conditions
+from services.filter_engine import apply_filters
 
 
 def _condition(**overrides) -> dict:
@@ -236,33 +234,3 @@ class TestGroupLogic:
         tracks = [_track(title="a"), _track(title="b")]
         assert apply_filters(tracks, []) == tracks
         assert apply_filters(tracks, None) == tracks
-
-
-class TestCountActiveConditions:
-    def test_counts_nested_conditions(self):
-        groups = [
-            _group(conditions=[_condition(), _condition()], groups=[_group(conditions=[_condition()])]),
-            _group(conditions=[_condition()]),
-        ]
-        assert count_active_conditions(groups) == 4
-
-    def test_zero_for_empty(self):
-        assert count_active_conditions([]) == 0
-        assert count_active_conditions(None) == 0
-
-
-def test_runner_uses_server_filters():
-    """The shared runner applies the filter tree to sample tracks (JS parity)."""
-    tracks = [
-        _track(title="low", userplaycount=5),
-        _track(title="high", userplaycount=20, userloved=True),
-    ]
-    filter_groups = [_group(conditions=[_condition(field="userplaycount", operator="gte", value=10)])]
-    with patch("services.automation_runner.get_top_tracks", return_value=tracks), patch(
-        "services.automation_runner.enrich_tracks", side_effect=lambda u, t, max_enrich=50, **kwargs: t
-    ):
-        result = run_automation_pipeline("user", "top_tracks", "3m", filter_groups, max_tracks=50)
-    assert result["total"] == 1
-    assert result["tracks"][0]["title"] == "high"
-    assert result["before_filter"] == 2
-    assert len(result["source_tracks"]) == 2

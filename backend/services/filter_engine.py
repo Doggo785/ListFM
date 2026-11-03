@@ -169,13 +169,3 @@ def apply_filters(tracks, filter_groups):
     if not filter_groups or len(filter_groups) == 0:
         return tracks
     return [t for t in tracks if any(evaluate_group(t, g) for g in filter_groups)]
-
-
-def count_active_conditions(filter_groups):
-    if not filter_groups:
-        return 0
-    count = 0
-    for group in filter_groups:
-        count += len(_get(group, "conditions") or [])
-        count += count_active_conditions(_get(group, "groups") or [])
-    return count

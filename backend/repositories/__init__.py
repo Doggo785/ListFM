@@ -27,18 +27,14 @@ from repositories.tags import (
     get_tag_by_name,
     get_track_tags,
     upsert_album_tag,
-    upsert_track_tag,
 )
 from repositories.tracks import (
     get_or_create_track,
     get_track_by_artist_title,
-    get_track_by_id,
     upsert_track,
 )
 from repositories.user_tracks import (
     get_user_track,
-    get_user_tracks_needing_sync,
-    update_last_played,
     upsert_user_track,
 )
 from repositories.users import (
@@ -73,19 +69,15 @@ __all__ = [
     "get_refresh_token_by_hash",
     "get_tag_by_name",
     "get_track_by_artist_title",
-    "get_track_by_id",
     "get_track_tags",
     "get_user_by_email",
     "get_user_by_id",
     "get_user_by_lastfm_username",
     "get_user_track",
-    "get_user_tracks_needing_sync",
     "revoke_refresh_token_family",
     "update_automation",
-    "update_last_played",
     "update_user",
     "upsert_album_tag",
     "upsert_track",
-    "upsert_track_tag",
     "upsert_user_track",
 ]
