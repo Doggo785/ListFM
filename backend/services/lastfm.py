@@ -208,6 +208,32 @@ def get_recent_tracks_extended(
     return tracks
 
 
+def _track_info(username: str, artist: str, title: str) -> dict:
+    """One track.getInfo (JSON, with the user's play count and loved flag).
+
+    Replaces five pylast getters that each refetched this same method.
+    A Last.fm error body raises pylast.WSError carrying its code, so callers
+    tell "not found" (6) and "rate limited" (29) apart from transport errors.
+    """
+    response = httpx.get(
+        LASTFM_API_URL,
+        params={
+            "method": "track.getInfo",
+            "artist": artist,
+            "track": title,
+            "username": username,
+            "api_key": get_settings().lastfm_api_key,
+            "format": "json",
+        },
+        timeout=30,
+    )
+    data = response.json()
+    if "error" in data:
+        raise pylast.WSError(None, str(data["error"]), data.get("message", ""))
+    response.raise_for_status()
+    return data["track"]
+
+
 def get_recent_tracks(
     username: str, limit: int = 5, time_from: int | None = None, time_to: int | None = None
 ) -> list[dict]:
@@ -294,6 +320,12 @@ def _normalize_tags(raw_tags: list[dict]) -> list[dict]:
     ]
 
 
+# Keys served by the single track.getInfo call (album_tags needs the album name).
+_TRACK_INFO_KEYS = (
+    "listeners", "global_playcount", "userplaycount", "userloved", "album", "album_tags",
+)
+
+
 def get_track_full_info(
     network: pylast.LastFMNetwork,
     username: str,
@@ -346,36 +378,18 @@ def get_track_full_info(
         if str(getattr(exc, "status", "") or "") != "6":
             result["fetch_failed"] = True
 
-    try:
-        track = pylast.Track(artist, title, network, username=username)
-    except Exception:  # noqa: BLE001 -- unconstructable track: return the empty result
-        return result
-
-    if _want("listeners"):
+    album_name: str | None = None
+    if any(_want(k) for k in _TRACK_INFO_KEYS):
         try:
             _gated()
-            result["listeners"] = track.get_listener_count()
-        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
-            _failed(exc)
-
-    if _want("global_playcount"):
-        try:
-            _gated()
-            result["global_playcount"] = track.get_playcount()
-        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
-            _failed(exc)
-
-    if _want("userplaycount"):
-        try:
-            _gated()
-            result["userplaycount"] = track.get_userplaycount() or 0
-        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
-            _failed(exc)
-
-    if _want("userloved"):
-        try:
-            _gated()
-            result["userloved"] = bool(track.get_userloved())
+            info = _track_info(username, artist, title)
+            result["listeners"] = int(info.get("listeners") or 0)
+            result["global_playcount"] = int(info.get("playcount") or 0)
+            result["userplaycount"] = int(info.get("userplaycount") or 0)
+            result["userloved"] = info.get("userloved") == "1"
+            album_node = info.get("album")
+            if isinstance(album_node, dict) and album_node.get("title"):
+                album_name = result["album"] = str(album_node["title"])
         except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
             _failed(exc)
 
@@ -403,33 +417,24 @@ def get_track_full_info(
         except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
             _failed(exc)
 
-    if _want("album") or _want("album_tags"):
-        try:
-            _gated()
-            album = track.get_album()
-            if album and album.title:
-                album_name = album.title
-                result["album"] = album_name
-                if _want("album_tags"):
-                    album_key = f"{artist.strip().lower()}|{album_name.strip().lower()}"
-                    with cache_guard:
-                        if album_key in album_cache:
-                            result["album_tags"] = album_cache[album_key]
-                        else:
-                            try:
-                                _gated()
-                                album_obj = network.get_album(artist, album_name)
-                                raw_tags = [
-                                    {"name": t.item.name, "count": int(t.weight)}
-                                    for t in album_obj.get_top_tags(limit=10)
-                                    if int(t.weight) > 0
-                                ]
-                                result["album_tags"] = _normalize_tags(raw_tags)
-                                album_cache[album_key] = result["album_tags"]
-                            except Exception as exc:  # noqa: BLE001 -- one bad album keeps the rest
-                                _failed(exc)
-        except Exception as exc:  # noqa: BLE001 -- _failed logs and flags it
-            _failed(exc)
+    if _want("album_tags") and album_name:
+        album_key = f"{artist.strip().lower()}|{album_name.strip().lower()}"
+        with cache_guard:
+            if album_key in album_cache:
+                result["album_tags"] = album_cache[album_key]
+            else:
+                try:
+                    _gated()
+                    album_obj = network.get_album(artist, album_name)
+                    raw_tags = [
+                        {"name": t.item.name, "count": int(t.weight)}
+                        for t in album_obj.get_top_tags(limit=10)
+                        if int(t.weight) > 0
+                    ]
+                    result["album_tags"] = _normalize_tags(raw_tags)
+                    album_cache[album_key] = result["album_tags"]
+                except Exception as exc:  # noqa: BLE001 -- one bad album keeps the rest
+                    _failed(exc)
 
     return result
 

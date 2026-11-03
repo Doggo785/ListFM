@@ -125,34 +125,6 @@ class _FakeTags:
         return self._tags
 
 
-class _FakeAlbum:
-    def __init__(self, title):
-        self.title = title
-
-    def get_top_tags(self, limit=None):
-        return []
-
-
-class _FakeTrack:
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def get_listener_count(self):
-        return 1234
-
-    def get_playcount(self):
-        return 5678
-
-    def get_userplaycount(self):
-        return 42
-
-    def get_userloved(self):
-        return 1
-
-    def get_album(self):
-        return _FakeAlbum(title="Fake Album")
-
-
 class _FakeNetwork:
     def get_artist(self, name):
         return _FakeTags([])
@@ -164,8 +136,15 @@ class _FakeNetwork:
 @pytest.mark.asyncio
 async def test_full_info_reports_album_title():
     """get_track_full_info exposes the album title for cache write-back."""
+    fake_info = {
+        "listeners": "1234",
+        "playcount": "5678",
+        "userplaycount": "42",
+        "userloved": "1",
+        "album": {"title": "Fake Album"},
+    }
     with patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0), patch.object(
-        lastfm.pylast, "Track", _FakeTrack
+        lastfm, "_track_info", return_value=fake_info
     ):
         info = get_track_full_info(_FakeNetwork(), "someuser", "A", "T")
     assert info["album"] == "Fake Album"
@@ -332,58 +311,66 @@ def test_throttled_call_honors_backoff_window():
 
 
 def test_enrich_29_error_arms_backoff_and_keeps_defaults():
-    """A 29 on one getter degrades that field and arms the backoff."""
-
-    class _FlakyTrack:
-        def get_listener_count(self):
-            raise lastfm.pylast.WSError(None, "29", "Rate limit exceeded")
-
-        def get_playcount(self):
-            return 5
-
-        def get_userplaycount(self):
-            return 0
-
-        def get_userloved(self):
-            return False
-
-        def get_album(self):
-            return None
-
+    """A 29 on track.getInfo keeps defaults, flags the result, arms the backoff."""
+    rate_limited = lastfm.pylast.WSError(None, "29", "Rate limit exceeded")
     with (
-        patch("services.lastfm.get_network", return_value=object()),
-        patch("services.lastfm.pylast.Track", return_value=_FlakyTrack()),
+        patch.object(lastfm, "_track_info", side_effect=rate_limited),
         patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
         patch.object(lastfm, "note_rate_limited") as mock_note,
     ):
         try:
-            out = get_track_full_info(object(), "u", "A", "T")
+            out = get_track_full_info(object(), "u", "A", "T", only={"listeners"})
         finally:
             lastfm._rate_limit_until = 0.0
     assert out["listeners"] == 0
-    assert out["global_playcount"] == 5
     assert out["fetch_failed"] is True
     mock_note.assert_called_once_with()
 
 
 def test_not_found_is_a_real_answer_not_a_failure():
     """Error 6 (track not found) keeps defaults without flagging the result."""
-
-    class _UnknownTrack:
-        def _missing(self):
-            raise lastfm.pylast.WSError(None, "6", "Track not found")
-
-        get_listener_count = get_playcount = get_userplaycount = _missing
-        get_userloved = get_album = _missing
-
+    not_found = lastfm.pylast.WSError(None, "6", "Track not found")
     with (
-        patch("services.lastfm.pylast.Track", return_value=_UnknownTrack()),
+        patch.object(lastfm, "_track_info", side_effect=not_found),
         patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
         patch.object(lastfm, "_rate_limit_until", 0.0),
     ):
         out = get_track_full_info(object(), "u", "A", "T", only={"listeners", "album"})
     assert out["listeners"] == 0
     assert "fetch_failed" not in out
+
+
+class _FakeResponse:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise lastfm.httpx.HTTPStatusError("bad", request=None, response=None)
+
+
+def test_track_info_parses_json_and_maps_error_codes():
+    """track.getInfo returns the track node; an error body raises WSError with its code."""
+    node = {"listeners": "5", "userloved": "1"}
+    with patch.object(lastfm.httpx, "get", return_value=_FakeResponse(200, {"track": node})) as get:
+        assert lastfm._track_info("u", "A", "T") == node
+    params = get.call_args.kwargs["params"]
+    assert (params["method"], params["username"], params["format"]) == (
+        "track.getInfo",
+        "u",
+        "json",
+    )
+    error = _FakeResponse(400, {"error": 6, "message": "Track not found"})
+    with (
+        patch.object(lastfm.httpx, "get", return_value=error),
+        pytest.raises(lastfm.pylast.WSError) as exc_info,
+    ):
+        lastfm._track_info("u", "A", "T")
+    assert exc_info.value.status == "6"
 
 
 @pytest.mark.asyncio

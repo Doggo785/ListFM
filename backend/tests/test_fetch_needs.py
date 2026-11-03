@@ -7,7 +7,6 @@ freshness lands (tranche 4).
 """
 
 import uuid
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -21,7 +20,11 @@ from services.automation_runner import (
     run_automation_pipeline,
     run_automation_pipeline_cached,
 )
-from services.lastfm import enrich_tracks
+from services.lastfm import (
+    enrich_tracks,
+    get_lastfm_call_count,
+    reset_lastfm_call_count,
+)
 
 from .conftest import _TestSessionLocal
 
@@ -108,103 +111,63 @@ def test_needed_fields_all_keys_short_circuits():
     assert needed_fields(groups) == set(FULL_FETCH_KEYS)
 
 
-class _FakeTrack:
-    def __init__(self):
-        self.calls = []
-
-    def get_listener_count(self):
-        self.calls.append("listeners")
-        return 11
-
-    def get_playcount(self):
-        self.calls.append("global_playcount")
-        return 22
-
-    def get_userplaycount(self):
-        self.calls.append("userplaycount")
-        return 3
-
-    def get_userloved(self):
-        self.calls.append("userloved")
-        return True
-
-    def get_album(self):
-        self.calls.append("album")
+_INFO = {
+    "listeners": "11",
+    "playcount": "22",
+    "userplaycount": "3",
+    "userloved": "1",
+    "album": {"title": "Alb"},
+}
 
 
 def test_enrich_tracks_only_skips_unneeded_calls():
     """only={"listeners"} performs exactly one live call per track."""
-    fake = _FakeTrack()
     tracks = [{"artist": "A", "title": "one"}]
     with (
         patch("services.lastfm.get_network", return_value=object()),
-        patch("services.lastfm.pylast.Track", return_value=fake),
+        patch("services.lastfm._track_info", return_value=_INFO) as info,
         patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
     ):
+        reset_lastfm_call_count()
         out = enrich_tracks("user", tracks, only={"listeners"})
-    assert fake.calls == ["listeners"]
+    assert info.call_count == 1
+    assert get_lastfm_call_count() == 1
     assert out[0]["listeners"] == 11
-    assert out[0]["userplaycount"] == 0
-    assert out[0]["userloved"] is False
     assert out[0]["artist_tags"] == []
+    assert out[0]["album_tags"] == []
 
 
 def test_enrich_tracks_full_by_default():
-    """only=None keeps today's behavior: every getter runs."""
-    fake = _FakeTrack()
+    """only=None: one track.getInfo serves every track-level field."""
     tracks = [{"artist": "A", "title": "one"}]
     with (
         patch("services.lastfm.get_network", return_value=object()),
-        patch("services.lastfm.pylast.Track", return_value=fake),
+        patch("services.lastfm._track_info", return_value=_INFO) as info,
         patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
     ):
         out = enrich_tracks("user", tracks)
-    assert fake.calls == [
-        "listeners",
-        "global_playcount",
-        "userplaycount",
-        "userloved",
-        "album",
-    ]
+    assert info.call_count == 1
+    assert out[0]["listeners"] == 11
+    assert out[0]["global_playcount"] == 22
     assert out[0]["userplaycount"] == 3
     assert out[0]["userloved"] is True
-
-
-class _ExplodingTrack:
-    """Every live getter fails: the track survives with safe defaults."""
-
-    def get_listener_count(self):
-        raise RuntimeError("boom")
-
-    def get_playcount(self):
-        raise RuntimeError("boom")
-
-    def get_userplaycount(self):
-        raise RuntimeError("boom")
-
-    def get_userloved(self):
-        raise RuntimeError("boom")
-
-    def get_album(self):
-        # Album lookup works but its tag fetch explodes: exercises the
-        # inner "one bad album keeps the rest" fallback.
-        return SimpleNamespace(title="Alb")
+    assert out[0]["album"] == "Alb"
 
 
 def test_enrich_tracks_only_survives_live_failures():
+    """Album tag lookup failing keeps the rest of the track."""
     tracks = [{"artist": "A", "title": "one"}]
     with (
         patch("services.lastfm.get_network", return_value=object()),
-        patch("services.lastfm.pylast.Track", return_value=_ExplodingTrack()),
+        patch("services.lastfm._track_info", return_value=_INFO),
         patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
     ):
         out = enrich_tracks("user", tracks)
-    assert out[0]["listeners"] == 0
-    assert out[0]["userplaycount"] == 0
-    assert out[0]["userloved"] is False
+    assert out[0]["listeners"] == 11
     assert out[0]["artist_tags"] == []
     assert out[0]["album"] == "Alb"
     assert out[0]["album_tags"] == []
+    assert out[0]["fetch_failed"] is True
 
 
 def test_sync_pipeline_empty_filters_skips_enrich():
