@@ -68,10 +68,6 @@ export async function request(path, options = {}) {
   return res.json();
 }
 
-export async function getUserInfo() {
-  return request("/api/info");
-}
-
 export async function getRecentTracks(limit = 50) {
   return request(`/api/recent-tracks?limit=${limit}`);
 }

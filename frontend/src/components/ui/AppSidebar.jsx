@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   IconHome,
@@ -8,7 +8,6 @@ import {
   IconLogout,
 } from "@tabler/icons-react";
 import { Sidebar, SidebarBody, SidebarLink } from "./Sidebar";
-import { getUserInfo } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 const iconClass = "text-neutral-200 h-5 w-5 flex-shrink-0";
@@ -17,16 +16,8 @@ function AppSidebar({ userLabel = "User" }) {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const [avatar, setAvatar] = useState(null);
-  const { user, logout } = useAuth();
+  const { user, logout, avatar } = useAuth();
   const username = user?.lastfm_username;
-
-  useEffect(() => {
-    if (!username) return;
-    getUserInfo()
-      .then((data) => setAvatar(data?.image || null))
-      .catch(() => setAvatar(null));
-  }, [username]);
 
   const isActive = (href) =>
     typeof href === "string" && href.startsWith("/") &&
