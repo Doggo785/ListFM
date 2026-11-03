@@ -4,10 +4,9 @@ Pipeline: dispatch source tracks -> deduplicate -> enrich (DB cache first,
 live Last.fm only on misses) -> apply_filters (server-side filter engine)
 -> explicit track limit.
 
-The sync ``run_automation_pipeline`` is kept for direct (already-async-safe)
-callers; ``run_automation_pipeline_cached`` is the async cache-first path
-used by the sweep and the preview endpoint. Blocking pylast calls always run
-in the default executor, never on the event loop.
+``run_automation_pipeline_cached`` is the async cache-first path used by
+the sweep and the preview endpoint. Blocking pylast calls always run in the
+default executor, never on the event loop.
 """
 
 import asyncio
@@ -30,7 +29,6 @@ from services.enrich_cache import enrich_tracks_cached
 from services.filter_engine import apply_filters
 from services.lastfm import (
     deduplicate,
-    enrich_tracks,
     get_loved_tracks,
     get_recent_tracks,
     get_top_artists_tracks,
@@ -72,43 +70,6 @@ def dispatch_source_tracks(source_type: str, username: str, period: str, limit: 
             return get_top_artists_tracks(username, period, limit)
         case _:
             raise UnsupportedSourceTypeError(f"Unsupported source type: {source_type}")
-
-
-def run_automation_pipeline(
-    username: str,
-    source_type: str,
-    period: str,
-    filter_groups: list,
-    max_tracks: int,
-    track_limit: int = DEFAULT_TRACK_LIMIT,
-) -> dict:
-    """Run the full automation pipeline and return the result summary.
-
-    Returns ``{tracks, total, before_filter, source_tracks}``.
-    """
-    limit = track_limit if not max_tracks else min(max_tracks, track_limit)
-    source_tracks = dispatch_source_tracks(source_type, username, period, limit)
-    deduped = deduplicate(source_tracks)
-    needs = needed_fields(filter_groups)
-    if deduped and all("userloved" in t for t in deduped):
-        # extended=1 dispatch already fetched loved flags: no live call.
-        needs.discard("userloved")
-    # No enrich key needed (no filters, or only dispatch fields like rank):
-    # skip the live layer entirely instead of fetching data nobody reads.
-    # Anything else runs the full fetch + write-back, unchanged.
-    enriched = (
-        deduped
-        if not needs
-        else enrich_tracks(username, deduped, max_enrich=limit)
-    )
-    filtered = apply_filters(enriched, filter_groups)
-    tracks = filtered[:limit]
-    return {
-        "tracks": tracks,
-        "total": len(tracks),
-        "before_filter": len(deduped),
-        "source_tracks": source_tracks,
-    }
 
 
 async def run_automation_pipeline_cached(

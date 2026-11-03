@@ -17,7 +17,6 @@ from services import lastfm
 from services.automation_runner import (
     FULL_FETCH_KEYS,
     needed_fields,
-    run_automation_pipeline,
     run_automation_pipeline_cached,
 )
 from services.lastfm import (
@@ -170,22 +169,8 @@ def test_enrich_tracks_only_survives_live_failures():
     assert out[0]["fetch_failed"] is True
 
 
-def test_sync_pipeline_empty_filters_skips_enrich():
-    """No filters: dispatch list flows straight to output, zero enrich calls."""
-    tracks = [{"title": "t", "artist": "a"}]
-    with (
-        patch(
-            "services.automation_runner.dispatch_source_tracks", return_value=tracks
-        ),
-        patch("services.automation_runner.enrich_tracks") as mock_enrich,
-    ):
-        result = run_automation_pipeline("u", "recent_tracks", "3m", [], max_tracks=50)
-    mock_enrich.assert_not_called()
-    assert result["total"] == 1
-    assert result["before_filter"] == 1
-
-
-def test_loved_only_filter_skips_enrich_on_extended_tracks():
+@pytest.mark.asyncio
+async def test_loved_only_filter_skips_enrich_on_extended_tracks():
     """extended=1 loved flags make the live layer unnecessary for loved filters."""
     tracks = [
         {"title": "loved", "artist": "a", "userloved": True},
@@ -194,14 +179,23 @@ def test_loved_only_filter_skips_enrich_on_extended_tracks():
     groups = [
         {"conditions": [{"field": "userloved", "operator": "is", "value": True}]}
     ]
-    with (
-        patch(
-            "services.automation_runner.dispatch_source_tracks", return_value=tracks
-        ),
-        patch("services.automation_runner.enrich_tracks") as mock_enrich,
-    ):
-        result = run_automation_pipeline("u", "recent_tracks", "3m", groups, max_tracks=50)
-    mock_enrich.assert_not_called()
+    async with _TestSessionLocal() as db:
+        with (
+            patch(
+                "services.automation_runner.dispatch_source_tracks", return_value=tracks
+            ),
+            patch("services.automation_runner.enrich_tracks_cached") as mock_cached,
+        ):
+            result = await run_automation_pipeline_cached(
+                db,
+                user_id="u1",
+                username="u",
+                source_type="recent_tracks",
+                period="3m",
+                filter_groups=groups,
+                max_tracks=50,
+            )
+    mock_cached.assert_not_called()
     assert [t["title"] for t in result["tracks"]] == ["loved"]
 
 

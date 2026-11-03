@@ -34,40 +34,6 @@ async def get_or_create_tag(db: AsyncSession, name: str) -> Tag:
     return result.scalar_one()
 
 
-async def upsert_track_tag(
-    db: AsyncSession,
-    track_id: str,
-    tag_name: str,
-    weight: int,
-) -> TrackTag:
-    """Upsert a track-tag association.
-
-    Caller is responsible for committing the session.
-    """
-    tag = await get_or_create_tag(db, tag_name)
-
-    stmt = (
-        insert(TrackTag)
-        .values(
-            track_id=track_id,
-            tag_id=tag.id,
-            weight=weight,
-            fetched_at=datetime.now(UTC),
-        )
-        .on_conflict_do_update(
-            index_elements=["track_id", "tag_id"],
-            set_={
-                "weight": weight,
-                "fetched_at": datetime.now(UTC),
-            },
-        )
-        .returning(TrackTag)
-    )
-    result = await db.execute(stmt)
-    await db.flush()
-    return result.scalar_one()
-
-
 async def upsert_album_tag(
     db: AsyncSession,
     album_id: str,

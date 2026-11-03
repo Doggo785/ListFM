@@ -8,11 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 CACHE_TTL = timedelta(hours=24)
 
 
-async def get_track_by_id(db: AsyncSession, track_id: str) -> Track | None:
-    result = await db.execute(select(Track).where(Track.id == track_id))
-    return result.scalar_one_or_none()
-
-
 async def get_track_by_artist_title(db: AsyncSession, artist: str, title: str) -> Track | None:
     result = await db.execute(
         select(Track).where(Track.artist == artist, Track.title == title)
