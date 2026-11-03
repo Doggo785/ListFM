@@ -22,6 +22,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# httpx logs every request URL at INFO, and Last.fm URLs carry the api_key.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 settings = get_settings()
 
