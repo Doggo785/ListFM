@@ -11,6 +11,7 @@ import Dashboard from "@/views/Dashboard";
 vi.mock("@/lib/api", () => ({
   request: vi.fn(async () => ({ lastfm_username: "tester" })),
   setCurrentUsername: vi.fn(),
+  setSessionExpiredHandler: vi.fn(),
   getAutomations: vi.fn(async () => []),
   getUserInfo: vi.fn(async () => ({ image: null })),
   getRecentTracks: vi.fn(async () => ({

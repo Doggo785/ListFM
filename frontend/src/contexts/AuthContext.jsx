@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
-import { request, setCurrentUsername } from "../lib/api.js";
+import { request, setCurrentUsername, setSessionExpiredHandler } from "../lib/api.js";
 
 const AuthContext = createContext(null);
 
@@ -31,6 +31,16 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     checkSession();
   }, [checkSession]);
+
+  // A failed refresh means the session is gone: drop the user so AuthGuard
+  // sends them to the login page instead of leaving screens full of 401s.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setUser(null);
+      setCurrentUsername(null);
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     await request("/api/auth/login", {

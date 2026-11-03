@@ -4,13 +4,14 @@ import React, { act } from "react";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { request } from "@/lib/api";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { request, setSessionExpiredHandler } from "@/lib/api";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import CronEditor from "@/components/builder/CronEditor";
 
 vi.mock("@/lib/api", () => ({
   request: vi.fn(),
   setCurrentUsername: vi.fn(),
+  setSessionExpiredHandler: vi.fn(),
 }));
 
 async function render(element) {
@@ -52,5 +53,24 @@ describe("browser timezone", () => {
   it("shows the zone next to the schedule", async () => {
     const container = await render(<CronEditor value="0 8 * * *" onChange={() => {}} />);
     expect(container.textContent).toContain("(Europe/Paris)");
+  });
+});
+
+describe("expired session", () => {
+  it("logs the user out when the API reports a failed refresh", async () => {
+    request.mockResolvedValue({ timezone: "Europe/Paris", lastfm_username: "u" });
+    function Probe() {
+      const { isAuthenticated } = useAuth();
+      return isAuthenticated ? "in" : "out";
+    }
+    const container = await render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+    expect(container.textContent).toBe("in");
+    const onExpired = setSessionExpiredHandler.mock.calls.at(-1)[0];
+    await act(async () => onExpired());
+    expect(container.textContent).toBe("out");
   });
 });

@@ -22,6 +22,7 @@ import PlaylistDetail from "@/views/PlaylistDetail";
 vi.mock("@/lib/api", () => ({
   request: vi.fn(async () => ({ lastfm_username: "tester" })),
   setCurrentUsername: vi.fn(),
+  setSessionExpiredHandler: vi.fn(),
   getAutomation: vi.fn(),
   updateAutomation: vi.fn(),
   deleteAutomation: vi.fn(),
