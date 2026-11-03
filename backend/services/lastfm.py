@@ -106,18 +106,11 @@ def epoch_to_datetime(ts) -> datetime | None:
 
 
 def get_user_info(username: str) -> dict:
-    network = get_network()
-    user = network.get_user(username)
-    # Force a real API call so a non-existent username raises pylast.WSError
-    # instead of being silently swallowed (which let link-lastfm accept any name).
-    user.get_playcount()
-    try:
-        image_url = user.get_image(size=pylast.SIZE_LARGE)
-    except Exception:  # noqa: BLE001 -- profile image is optional: degrade to None
-        image_url = None
+    """Profile in one user.getInfo call; unknown users raise pylast.WSError (6)."""
+    user = _lastfm_json("user.getInfo", user=username)["user"]
     return {
         "username": username,
-        "image": image_url,
+        "image": _pick_image(user.get("image")),
     }
 
 
@@ -208,20 +201,17 @@ def get_recent_tracks_extended(
     return tracks
 
 
-def _track_info(username: str, artist: str, title: str) -> dict:
-    """One track.getInfo (JSON, with the user's play count and loved flag).
+def _lastfm_json(method: str, **params: str) -> dict:
+    """One Last.fm API call in JSON.
 
-    Replaces five pylast getters that each refetched this same method.
     A Last.fm error body raises pylast.WSError carrying its code, so callers
     tell "not found" (6) and "rate limited" (29) apart from transport errors.
     """
     response = httpx.get(
         LASTFM_API_URL,
         params={
-            "method": "track.getInfo",
-            "artist": artist,
-            "track": title,
-            "username": username,
+            "method": method,
+            **params,
             "api_key": get_settings().lastfm_api_key,
             "format": "json",
         },
@@ -231,7 +221,15 @@ def _track_info(username: str, artist: str, title: str) -> dict:
     if "error" in data:
         raise pylast.WSError(None, str(data["error"]), data.get("message", ""))
     response.raise_for_status()
-    return data["track"]
+    return data
+
+
+def _track_info(username: str, artist: str, title: str) -> dict:
+    """One track.getInfo with the user's play count and loved flag.
+
+    Replaces five pylast getters that each refetched this same method.
+    """
+    return _lastfm_json("track.getInfo", artist=artist, track=title, username=username)["track"]
 
 
 def get_recent_tracks(

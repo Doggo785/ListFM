@@ -1,9 +1,9 @@
-"""Unit tests for services.lastfm.get_user_info with a mocked network.
+"""Unit tests for services.lastfm.get_user_info with a mocked HTTP layer.
 
-These tests never touch the real Last.fm API: `services.lastfm.get_network`
-is patched with fake pylast objects. A non-existent username must make
-`get_user_info` propagate `pylast.WSError` (so the link-lastfm flow can
-reject it) instead of silently returning a partial result.
+These tests never touch the real Last.fm API: `services.lastfm.httpx.get` is
+patched. A non-existent username must make `get_user_info` propagate
+`pylast.WSError` (so the link-lastfm flow can reject it) instead of
+silently returning a partial result.
 """
 
 from unittest.mock import patch
@@ -12,61 +12,48 @@ import pylast
 import pytest
 from services.lastfm import get_user_info
 
-# Sentinel: get_playcount() raises WSError (simulates a non-existent account).
-_MISSING_USER = object()
-# Sentinel: get_image() raises (simulates an image fetch failure).
-_FAIL_IMAGE_FETCH = object()
 
+class _Response:
+    def __init__(self, payload, status_code=200):
+        self._payload = payload
+        self.status_code = status_code
 
-class _FakeUser:
-    """Minimal pylast.User stand-in exposing only what get_user_info calls."""
+    def json(self):
+        return self._payload
 
-    def __init__(self, playcount=_MISSING_USER, image_url=None):
-        self._playcount = playcount
-        self._image_url = image_url
-
-    def get_playcount(self):
-        if self._playcount is _MISSING_USER:
-            raise pylast.WSError(None, 6, "User not found")
-        return self._playcount
-
-    def get_image(self, size=None):
-        if self._image_url is _FAIL_IMAGE_FETCH:
-            raise RuntimeError("image fetch failed")
-        return self._image_url
-
-
-class _FakeNetwork:
-    def __init__(self, user):
-        self._user = user
-
-    def get_user(self, username):
-        return self._user
+    def raise_for_status(self):
+        pass
 
 
 def test_get_user_info_propagates_wserror_for_nonexistent_user():
-    """Given a user whose get_playcount() raises WSError, get_user_info must propagate it."""
-    network = _FakeNetwork(_FakeUser(playcount=_MISSING_USER))
+    missing = _Response({"error": 6, "message": "User not found"}, status_code=404)
     with (
-        patch("services.lastfm.get_network", return_value=network),
-        pytest.raises(pylast.WSError),
+        patch("services.lastfm.httpx.get", return_value=missing),
+        pytest.raises(pylast.WSError) as exc_info,
     ):
         get_user_info("ghost_user_999")
+    assert exc_info.value.status == "6"
 
 
-def test_get_user_info_returns_populated_dict_for_existing_user():
-    """Given an existing user, get_user_info returns the populated dict."""
-    network = _FakeNetwork(
-        _FakeUser(playcount="1234", image_url="https://last.fm/avatar.png")
-    )
-    with patch("services.lastfm.get_network", return_value=network):
+def test_get_user_info_returns_profile_in_one_call():
+    payload = {
+        "user": {
+            "name": "real_user",
+            "image": [
+                {"size": "small", "#text": "https://last.fm/s.png"},
+                {"size": "large", "#text": "https://last.fm/avatar.png"},
+            ],
+        }
+    }
+    with patch("services.lastfm.httpx.get", return_value=_Response(payload)) as get:
         info = get_user_info("real_user")
     assert info == {"username": "real_user", "image": "https://last.fm/avatar.png"}
+    assert get.call_count == 1
+    assert get.call_args.kwargs["params"]["method"] == "user.getInfo"
 
 
-def test_get_user_info_returns_none_image_when_image_fetch_fails():
-    """Given an image fetch failure, get_user_info still returns the dict with image=None."""
-    network = _FakeNetwork(_FakeUser(playcount="42", image_url=_FAIL_IMAGE_FETCH))
-    with patch("services.lastfm.get_network", return_value=network):
+def test_get_user_info_returns_none_image_when_profile_has_none():
+    payload = {"user": {"name": "no_avatar_user", "image": [{"size": "large", "#text": ""}]}}
+    with patch("services.lastfm.httpx.get", return_value=_Response(payload)):
         info = get_user_info("no_avatar_user")
     assert info == {"username": "no_avatar_user", "image": None}

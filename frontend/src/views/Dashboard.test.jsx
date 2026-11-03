@@ -9,10 +9,9 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Dashboard from "@/views/Dashboard";
 
 vi.mock("@/lib/api", () => ({
-  request: vi.fn(async () => ({ lastfm_username: "tester" })),
+  request: vi.fn(async () => ({ lastfm_username: "tester", image: "https://last.fm/a.png" })),
   setSessionExpiredHandler: vi.fn(),
   getAutomations: vi.fn(async () => []),
-  getUserInfo: vi.fn(async () => ({ image: null })),
   getRecentTracks: vi.fn(async () => ({
     tracks: [
       { title: "Song A", artist: "Artist X", album: "Album 1" },
@@ -20,6 +19,12 @@ vi.mock("@/lib/api", () => ({
       { title: "Song C", artist: "Artist Y", album: "Album 2" },
     ],
   })),
+}));
+
+// jsdom cannot read image pixels; return a fixed palette for the avatar ring.
+vi.mock("@/lib/color-extract", async (importOriginal) => ({
+  ...(await importOriginal()),
+  extractColors: vi.fn(async () => []),
 }));
 
 // jsdom has no IntersectionObserver (used by motion); a no-op stub is enough

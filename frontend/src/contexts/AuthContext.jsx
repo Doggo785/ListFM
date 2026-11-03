@@ -84,9 +84,27 @@ export function AuthProvider({ children }) {
   }, []);
 
   const isLastfmLinked = !!user?.lastfm_username;
+  const lastfmUsername = user?.lastfm_username;
+  const [avatar, setAvatar] = useState(null);
+
+  // One profile call per linked account, shared by the sidebar and dashboard.
+  useEffect(() => {
+    if (!lastfmUsername) {
+      setAvatar(null);
+      return;
+    }
+    let active = true;
+    request("/api/info")
+      .then((data) => active && setAvatar(data?.image || null))
+      .catch(() => active && setAvatar(null));
+    return () => {
+      active = false;
+    };
+  }, [lastfmUsername]);
 
   const value = useMemo(() => ({
     user,
+    avatar,
     isAuthenticated: !!user,
     isLastfmLinked,
     login,
@@ -94,7 +112,7 @@ export function AuthProvider({ children }) {
     logout,
     linkLastfm,
     loading,
-  }), [user, loading, isLastfmLinked, login, register, logout, linkLastfm]);
+  }), [user, avatar, loading, isLastfmLinked, login, register, logout, linkLastfm]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

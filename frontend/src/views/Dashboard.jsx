@@ -7,7 +7,7 @@ import Loader from "../components/elements/Loader";
 import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import CountUp from "../components/elements/CountUp";
 import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
-import { getAutomations, getUserInfo, getRecentTracks } from "@/lib/api";
+import { getAutomations, getRecentTracks } from "@/lib/api";
 import {
   SOURCE_TYPE_LABELS,
   PERIOD_OPTIONS,
@@ -53,13 +53,12 @@ function buildDescription(auto) {
 }
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, avatar } = useAuth();
   const username = user?.lastfm_username;
   const navigate = useNavigate();
   const [playlist, setPlaylist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [avatar, setAvatar] = useState(null);
   const [ringColors, setRingColors] = useState(['#ff530b', '#c084fc', '#17AEFF']);
 
   const lastVisit = useMemo(() => getLastVisit(username), [username]);
@@ -85,18 +84,15 @@ function Dashboard() {
   }, [username]);
 
   useEffect(() => {
-    if (!username) return;
-    getUserInfo()
-      .then(async (data) => {
-        const img = data?.image || null;
-        setAvatar(img);
-        if (img) {
-          const palette = await extractColors(img);
-          setRingColors(pickRingColors(palette));
-        }
-      })
-      .catch(() => setAvatar(null));
-  }, [username]);
+    if (!avatar) return;
+    let active = true;
+    extractColors(avatar).then((palette) => {
+      if (active) setRingColors(pickRingColors(palette));
+    });
+    return () => {
+      active = false;
+    };
+  }, [avatar]);
 
   useEffect(() => {
     if (!username) return;

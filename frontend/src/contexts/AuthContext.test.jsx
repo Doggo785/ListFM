@@ -73,3 +73,42 @@ describe("expired session", () => {
     expect(container.textContent).toBe("out");
   });
 });
+
+describe("profile avatar", () => {
+  it("fetches the Last.fm profile once and shares the avatar", async () => {
+    request.mockImplementation(async (path) =>
+      path === "/api/info"
+        ? { image: "https://last.fm/a.png" }
+        : { timezone: "Europe/Paris", lastfm_username: "u" }
+    );
+    function Probe() {
+      const { avatar } = useAuth();
+      return avatar || "none";
+    }
+    const container = await render(
+      <AuthProvider>
+        <Probe />
+        <Probe />
+      </AuthProvider>
+    );
+    expect(container.textContent).toBe("https://last.fm/a.png".repeat(2));
+    expect(request.mock.calls.filter(([path]) => path === "/api/info")).toHaveLength(1);
+  });
+
+  it("falls back to no avatar when the profile call fails", async () => {
+    request.mockImplementation(async (path) => {
+      if (path === "/api/info") throw new Error("down");
+      return { timezone: "Europe/Paris", lastfm_username: "u" };
+    });
+    function Probe() {
+      const { avatar } = useAuth();
+      return avatar || "none";
+    }
+    const container = await render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+    expect(container.textContent).toBe("none");
+  });
+});
