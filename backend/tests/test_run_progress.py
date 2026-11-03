@@ -143,36 +143,27 @@ def test_enrich_reports_completion_counts():
 
 
 def test_cancel_aborts_between_calls_mid_track():
-    """A cancel landing mid-track stops the remaining getters of that track."""
+    """A cancel landing mid-track stops the remaining calls of that track."""
     from services.lastfm import get_track_full_info
 
     key = "mid-track"
     progress_store.start(key)
 
-    class FakeTrack:
-        def get_listener_count(self):
-            return 11
-
-        def get_playcount(self):
-            progress_store.cancel(key)
-            return 22
-
-        def get_userplaycount(self):
-            raise AssertionError("should never run after cancel")
+    def _info_then_cancel(*_args):
+        progress_store.cancel(key)
+        return {"listeners": "11"}
 
     with (
-        patch("services.lastfm.get_network", return_value=object()),
-        patch("services.lastfm.pylast.Track", return_value=FakeTrack()),
+        patch("services.lastfm._track_info", side_effect=_info_then_cancel),
         patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
     ):
         out = get_track_full_info(
             object(), "u", "A", "T", progress_key=key
         )
     assert out["listeners"] == 11
-    assert out["global_playcount"] == 22
-    assert out["userplaycount"] == 0
+    assert out["artist_tags"] == []
     assert progress_store.read(key).stage == "cancelled"
-    assert progress_store.read(key).calls == 2
+    assert progress_store.read(key).calls == 1
 
 
 @pytest.mark.asyncio
