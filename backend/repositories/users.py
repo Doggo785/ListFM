@@ -144,7 +144,9 @@ async def _get_or_create_user_from_provider(
         )
         user = result.scalar_one_or_none()
         if user is not None:
-            if not email_verified:
+            # Both sides must own the address: a local account registered
+            # with someone else's unverified email must not absorb their login.
+            if not (email_verified and user.email_verified):
                 raise HTTPException(
                     status_code=409,
                     detail=DUPLICATE_EMAIL_MESSAGE,

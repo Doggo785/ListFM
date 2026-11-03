@@ -95,12 +95,28 @@ async def test_google_callback_new_user(client: AsyncClient):
         await _cleanup_user(email=email)
 
 
+async def _prelink(client: AsyncClient, provider: str, provider_user_id: str) -> None:
+    """Bind a provider id to the logged-in user, as an earlier OAuth login would."""
+    async with _TestSessionLocal() as db:
+        db.add(
+            AuthProvider(
+                id=str(uuid.uuid4()),
+                user_id=_get_user_id_from_cookies(client),
+                provider=provider,
+                provider_user_id=provider_user_id,
+                linked_at=datetime.now(UTC),
+            )
+        )
+        await db.commit()
+
+
 @pytest.mark.asyncio
 async def test_google_callback_returning_user(client: AsyncClient):
-    """Google callback for an existing user redirects to /dashboard."""
+    """Google callback for an already-linked user redirects to /dashboard."""
     email = _unique_email()
     try:
         await _register_and_login(client, email)
+        await _prelink(client, "google", "google_12345")
 
         with (
             patch.object(
@@ -133,6 +149,7 @@ async def test_oauth_finalize_revokes_previous_families(client: AsyncClient):
     email = _unique_email()
     try:
         await _register_and_login(client, email)
+        await _prelink(client, "google", "google_12345")
         old_refresh = client.cookies.get("refresh_token")
         assert old_refresh is not None
 
@@ -249,10 +266,11 @@ async def test_discord_callback_new_user(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_discord_callback_returning_user(client: AsyncClient):
-    """Discord callback with email for an existing user redirects to /dashboard."""
+    """Discord callback for an already-linked user redirects to /dashboard."""
     email = _unique_email()
     try:
         await _register_and_login(client, email)
+        await _prelink(client, "discord", "discord_12345")
 
         with (
             patch.object(
@@ -364,6 +382,47 @@ async def test_google_callback_existing_user_unverified_email_blocked(client: As
                 select(AuthProvider).where(
                     AuthProvider.provider == "google",
                     AuthProvider.provider_user_id == "google_attacker_123",
+                )
+            )
+            assert result.scalar_one_or_none() is None
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_google_verified_email_never_binds_to_unverified_local_account(client: AsyncClient):
+    """A squatter's unverified local account must not absorb the real owner's Google login."""
+    email = _unique_email()
+    try:
+        await _register_and_login(client, email)
+
+        with (
+            patch.object(
+                GoogleOAuth2,
+                "get_access_token",
+                return_value={"access_token": "fake_token"},
+            ),
+            patch("routers.auth_oauth.httpx.AsyncClient") as mock_httpx,
+        ):
+            mock_resp = _MockGoogleResponse(200, {
+                "id": "google_owner_456",
+                "email": email,
+                "name": "Owner",
+                "verified_email": True,
+            })
+            mock_httpx.return_value.__aenter__.return_value.get.return_value = mock_resp
+            resp = await client.get(
+                "/api/auth/google/callback?code=fakecode&state=fakestate",
+                cookies={"oauth_state": "fakestate"},
+            )
+
+        assert resp.status_code == 409
+        assert "access_token" not in resp.cookies
+        async with _TestSessionLocal() as db:
+            result = await db.execute(
+                select(AuthProvider).where(
+                    AuthProvider.provider == "google",
+                    AuthProvider.provider_user_id == "google_owner_456",
                 )
             )
             assert result.scalar_one_or_none() is None
