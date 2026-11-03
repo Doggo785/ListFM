@@ -7,6 +7,15 @@ let isRefreshing = false;
 let refreshPromise = null;
 
 let _username = null;
+let _onSessionExpired = null;
+
+/**
+ * Called when a refresh fails: the session is over, AuthContext logs out.
+ * @param {(() => void)|null} handler
+ */
+export function setSessionExpiredHandler(handler) {
+  _onSessionExpired = handler;
+}
 
 /**
  * Cache the current user's Last.fm username.
@@ -54,6 +63,7 @@ export async function request(path, options = {}) {
       if (refreshRes.ok) {
         return request(path, { ...options, _retried: true });
       }
+      _onSessionExpired?.();
     } catch {
       // Refresh failed (network error, etc.) — fall through to original 401
     }
