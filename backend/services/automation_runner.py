@@ -295,11 +295,18 @@ async def _mark_success(db: AsyncSession, history, result: dict, automation: Aut
     await db.flush()
 
 
-async def _mark_failure(db: AsyncSession, history, exc: Exception) -> None:
-    """Record a failed run on the history row."""
+async def _mark_failure(
+    db: AsyncSession, history, exc: Exception, automation: Automation
+) -> None:
+    """Record a failed run on the history row and bump last_run.
+
+    The retry chain owns failures; without the bump the sweep reruns the
+    automation as attempt 1 every tick.
+    """
     history.status = "failed"
     history.error_message = str(exc)[:2000]
     history.completed_at = datetime.now(UTC)
+    automation.last_run = datetime.now(UTC)
     await db.flush()
 
 
@@ -348,7 +355,7 @@ async def run_automation(
             progress_key=progress_key,
         )
     except Exception as exc:  # noqa: BLE001 - record any pipeline failure
-        await _mark_failure(db, history, exc)
+        await _mark_failure(db, history, exc, automation)
         if progress_key is not None:
             progress_store.finish(progress_key, error=str(exc)[:500])
         return history
