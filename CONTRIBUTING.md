@@ -13,7 +13,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 ```
 
-`.env` stays at the repo root, see `.env.example`. Run migrations before first start:
+`.env` stays at the repo root, see `.env.example`. Activate `.venv` first (`source .venv/bin/activate`): `alembic` and `uvicorn` installed elsewhere fail with `No module named 'config'`. Run migrations before first start:
 
 ```
 alembic -c backend/alembic.ini upgrade head

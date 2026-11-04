@@ -22,7 +22,8 @@ Lire avant d'agir :
 
 - `services/lastfm.py` est du `pylast` synchrone : l'appeler via `asyncio.to_thread` (routers) ou `run_in_executor` (runner), jamais directement dans du code async.
 - Les appels Last.fm de la synchro passent par `_throttled_call` (cadence `LASTFM_MIN_INTERVAL`, repli sur l'erreur 29). Les tests patchent l'intervalle à 0.
-- Le moteur de filtres existe en deux copies de même sémantique : `frontend/src/lib/filter-engine.js` (aperçu instantané) et `backend/services/filter_engine.py` (preview et sweep). Un opérateur ajouté va dans les deux.
+- Le moteur de filtres n'existe que côté serveur (`services/filter_engine.py`) : l'écran affiche la réponse de l'aperçu sans la retravailler. Une condition sans valeur et un groupe vide sont ignorés.
+- `filter_groups` est validé à la lecture en base : retirer un champ ou un opérateur demande une migration qui réécrit les automations stockées.
 - Le pipeline et les filtres ne font aucun appel Last.fm (ADR 0003) : ils lisent les écoutes et le catalogue de tags en base. Un champ jamais cherché reste absent de la piste et ne passe aucun filtre, pas même `not_contains`.
 - Les repositories ne commitent pas : l'appelant commit, et rattrape `SQLAlchemyError` avec un rollback.
 - Soft-delete par `deleted_at` sur `User`, `Automation`, `GeneratedPlaylist` : chaque requête filtre `deleted_at IS NULL`.
