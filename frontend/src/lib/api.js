@@ -80,6 +80,10 @@ export async function getScrobbleSync() {
   return request("/api/scrobbles/sync");
 }
 
+export async function getListeningTotals() {
+  return request("/api/scrobbles/totals");
+}
+
 export async function previewAutomation(automation, progressToken, automationId) {
   return request("/api/automations/preview", {
     method: "POST",

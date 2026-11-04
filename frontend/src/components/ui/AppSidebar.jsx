@@ -59,7 +59,7 @@ function AppSidebar({ userLabel = "User" }) {
         <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             className="mt-4 mb-8 px-4 text-left"
           >
             <h1 className="text-2xl font-black text-[#ff530b]">ListFM</h1>
