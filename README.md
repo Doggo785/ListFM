@@ -39,7 +39,7 @@ Planned text: "Try it via the hosted instance" + link.
 - Filter rules (filter groups): track limit, period, tags and genres, value caps, exclusions.
 - Run history with bounded auto-retry and manual re-run.
 - Generated playlists with an openable detail view and frozen snapshots.
-- Dashboard with recent tracks and listening stats: unique artists, albums, top artist. The dashboard shows the last 50 recent tracks.
+- Dashboard with the totals of your stored history (listens, tracks, artists, albums) and your most played artist over the last 50 plays.
 - Auth with email and password plus optional Google and Discord OAuth. JWT access and refresh tokens live in httpOnly cookies, with refresh rotation and revoke-all on login.
 - Last.fm responses are cached in the database with per-data freshness (7 days for global data and tags, 30-day safety net), so repeat runs skip extra API calls.
 

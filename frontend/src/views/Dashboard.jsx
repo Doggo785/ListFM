@@ -7,7 +7,7 @@ import Loader from "../components/elements/Loader";
 import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import CountUp from "../components/elements/CountUp";
 import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
-import { getAutomations, getRecentTracks } from "@/lib/api";
+import { getAutomations, getListeningTotals, getRecentTracks } from "@/lib/api";
 import { describeAutomationWithSchedule } from "@/lib/automation-rules";
 import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
 import {
@@ -21,6 +21,8 @@ import {
 } from "@tabler/icons-react";
 import { extractColors, pickRingColors } from "../lib/color-extract";
 import { fadeUp, stagger } from "../lib/animation";
+
+const TOTALS_POLL_MS = 3000;
 
 function StatBlock({ value, label, color, delay = 0 }) {
   return (
@@ -47,6 +49,7 @@ function Dashboard() {
   const lastVisit = useMemo(() => getLastVisit(username), [username]);
   const isFirstVisit = lastVisit === null;
   const [automations, setAutomations] = useState([]);
+  const [totals, setTotals] = useState(null);
 
   useEffect(() => {
     if (!username) return;
@@ -59,6 +62,28 @@ function Dashboard() {
       }
     };
     load();
+  }, [username]);
+
+  useEffect(() => {
+    if (!username) return undefined;
+    let timer;
+    let stopped = false;
+    const load = async () => {
+      try {
+        const next = await getListeningTotals();
+        if (stopped) return;
+        setTotals(next);
+        // They grow during the first load, then a page visit is fresh enough.
+        if (!next.complete) timer = setTimeout(load, TOTALS_POLL_MS);
+      } catch {
+        // Totals silently fail; dashboard still renders without them.
+      }
+    };
+    load();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
   }, [username]);
 
   useEffect(() => {
@@ -93,20 +118,14 @@ function Dashboard() {
     fetchRecentTracks();
   }, [username]);
 
-  const stats = useMemo(() => {
-    if (!username) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
-    if (!playlist.length) return { tracks: 0, artists: 0, albums: 0, topArtist: null };
-    const artists = new Set();
-    const albums = new Set();
+  const topArtist = useMemo(() => {
+    if (!username || !playlist.length) return null;
     const artistCounts = {};
     playlist.forEach((t) => {
-      artists.add(t.artist);
-      if (t.album) albums.add(t.album);
       artistCounts[t.artist] = (artistCounts[t.artist] || 0) + 1;
     });
-    const sorted = Object.entries(artistCounts).sort((a, b) => b[1] - a[1]);
-    const topArtist = sorted[0] ? { name: sorted[0][0], plays: sorted[0][1] } : null;
-    return { tracks: playlist.length, artists: artists.size, albums: albums.size, topArtist };
+    const [name, plays] = Object.entries(artistCounts).sort((a, b) => b[1] - a[1])[0];
+    return { name, plays };
   }, [username, playlist]);
 
   const automationCards = useMemo(() => {
@@ -194,31 +213,28 @@ function Dashboard() {
 
           <motion.div
             variants={stagger}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4"
+            className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-4"
           >
-            <StatBlock value={stats.tracks} label="Tracks" color="#17AEFF" delay={0} />
-            <StatBlock value={stats.artists} label="Artists" color="#c084fc" delay={0.1} />
-            <StatBlock value={stats.albums} label="Albums" color="#ff530b" delay={0.2} />
-            <StatBlock value={automations.length} label="Automations" color="#22c55e" delay={0.3} />
+            <StatBlock value={totals?.listens ?? 0} label="Listens" color="#ffffff" delay={0} />
+            <StatBlock value={totals?.tracks ?? 0} label="Tracks" color="#17AEFF" delay={0.1} />
+            <StatBlock value={totals?.artists ?? 0} label="Artists" color="#c084fc" delay={0.2} />
+            <StatBlock value={totals?.albums ?? 0} label="Albums" color="#ff530b" delay={0.3} />
+            <StatBlock value={automations.length} label="Automations" color="#22c55e" delay={0.4} />
           </motion.div>
-
-          <motion.p variants={fadeUp} className="text-center text-xs text-neutral-500">
-            Partial preview · last 50 plays
-          </motion.p>
 
           <motion.div variants={fadeUp}>
             <div className="w-12 h-px bg-neutral-800 mx-auto" />
           </motion.div>
 
-          {stats.topArtist && (
+          {topArtist && (
             <motion.section variants={fadeUp} className="text-center">
               <p className="text-xs text-neutral-500 uppercase tracking-wider font-medium mb-2">
-                Most played
+                Most played · last 50 plays
               </p>
               <div className="flex items-center justify-center gap-3">
                 <IconHeadphones size={18} className="text-[#ff530b]" strokeWidth={1.5} />
-                <span className="text-xl font-bold text-white">{stats.topArtist.name}</span>
-                <span className="text-sm text-neutral-500">{stats.topArtist.plays} plays</span>
+                <span className="text-xl font-bold text-white">{topArtist.name}</span>
+                <span className="text-sm text-neutral-500">{topArtist.plays} plays</span>
               </div>
             </motion.section>
           )}

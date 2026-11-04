@@ -50,9 +50,10 @@ export default function CountUp({
 
   useEffect(() => {
     if (ref.current) {
-      ref.current.textContent = formatValue(direction === 'down' ? to : from);
+      // Where the count is now: a new target must not flash back to the start.
+      ref.current.textContent = formatValue(springValue.get());
     }
-  }, [from, to, direction, formatValue]);
+  }, [from, to, direction, formatValue, springValue]);
 
   useEffect(() => {
     if (isInView && startWhen) {

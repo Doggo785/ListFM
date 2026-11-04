@@ -14,7 +14,11 @@ from models.scrobble import Scrobble
 from models.track import Track
 from models.user import User
 from models.user_track import UserTrack
-from repositories.scrobbles import get_window_tracks
+from repositories.scrobbles import (
+    get_window_tracks,
+    store_scrobbles,
+    store_track_albums,
+)
 from services import scrobble_sync
 from sqlalchemy import func, select
 
@@ -161,6 +165,27 @@ async def test_link_starts_sync_and_relink_drops_history(client: AsyncClient, _n
     async with _TestSessionLocal() as db:
         user = await db.get(User, user_id)
         assert user.scrobbles_complete_at is None
+
+
+@pytest.mark.asyncio
+async def test_totals_count_this_users_stored_history(client: AsyncClient):
+    await _register_and_login(client, _unique_email())
+    day = datetime(2026, 1, 1, tzinfo=UTC)
+    async with _TestSessionLocal() as db:
+        user = (await db.execute(select(User))).scalars().one()
+        someone_else = User(id=str(uuid.uuid4()), email=_unique_email())
+        db.add(someone_else)
+        await db.flush()
+        # A replay, a second track of the artist, another artist, one track with no album.
+        await store_scrobbles(db, user.id, [
+            ("A", "X", day), ("A", "X", day + timedelta(days=1)), ("B", "X", day), ("C", "Y", day), ("D", "Y", day),
+        ])
+        await store_track_albums(db, [("A", "X", "One"), ("B", "X", "One"), ("C", "Y", "Two")])
+        await store_scrobbles(db, someone_else.id, [("Other", "Z", day)])
+        await db.commit()
+
+    resp = await client.get("/api/scrobbles/totals")
+    assert resp.json() == {"listens": 5, "tracks": 4, "artists": 2, "albums": 2, "complete": False}
 
 
 @pytest.mark.asyncio
