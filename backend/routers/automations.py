@@ -32,6 +32,7 @@ from services.automation_runner import (
     run_automation_pipeline_cached,
 )
 from services.progress import store as progress_store
+from services.scrobble_sync import start_scrobble_sync
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -187,6 +188,15 @@ async def _lock_or_409(db: AsyncSession, automation: Automation) -> None:
         raise HTTPException(status_code=409, detail="Automation already running")
 
 
+async def _history_loaded_or_409(db: AsyncSession, automation: Automation) -> None:
+    """A manual run waits for the first full load (ADR 0001), and leaves no history row."""
+    user = await db.get(User, automation.user_id)
+    if user is None or user.scrobbles_complete_at is None:
+        # Restarts an interrupted first load; a no-op while one runs.
+        start_scrobble_sync(automation.user_id, automation.lastfm_username)
+        raise HTTPException(status_code=409, detail="Your listening history is still loading. Run this when it finishes.")
+
+
 async def _run_and_commit(
     db: AsyncSession,
     automation: Automation,
@@ -194,6 +204,7 @@ async def _run_and_commit(
     attempt: int,
     body: RunRequest | None,
 ):
+    await _history_loaded_or_409(db, automation)
     token = body.progress_token if body and body.progress_token else None
     progress_key = f"run:{token}" if token else f"run:{automation.id}"
     progress_store.start(progress_key)

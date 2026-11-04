@@ -17,7 +17,9 @@ from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
+from models.user import User
 from repositories.automation_history import create_automation_history
+from routers.automations import _history_loaded_or_409
 from services.automation_runner import MAX_ATTEMPT, run_due_automations
 from sqlalchemy import delete, func, select
 
@@ -348,6 +350,39 @@ async def test_run_now_triggers_manual_run(client: AsyncClient):
         assert entry["status"] == "completed"
         assert entry["tracks_generated"] == 1
         assert entry["generated_playlist_id"] is not None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_manual_run_waits_for_the_first_load_and_leaves_no_row(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+        failed_id = await _insert_failed_run(automation_id, attempt=1, scheduled_for=datetime.now(UTC))
+
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+        with (
+            patch("routers.automations._history_loaded_or_409", _history_loaded_or_409),
+            patch("routers.automations.start_scrobble_sync") as start,
+            patch("services.automation_runner.get_window_tracks", return_value=tracks),
+        ):
+            for path in ("run", f"history/{failed_id}/retry"):
+                resp = await client.post(f"/api/automations/{automation_id}/{path}")
+                assert resp.status_code == 409
+                assert "still loading" in resp.json()["detail"]
+            assert start.call_count == 2
+            history = await client.get(f"/api/automations/{automation_id}/history")
+            assert [row["id"] for row in history.json()] == [failed_id]
+
+            async with _TestSessionLocal() as db:
+                user = await db.get(User, _get_user_id_from_cookies(client))
+                user.scrobbles_complete_at = datetime.now(UTC)
+                await db.commit()
+            resp = await client.post(f"/api/automations/{automation_id}/run")
+        assert resp.json()["status"] == "completed"
     finally:
         await _cleanup_user_with_automations(client, email)
 
