@@ -36,7 +36,7 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
    - Moins de morceaux que la taille : playlist plus courte, historique « 32/50 ». Zéro : run vide.
    - Table rase des automations, playlists et historique existants (des tests), aucune migration.
 4. *(fait)* **Catalogue de tags** (ADR 0003) : tâche de fond après la synchro, un appel par artiste, les plus écoutés d'abord, partagé entre utilisateurs, valable 90 jours. Tags d'album plus tard (la synchro doit d'abord garder l'album de chaque écoute).
-5. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage et le taux de tags connus. Aucun appel Last.fm. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
+5. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage et le taux de tags connus. Aucun appel Last.fm. L'API expose aussi l'avancement des tâches de fond (écoutes, tags) pour le suivi de la phase B. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
 6. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
 7. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
 
@@ -46,7 +46,7 @@ Une identité forte, claire et marquée, pas l'allure générique des pages fait
 
 1. `impeccable init` → `PRODUCT.md`. Nouvelle identité écrite dans `DESIGN.md` (pas `document`, qui décrirait l'ancien style). Trancher dark-only ici.
 2. **Tokens** (couleurs, typo, espacements, rayons, mouvement) à un seul endroit, branchés sur tout le site : toutes les pages changent de peau en une PR.
-3. **Composants de base** refaits sur ces tokens : Button, Select, modales accessibles (role, focus, Échap), Sidebar, SVG OAuth, props Grainient et `SOURCE_OPTIONS` dédoublonnés.
+3. **Composants de base** refaits sur ces tokens : Button, Select, modales accessibles (role, focus, Échap), Sidebar, SVG OAuth, props Grainient et `SOURCE_OPTIONS` dédoublonnés. **Suivi des tâches de fond** : indicateur discret visible sur toutes les pages, qui remplace `SyncBanner`, reste tant qu'une tâche peut changer les résultats (« Recherche des tags : 1 200 / 9 552 artistes. Les filtres de tag peuvent être incomplets d'ici là. ») et reste muet pour les petites synchros de routine.
 4. **Détecteur bloquant** : `npx impeccable detect` dans `scripts/ci-local.sh` et en CI.
 
 Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
