@@ -28,7 +28,7 @@ Tant que 1→2→3 ne marche pas de bout en bout de façon fiable, ne pas partir
 - **Vocabulaire tranché (2026-09-09)**: côté user on dit **Automation** pour l'objet qui définit comment une playlist va être générée (source + schedule + filtres), et playlist générée / historique pour le résultat. Garder ce mot dans le menu et l'UI, ne pas mélanger avec "Playlist auto".
 - **Sessions**: multi-device simple = **revoke-all au login** gardé pour l'instant (comme Netflix qui déconnecte le salon quand tu te connectes sur tel). Suffisant à l'échelle potes, ne pas complexifier.
 - **Historique voulu**: date, nombre de tracks après filtre (+ avant filtre en bonus), et ouverture du détail avec **tracks + tags figés au moment de la génération** pour voir la génération proprement. Cron vide = manuel sans auto-update, validé.
-- **Cache**: OUI, cache DB pour ne pas inonder Last.fm (carnet de courses réutilisé plutôt que retour au marché à chaque recette). Fraîcheur différenciée par groupe de données (global et tags 7 j, perso revérifiée si rejouée, loved 7 j, filet 30 j), constantes dans `backend/services/enrich_cache.py`.
+- **Cache**: OUI, cache DB pour ne pas inonder Last.fm (carnet de courses réutilisé plutôt que retour au marché à chaque recette). Écoutes et tags sont gardés en base et les filtres ne lisent que la base (ADR 0001, ADR 0003) ; les tags sont valables 90 jours.
 - **Retry validé (2026-09-09)**: retry borné avec `scheduled_for` d'origine (pas de décalage silencieux de saison), relance manuelle = même période d'origine. Historique affiche `prévu le / exécuté le`.
 
 ## 4. Contraintes déploiement et confort

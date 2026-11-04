@@ -35,9 +35,10 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
    - Limites : taille, maximum par artiste, maximum par album, pas de répétition sur les N dernières playlists de l'automation.
    - Moins de morceaux que la taille : playlist plus courte, historique « 32/50 ». Zéro : run vide.
    - Table rase des automations, playlists et historique existants (des tests), aucune migration.
-4. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage. Les tags pas encore en cache se cherchent sur clic, avec l'estimation d'appels. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
-5. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
-6. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
+4. **Catalogue de tags** (ADR 0003) : tâche de fond après la synchro, un appel par artiste, les plus écoutés d'abord, partagé entre utilisateurs, valable 90 jours. À trancher : les filtres auditeurs et popularité mondiale, qui demandent un appel par morceau. Tags d'album plus tard (la synchro doit d'abord garder l'album de chaque écoute).
+5. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage et le taux de tags connus. Aucun appel Last.fm. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
+6. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
+7. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
 
 ### Phase B : identité visuelle avec [Impeccable](https://github.com/pbakaus/impeccable)
 
