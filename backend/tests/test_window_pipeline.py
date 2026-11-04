@@ -176,3 +176,32 @@ async def test_run_syncs_first_and_survives_a_sync_failure():
             await _sync_before_run(db, automation)
     sync.assert_not_called()
 
+
+@pytest.mark.asyncio
+async def test_last_listened_counts_from_the_run_date():
+    # NOW is in the past: from today's date this listen would be months old.
+    user_id = await _user_with_listens([("Week", 3), ("Old", 40)])
+    recent = [{"conditions": [{"field": "timestamp", "operator": "within_days", "value": 7}]}]
+    async with _TestSessionLocal() as db:
+        result = await run_automation_pipeline_cached(
+            db, user_id=user_id, username="u", window={"length": None}, sort="most_played",
+            filter_groups=recent, max_tracks=10, at=NOW,
+        )
+    assert [t["title"] for t in result["tracks"]] == ["Week"]
+
+
+@pytest.mark.asyncio
+async def test_removed_filter_options_are_refused_and_tags_are_listed(client):
+    from .test_automation_filters import _frontend_payload, _register_login_link
+
+    await _register_login_link(client, _unique_email())
+    for condition in (
+        {"id": "c", "field": "rank", "operator": "lte", "value": 10},
+        {"id": "c", "field": "playcount", "operator": "gt", "value": 1},
+        {"id": "c", "field": "playcount", "operator": "lt", "value": 1},
+        {"id": "c", "field": "playcount", "operator": "neq", "value": 1},
+    ):
+        body = _frontend_payload([{"id": "g", "conditions": [condition]}])
+        assert (await client.post("/api/automations", json=body)).status_code == 422
+
+    assert (await client.get("/api/tags")).json() == []
