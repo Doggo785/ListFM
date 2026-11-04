@@ -259,6 +259,13 @@ class PreviewRequest(BaseModel):
     progress_token: str | None = Field(default=None, max_length=64)
 
 
+class KnownTag(BaseModel):
+    """A tag of the catalogue, and how many of the user's artists carry it."""
+
+    name: str
+    artists: int
+
+
 class ScrobbleSyncStatus(BaseModel):
     """Listening history sync: live progress, and whether the first full load is done."""
 

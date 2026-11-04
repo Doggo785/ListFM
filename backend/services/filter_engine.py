@@ -1,16 +1,15 @@
-"""Server-side port of frontend/src/lib/filter-engine.js.
+"""The filter engine: which tracks of the window an automation keeps.
 
-Keeps the exact same filter semantics as the JS implementation so preview and
-the scheduled automation runner share one source of truth:
-
-- numeric compare ops (eq/neq/gt/gte/lt/lte/between) with JS-style NaN handling
-- tag contains/not_contains/eq with countMin
+- numeric compare ops (eq/gte/lte/between)
+- tag contains/not_contains with countMin
 - userloved `is`
-- relative Date.now() for recent timestamps (within_days/before)
+- ages counted from the run's date (within_days/before)
 - recursive AND/OR groups; top-level groups are OR'd
+- a condition without its value and a group with nothing in it are ignored:
+  they say nothing about tracks, neither "keep all" nor "keep none"
 
-Accepts both plain dicts (from the API request body) and the
-FilterGroup/FilterCondition Pydantic models (from the DB JSONB column).
+Accepts both plain dicts and the FilterGroup/FilterCondition Pydantic models
+(from the DB JSONB column).
 """
 
 import math
@@ -25,28 +24,23 @@ def _get(obj, key, default=None):
 
 
 def _to_number(value):
-    """JS-style Number(): None/undefined -> NaN, bool -> 0/1, '' -> 0."""
+    """Number or NaN; bool -> 0/1."""
     if value is None:
         return float("nan")
     if isinstance(value, bool):
         return 1.0 if value else 0.0
-    if isinstance(value, str) and value.strip() == "":
-        return 0.0
     try:
         return float(value)
     except (TypeError, ValueError):
         return float("nan")
 
 
-def get_field_value(track, field, tag_source):
-    if field == "timestamp":
-        if track.get("timestamp") is None:
-            return None
-        return math.floor(time.time()) - track["timestamp"]
+def get_field_value(track, field, tag_source, now):
+    if field in ("timestamp", "first_played"):
+        played = track.get(field)
+        return None if played is None else now - played
     if field == "tags":
         return track.get("album_tags" if tag_source == "album" else "artist_tags")
-    if field == "first_played":
-        return track.get("first_played_age")
     return track.get(field)
 
 
@@ -68,7 +62,6 @@ def _find_tag_match(tags, value, count_min):
 _TAG_OPERATORS = {
     "contains": lambda match: match is not None,
     "not_contains": lambda match: match is None,
-    "eq": lambda match: match is not None,
 }
 
 
@@ -92,8 +85,8 @@ def _evaluate_boolean_condition(field_value, operator, value):
     return bool(field_value) == bool_val
 
 
-def _between(num, target, field_value, value, value_max):
-    """Numeric between: needs valueMax; False when valueMax is NaN."""
+def _between(num, target, value_max):
+    """Numeric between: False when valueMax is not a number."""
     max_val = _to_number(value_max)
     if math.isnan(max_val):
         return False
@@ -101,41 +94,26 @@ def _between(num, target, field_value, value, value_max):
 
 
 _NUMERIC_OPERATORS = {
-    "eq": lambda num, target, field_value, value, value_max: num == target,
-    "neq": lambda num, target, field_value, value, value_max: num != target,
-    "gt": lambda num, target, field_value, value, value_max: num > target,
-    "gte": lambda num, target, field_value, value, value_max: num >= target,
-    "lt": lambda num, target, field_value, value, value_max: num < target,
-    "lte": lambda num, target, field_value, value, value_max: num <= target,
+    "eq": lambda num, target, value_max: num == target,
+    "gte": lambda num, target, value_max: num >= target,
+    "lte": lambda num, target, value_max: num <= target,
     "between": _between,
-    "within_days": lambda num, target, field_value, value, value_max: num <= target * 86400,
-    "before": lambda num, target, field_value, value, value_max: num >= target * 86400,
-    "contains": lambda num, target, field_value, value, value_max: str(field_value).lower().find(str(value).lower()) != -1,
-    "not_contains": lambda num, target, field_value, value, value_max: str(field_value).lower().find(str(value).lower()) == -1,
+    "within_days": lambda num, target, value_max: num <= target * 86400,
+    "before": lambda num, target, value_max: num >= target * 86400,
 }
 
 
-def _evaluate_numeric_condition(field, operator, field_value, value, value_max):
-    """Numeric compare ops with JS-style NaN handling.
-
-    contains/not_contains live here too: they substring-search the stringified
-    field value, mirroring the JS switch's numeric branch.
-    """
+def _evaluate_numeric_condition(operator, field_value, value, value_max):
     num = _to_number(field_value)
     target = _to_number(value)
-
-    if math.isnan(target):
+    if math.isnan(target) or math.isnan(num):
         return False
-    if math.isnan(num):
-        return field == "timestamp"
-
     handler = _NUMERIC_OPERATORS.get(operator)
-    if handler is None:
-        return False
-    return handler(num, target, field_value, value, value_max)
+    return handler(num, target, value_max) if handler is not None else False
 
 
-def evaluate_condition(track, condition):
+def evaluate_condition(track, condition, now=None):
+    now = math.floor(time.time()) if now is None else now
     field = _get(condition, "field")
     operator = _get(condition, "operator")
     value = _get(condition, "value")
@@ -149,30 +127,36 @@ def evaluate_condition(track, condition):
     elif field == "listening_moment":
         field_value = (track.get("moment_plays") or {}).get(_get(condition, "id"), 0)
     else:
-        field_value = get_field_value(track, field, tag_source)
+        field_value = get_field_value(track, field, tag_source, now)
 
     if field == "tags":
         return _evaluate_tag_condition(field_value, operator, value, count_min)
     if field == "userloved":
         return _evaluate_boolean_condition(field_value, operator, value)
-    return _evaluate_numeric_condition(field, operator, field_value, value, value_max)
+    return _evaluate_numeric_condition(operator, field_value, value, value_max)
 
 
-def evaluate_group(track, group):
-    if not group:
+def _is_complete(condition):
+    value = _get(condition, "value")
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return False
+    if _get(condition, "operator") == "between":
+        return _get(condition, "valueMax") not in (None, "")
+    return True
+
+
+def _is_active(group):
+    return any(_is_complete(c) for c in _get(group, "conditions") or []) or any(
+        _is_active(g) for g in _get(group, "groups") or []
+    )
+
+
+def evaluate_group(track, group, now=None):
+    results = [evaluate_condition(track, c, now) for c in _get(group, "conditions") or [] if _is_complete(c)]
+    results += [evaluate_group(track, g, now) for g in _get(group, "groups") or [] if _is_active(g)]
+    if not results:
         return True
-
-    conditions = _get(group, "conditions") or []
-    groups = _get(group, "groups") or []
-    logic = _get(group, "logic") or "AND"
-
-    results = [evaluate_condition(track, c) for c in conditions]
-    results += [evaluate_group(track, g) for g in groups]
-
-    if len(results) == 0:
-        return True
-
-    return all(results) if logic == "AND" else any(results)
+    return all(results) if (_get(group, "logic") or "AND") == "AND" else any(results)
 
 
 def conditions_on(filter_groups, field, setting):
@@ -184,7 +168,10 @@ def conditions_on(filter_groups, field, setting):
         yield from conditions_on(_get(group, "groups"), field, setting)
 
 
-def apply_filters(tracks, filter_groups):
-    if not filter_groups or len(filter_groups) == 0:
+def apply_filters(tracks, filter_groups, now=None):
+    """Tracks kept by the filters; ``now`` is the run's date in epoch seconds."""
+    active = [g for g in filter_groups or [] if _is_active(g)]
+    if not active:
         return tracks
-    return [t for t in tracks if any(evaluate_group(t, g) for g in filter_groups)]
+    now = math.floor(time.time()) if now is None else now
+    return [t for t in tracks if any(evaluate_group(t, g, now) for g in active)]

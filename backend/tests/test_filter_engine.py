@@ -1,9 +1,6 @@
-"""Tests for the server-side filter engine (port of frontend/src/lib/filter-engine.js).
-
-Parity fixtures mirror the JS semantics from filter-engine.js so the Python
-port stays behaviorally identical: numeric compare ops (eq/neq/gt/gte/lt/lte)
-with NaN handling, tag contains/not_contains/eq with countMin, userloved is,
-relative Date.now() for recent timestamps, and recursive AND/OR groups.
+"""Tests for the filter engine: numeric compare ops (eq/gte/lte/between), tag
+contains/not_contains with countMin, userloved is, ages from the run's date,
+recursive AND/OR groups, and what happens to empty conditions and groups.
 """
 
 import time
@@ -45,7 +42,6 @@ def _track(**overrides) -> dict:
         "playcount": 0,
         "global_playcount": 0,
         "listeners": 0,
-        "rank": 0,
         "artist_tags": [],
         "album_tags": [],
     }
@@ -59,22 +55,14 @@ class TestNumericOperators:
         groups = [_group(conditions=[_condition(field="userplaycount", operator="gte", value=10)])]
         assert [t["title"] for t in apply_filters(tracks, groups)] == ["high"]
 
-    def test_neq(self):
-        tracks = [_track(title="a", userplaycount=5), _track(title="b", userplaycount=10)]
-        groups = [_group(conditions=[_condition(field="userplaycount", operator="neq", value=5)])]
-        assert [t["title"] for t in apply_filters(tracks, groups)] == ["b"]
 
-    def test_gt_lt_lte(self):
+    def test_lte(self):
         tracks = [
             _track(title="a", userplaycount=1),
             _track(title="b", userplaycount=5),
             _track(title="c", userplaycount=10),
         ]
-        gt = [_group(conditions=[_condition(field="userplaycount", operator="gt", value=1)])]
-        lt = [_group(conditions=[_condition(field="userplaycount", operator="lt", value=10)])]
         lte = [_group(conditions=[_condition(field="userplaycount", operator="lte", value=5)])]
-        assert [t["title"] for t in apply_filters(tracks, gt)] == ["b", "c"]
-        assert [t["title"] for t in apply_filters(tracks, lt)] == ["a", "b"]
         assert [t["title"] for t in apply_filters(tracks, lte)] == ["a", "b"]
 
     def test_between(self):
@@ -116,13 +104,6 @@ class TestTagOperations:
         groups = [_group(conditions=[_condition(field="tags", operator="not_contains", value="rock")])]
         assert [t["title"] for t in apply_filters(tracks, groups)] == ["poppy"]
 
-    def test_tag_eq(self):
-        tracks = [
-            _track(title="rocky", artist_tags=[{"name": "rock", "count": 60}]),
-            _track(title="poppy", artist_tags=[{"name": "pop", "count": 60}]),
-        ]
-        groups = [_group(conditions=[_condition(field="tags", operator="eq", value="rock")])]
-        assert [t["title"] for t in apply_filters(tracks, groups)] == ["rocky"]
 
     def test_album_tag_source(self):
         tracks = [_track(title="a", album_tags=[{"name": "metal", "count": 80}], artist_tags=[])]
@@ -166,11 +147,17 @@ class TestTimestamp:
         groups = [_group(conditions=[_condition(field="timestamp", operator="before", value=7)])]
         assert [t["title"] for t in apply_filters(tracks, groups)] == ["old"]
 
-    def test_missing_timestamp_passes(self):
-        # JS: Number(undefined) -> NaN -> `return field === "timestamp"` -> true
+    def test_missing_timestamp_does_not_pass(self):
         tracks = [_track(title="no-ts")]
         groups = [_group(conditions=[_condition(field="timestamp", operator="within_days", value=7)])]
-        assert [t["title"] for t in apply_filters(tracks, groups)] == ["no-ts"]
+        assert apply_filters(tracks, groups) == []
+
+    def test_ages_count_from_the_given_date(self):
+        run_date = 1_700_000_000
+        tracks = [_track(title="that week", timestamp=run_date - 3 * 86400)]
+        groups = [_group(conditions=[_condition(field="timestamp", operator="within_days", value=7)])]
+        assert apply_filters(tracks, groups, run_date) == tracks
+        assert apply_filters(tracks, groups) == []
 
 
 class TestGroupLogic:
@@ -239,8 +226,50 @@ class TestGroupLogic:
 def test_unknown_tags_match_no_tag_operator():
     unknown = {"title": "x", "artist": "y"}
     known_empty = {"title": "x", "artist": "y", "artist_tags": []}
-    for operator in ("contains", "not_contains", "eq"):
+    for operator in ("contains", "not_contains"):
         groups = [{"conditions": [{"field": "tags", "operator": operator, "value": "rock"}]}]
         assert apply_filters([unknown], groups) == []
     groups = [{"conditions": [{"field": "tags", "operator": "not_contains", "value": "rock"}]}]
     assert apply_filters([known_empty], groups) == [known_empty]
+
+
+IMPOSSIBLE = _condition(field="userplaycount", operator="gte", value=100000)
+FIVE_PLAYS = [_track(title="a", userplaycount=5)]
+
+
+class TestEmptyFilters:
+    """What was not filled in says nothing about tracks: neither keep all nor keep none."""
+
+    def test_empty_group_alone_keeps_everything(self):
+        assert apply_filters(FIVE_PLAYS, [_group()]) == FIVE_PLAYS
+
+    def test_empty_top_level_group_does_not_open_the_filter(self):
+        groups = [_group(conditions=[IMPOSSIBLE]), _group()]
+        assert apply_filters(FIVE_PLAYS, groups) == []
+
+    def test_empty_sub_group_under_any_does_not_open_the_filter(self):
+        groups = [_group(conditions=[IMPOSSIBLE], groups=[_group()], logic="OR")]
+        assert apply_filters(FIVE_PLAYS, groups) == []
+
+    def test_sub_group_with_only_empty_groups_is_empty_too(self):
+        groups = [_group(conditions=[IMPOSSIBLE], groups=[_group(groups=[_group()])], logic="OR")]
+        assert apply_filters(FIVE_PLAYS, groups) == []
+
+    def test_condition_without_value_is_ignored(self):
+        for operator in ("gte", "lte", "eq"):
+            groups = [_group(conditions=[_condition(operator=operator, value="")])]
+            assert apply_filters(FIVE_PLAYS, groups) == FIVE_PLAYS
+        tag = _condition(field="tags", operator="contains", value="  ")
+        assert apply_filters(FIVE_PLAYS, [_group(conditions=[tag])]) == FIVE_PLAYS
+
+    def test_between_without_maximum_is_ignored(self):
+        condition = _condition(operator="between", value=100, valueMax=None)
+        assert apply_filters(FIVE_PLAYS, [_group(conditions=[condition])]) == FIVE_PLAYS
+
+    def test_incomplete_condition_leaves_the_others_in_charge(self):
+        groups = [_group(conditions=[_condition(value=""), IMPOSSIBLE], logic="OR")]
+        assert apply_filters(FIVE_PLAYS, groups) == []
+
+    def test_zero_is_a_value(self):
+        groups = [_group(conditions=[_condition(operator="lte", value=0)])]
+        assert apply_filters(FIVE_PLAYS, groups) == []

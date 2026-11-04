@@ -219,11 +219,7 @@ async def run_automation_pipeline_cached(
     artist_tags = await get_known_artist_tags(db, user_id)
     ranks_by_condition = await _artist_ranks_by_condition(db, user_id, filter_groups, (start, end), at, timezone)
     plays_by_condition = await _moment_plays_by_condition(db, user_id, moments, (start, end), timezone)
-    at_epoch = int(at.timestamp())
-    for rank, track in enumerate(candidates, start=1):
-        track["rank"] = rank
-        # Counted from the run's date, so a retry judges the same tracks.
-        track["first_played_age"] = at_epoch - track["first_played"]
+    for track in candidates:
         track["artist_ranks"] = {
             condition_id: ranks[track["artist"]]
             for condition_id, ranks in ranks_by_condition.items()
@@ -244,7 +240,8 @@ async def run_automation_pipeline_cached(
         if no_repeat_playlists and automation_id
         else set()
     )
-    filtered = apply_filters(candidates, filter_groups)
+    # Ages count from the run's date, so a retry judges the same tracks.
+    filtered = apply_filters(candidates, filter_groups, int(at.timestamp()))
     tracks = apply_limits(filtered, max_tracks, max_per_artist, max_per_album, already_used)
     window_artists = {track["artist"] for track in candidates}
     if progress_key is not None:

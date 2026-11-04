@@ -1,6 +1,6 @@
 import { IconFilter } from "@tabler/icons-react";
 import FilterBuilder from "@/components/builder/FilterBuilder";
-import { countActiveConditions } from "@/lib/filter-engine";
+import { countActiveConditions } from "@/lib/automation-rules";
 
 export function StepFilters({ data, onChange }) {
   const filterCount = countActiveConditions(data.filterGroups);
@@ -29,7 +29,6 @@ export function StepFilters({ data, onChange }) {
         <FilterBuilder
           value={data.filterGroups}
           onChange={(filterGroups) => onChange({ ...data, filterGroups })}
-          disabledFields={data.source?.type !== "recent_tracks" ? ["timestamp"] : []}
         />
       </div>
     </div>

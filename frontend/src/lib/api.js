@@ -92,6 +92,10 @@ export async function previewAutomation(automation, progressToken, automationId)
   });
 }
 
+export async function getKnownTags() {
+  return request("/api/tags");
+}
+
 export async function getAutomations() {
   return request("/api/automations");
 }

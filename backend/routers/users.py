@@ -4,9 +4,10 @@ import logging
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, Query
 from models.user import User
+from repositories.scrobbles import get_known_tags
 from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tracks
 from routers.deps import get_current_active_user, get_current_user_lastfm_username
-from schemas import RecentTracksResponse, ScrobbleSyncStatus, Track, UserInfo
+from schemas import KnownTag, RecentTracksResponse, ScrobbleSyncStatus, Track, UserInfo
 from services.lastfm import (
     epoch_to_datetime,
     get_recent_tracks,
@@ -109,3 +110,12 @@ async def start_sync(
     if not is_fresh(current_user):
         start_scrobble_sync(current_user.id, username)
     return _sync_status(current_user)
+
+
+@router.get("/tags", response_model=list[KnownTag])
+async def known_tags(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tags to suggest in a filter: those the catalogue knows for this user's artists."""
+    return await get_known_tags(db, current_user.id)

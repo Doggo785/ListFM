@@ -265,3 +265,24 @@ async def get_moment_plays(
         .group_by(Track.title, Track.artist)
     )
     return {(row.title, row.artist): row.plays for row in rows}
+
+
+async def get_known_tags(db: AsyncSession, user_id: str, limit: int = 500) -> list[dict]:
+    """The catalogue's tags among this user's artists, the most widespread first."""
+    listened = (
+        select(Track.artist)
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .where(Scrobble.user_id == user_id)
+        .distinct()
+    )
+    name = func.lower(Tag.name)
+    artists = func.count(func.distinct(ArtistTag.artist))
+    rows = await db.execute(
+        select(name.label("name"), artists.label("artists"))
+        .join(ArtistTag, ArtistTag.tag_id == Tag.id)
+        .where(ArtistTag.artist.in_(listened))
+        .group_by(name)
+        .order_by(artists.desc(), name)
+        .limit(limit)
+    )
+    return [{"name": row.name, "artists": row.artists} for row in rows]

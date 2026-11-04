@@ -11,8 +11,16 @@ from models.artist import Artist
 from models.artist_tag import ArtistTag
 from models.tag import Tag
 from models.user import User
-from repositories.scrobbles import get_known_artist_tags, store_scrobbles
-from repositories.tags import mark_artist_tags_fetched, replace_artist_tags
+from repositories.scrobbles import (
+    get_known_artist_tags,
+    get_known_tags,
+    store_scrobbles,
+)
+from repositories.tags import (
+    mark_artist_tags_fetched,
+    replace_artist_tags,
+    upsert_artist_tag,
+)
 from services import lastfm, scrobble_sync, tag_catalogue
 from services.progress import store as progress_store
 from services.tag_catalogue import (
@@ -284,3 +292,18 @@ async def test_background_pass_reports_its_progress():
         await asyncio.gather(*tag_catalogue._background_tasks)
     assert seen == [("tags", 0, 2), ("tags", 1, 2)]
     assert progress_store.read(key).stage == "done"
+
+
+@pytest.mark.asyncio
+async def test_known_tags_cover_this_users_artists_most_widespread_first():
+    mine, also_mine, other = _name("mine"), _name("also"), _name("other")
+    user_id = await _user_listening_to(mine, also_mine)
+    common, rare, foreign = _name("Common"), _name("rare"), _name("foreign")
+    async with _TestSessionLocal() as db:
+        await upsert_artist_tag(db, mine, common, 100)
+        await upsert_artist_tag(db, mine, rare, 50)
+        await upsert_artist_tag(db, also_mine, common.lower(), 90)
+        await upsert_artist_tag(db, other, foreign, 100)
+        await db.commit()
+        tags = await get_known_tags(db, user_id)
+    assert tags == [{"name": common.lower(), "artists": 2}, {"name": rare, "artists": 1}]

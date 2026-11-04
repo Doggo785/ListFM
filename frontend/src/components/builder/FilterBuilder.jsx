@@ -6,7 +6,6 @@ import {
   IconBolt,
   IconHeart,
   IconChartBar,
-  IconList,
   IconTag,
   IconClock,
   IconFilter,
@@ -18,9 +17,11 @@ import {
 import {
   FILTER_FIELDS,
   FILTER_OPERATORS,
+  conditionForField,
   createGroup,
   createCondition,
 } from "@/lib/automation-rules";
+import { getKnownTags } from "@/lib/api";
 import CustomSelect from "@/components/ui/CustomSelect";
 
 const INPUT_CLASSES =
@@ -30,7 +31,6 @@ const FIELD_ICONS = {
   userplaycount: IconBolt,
   userloved: IconHeart,
   playcount: IconChartBar,
-  rank: IconList,
   tags: IconTag,
   timestamp: IconClock,
 };
@@ -68,7 +68,7 @@ function LogicToggle({ value, onChange }) {
   );
 }
 
-function FilterRow({ condition, onChange, onRemove, availableTags = [], disabledFields = [] }) {
+function FilterRow({ condition, onChange, onRemove, knownTags }) {
   const fieldDef = FILTER_FIELDS[condition.field] || { type: "number", description: "" };
   const operators = FILTER_OPERATORS[fieldDef.type] || FILTER_OPERATORS.number;
   const FieldIcon = FIELD_ICONS[condition.field] || IconBolt;
@@ -79,13 +79,10 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
 
   const [tagSearch, setTagSearch] = useState(condition.field === "tags" ? (condition.value || "") : "");
   const [showTagDropdown, setShowTagDropdown] = useState(false);
-  // Artist tags only until albums are stored (ADR 0003).
-  const tagSource = "artist";
   const tagInputRef = useRef(null);
 
-  const currentTags = availableTags[tagSource] || [];
   const searchLower = tagSearch.toLowerCase();
-  const filteredTags = currentTags.filter(
+  const filteredTags = knownTags.filter(
     (t) => t.name.includes(searchLower) && t.name !== condition.value
   ).slice(0, 12);
 
@@ -99,13 +96,11 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const fieldOptions = FIELD_ENTRIES
-    .filter(([key]) => !disabledFields.includes(key))
-    .map(([key, def]) => ({
-      value: key,
-      label: def.label,
-      icon: FIELD_ICONS[key] || IconBolt,
-    }));
+  const fieldOptions = FIELD_ENTRIES.map(([key, def]) => ({
+    value: key,
+    label: def.label,
+    icon: FIELD_ICONS[key] || IconBolt,
+  }));
 
   const operatorOptions = operators.map((op) => ({
     value: op.value,
@@ -125,7 +120,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
                 : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
             }`}
           >
-            Yes
+            Loved
           </button>
           <button
             type="button"
@@ -136,14 +131,13 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
                 : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
             }`}
           >
-            No
+            Not loved
           </button>
         </div>
       );
     }
 
     if (condition.field === "tags") {
-      const tagSourceLabel = tagSource === "artist" ? "Artist" : "Album";
       return (
         <div className="space-y-2.5">
           <div className="relative" ref={tagInputRef}>
@@ -155,23 +149,19 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
                 onChange={(e) => {
                   setTagSearch(e.target.value);
                   setShowTagDropdown(true);
-                  if (e.target.value) {
-                    onChange({ ...condition, value: e.target.value });
-                  }
+                  onChange({ ...condition, value: e.target.value });
                 }}
                 onFocus={() => setShowTagDropdown(true)}
-                placeholder={`Search ${tagSourceLabel.toLowerCase()} tags...`}
+                placeholder="Search tags..."
                 className="flex-1 bg-transparent text-sm text-white placeholder:text-neutral-600 focus:outline-none min-w-0"
               />
             </div>
             {showTagDropdown && (
               <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
                 <div className="max-h-56 overflow-y-auto p-1">
-                  {currentTags.length === 0 ? (
+                  {knownTags.length === 0 ? (
                     <div className="px-3 py-2.5 text-sm text-neutral-500">
-                      {tagSearch
-                        ? `Use "${tagSearch}"`
-                        : "Load a preview to see available tags"}
+                      {tagSearch ? `Use "${tagSearch}"` : "No known tags yet. Type one to use it."}
                     </div>
                   ) : filteredTags.length === 0 ? (
                     <div className="px-3 py-2.5 text-sm text-neutral-500">
@@ -183,7 +173,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
                         key={tag.name}
                         type="button"
                         onClick={() => {
-                          onChange({ ...condition, value: tag.name, tagSource });
+                          onChange({ ...condition, value: tag.name });
                           setTagSearch(tag.name);
                           setShowTagDropdown(false);
                         }}
@@ -195,10 +185,8 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
                       >
                         <IconTag size={12} className="shrink-0 text-neutral-500" />
                         <span className="flex-1 truncate">{tag.name}</span>
-                        <span className={`text-[10px] font-mono tabular-nums shrink-0 ${
-                          tag.count >= 70 ? "text-[#ff530b]" : tag.count >= 40 ? "text-neutral-400" : "text-neutral-600"
-                        }`}>
-                          {tag.count}%
+                        <span className="text-[10px] font-mono tabular-nums shrink-0 text-neutral-500">
+                          {tag.artists} artist{tag.artists === 1 ? "" : "s"}
                         </span>
                       </button>
                     ))
@@ -208,11 +196,11 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-neutral-600 text-xs">Min reliability:</span>
+            <span className="text-neutral-600 text-xs">Min tag strength:</span>
             <span className="group/tooltip relative flex items-center">
               <IconHelp size={12} className="text-neutral-600 hover:text-neutral-400 transition-colors cursor-help" />
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-2 text-[11px] text-neutral-300 leading-relaxed shadow-[0_8px_24px_rgba(0,0,0,0.5)] opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto transition-opacity z-50">
-                Minimum percentage of tracks by this {tagSource === "artist" ? "artist" : "album"} that carry this tag. For example, 80% means 8 out of 10 tracks are associated with this genre.
+                How strongly Last.fm listeners link this tag to the artist. The artist&apos;s top tag is always 100. Leave at 0 to accept any strength.
                 <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#1a1a1a]" />
               </span>
             </span>
@@ -225,7 +213,7 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
               placeholder="0"
               className="w-16 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-2.5 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
             />
-            <span className="text-neutral-600 text-xs">%</span>
+            <span className="text-neutral-600 text-xs">/ 100</span>
           </div>
         </div>
       );
@@ -249,43 +237,13 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       );
     }
 
-    if (condition.field === "rank") {
-      return (
-        <div className="flex items-center gap-2">
-          <span className="text-neutral-500 text-sm font-medium shrink-0">#</span>
-          <input
-            type="number"
-            value={condition.value ?? ""}
-            onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
-            placeholder="e.g. 10"
-            min="1"
-            className={`flex-1 ${INPUT_CLASSES}`}
-          />
-          {needsMax && (
-            <>
-              <span className="text-neutral-600 text-xs font-medium">to</span>
-              <span className="text-neutral-500 text-sm font-medium">#</span>
-              <input
-                type="number"
-                value={condition.valueMax ?? ""}
-                onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? null : Number(e.target.value) })}
-                placeholder="e.g. 50"
-                min="1"
-                className={`flex-1 ${INPUT_CLASSES}`}
-              />
-            </>
-          )}
-        </div>
-      );
-    }
-
     return (
       <div className="flex items-center gap-2">
         <input
           type={isText ? "text" : "number"}
           value={condition.value ?? ""}
           onChange={(e) => onChange({ ...condition, value: isText ? e.target.value : (e.target.value === "" ? "" : Number(e.target.value)) })}
-          placeholder={isText ? "Enter value..." : "Min"}
+          placeholder={needsMax ? "Min" : "Number"}
           className={`flex-1 ${INPUT_CLASSES}`}
         />
         {needsMax && (
@@ -314,20 +272,22 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
         <CustomSelect
           value={condition.field}
           onChange={(newField) => {
-            const newType = FILTER_FIELDS[newField]?.type || "number";
-            const defaultOp = FILTER_OPERATORS[newType]?.[0]?.value || "eq";
-            onChange({ ...condition, field: newField, operator: defaultOp });
+            setTagSearch("");
+            setShowTagDropdown(false);
+            onChange(conditionForField(condition, newField));
           }}
           options={fieldOptions}
           className="flex-1 min-w-0"
         />
 
-        <CustomSelect
-          value={condition.operator}
-          onChange={(op) => onChange({ ...condition, operator: op })}
-          options={operatorOptions}
-          className="w-32 shrink-0"
-        />
+        {operatorOptions.length > 1 && (
+          <CustomSelect
+            value={condition.operator}
+            onChange={(op) => onChange({ ...condition, operator: op })}
+            options={operatorOptions}
+            className="w-32 shrink-0"
+          />
+        )}
 
         <button
           type="button"
@@ -339,22 +299,14 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       </div>
 
       <div className="px-4 pb-3.5 pt-0">
-        <p className={`text-[11px] mb-2.5 leading-relaxed ${
-          disabledFields.includes(condition.field) ? "text-amber-500/80" : "text-neutral-600"
-        }`}>
-          {disabledFields.includes(condition.field)
-            ? "This filter is not available with the current source. Change the source to \"Recent Tracks\" to use it."
-            : condition.field === "tags"
-              ? `${tagSource === "artist" ? "Genre or mood tag associated with the artist" : "Genre or mood tag associated with the album"} of the track`
-              : fieldDef.description}
-        </p>
+        <p className="text-[11px] mb-2.5 leading-relaxed text-neutral-600">{fieldDef.description}</p>
         {renderValueInput()}
       </div>
     </div>
   );
 }
 
-function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [], disabledFields = [] }) {
+function FilterGroup({ group, onChange, onRemove, depth = 0, knownTags }) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef(null);
   const subGroups = group.groups || [];
@@ -456,8 +408,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
             condition={cond}
             onChange={(c) => updateCondition(i, c)}
             onRemove={() => removeCondition(i)}
-            availableTags={availableTags}
-            disabledFields={disabledFields}
+            knownTags={knownTags}
           />
         ))}
 
@@ -468,8 +419,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
             onChange={(g) => updateSubGroup(i, g)}
             onRemove={() => removeSubGroup(i)}
             depth={depth + 1}
-            availableTags={availableTags}
-            disabledFields={disabledFields}
+            knownTags={knownTags}
           />
         ))}
       </div>
@@ -512,8 +462,22 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
   );
 }
 
-export default function FilterBuilder({ value, onChange, availableTags = [], disabledFields = [] }) {
+export default function FilterBuilder({ value, onChange }) {
   const groups = value || [];
+  const [knownTags, setKnownTags] = useState([]);
+
+  useEffect(() => {
+    let stale = false;
+    // Only suggestions: without them a tag can still be typed.
+    getKnownTags()
+      .then((tags) => {
+        if (!stale) setKnownTags(tags);
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+  }, []);
 
   const updateGroup = (idx, newGroup) => {
     const updated = [...groups];
@@ -544,8 +508,7 @@ export default function FilterBuilder({ value, onChange, availableTags = [], dis
             group={group}
             onChange={(g) => updateGroup(i, g)}
             onRemove={groups.length > 1 ? () => removeGroup(i) : undefined}
-            availableTags={availableTags}
-            disabledFields={disabledFields}
+            knownTags={knownTags}
           />
         </div>
       ))}

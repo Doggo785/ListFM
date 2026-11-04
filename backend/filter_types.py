@@ -1,7 +1,7 @@
 """Typed models for the recursive automation filter tree (JSONB).
 
-Mirrors the frontend contract in frontend/src/lib/filter-engine.js and
-frontend/src/lib/automation-rules.js so the backend validates the tree
+Mirrors the frontend contract in frontend/src/lib/automation-rules.js so the
+backend validates the tree
 server-side instead of treating it as untyped ``list[dict]``.
 """
 
@@ -18,7 +18,6 @@ FilterField = Literal[
     "userplaycount",
     "userloved",
     "playcount",
-    "rank",
     "tags",
     "timestamp",
     "first_played",
@@ -26,13 +25,10 @@ FilterField = Literal[
     "listening_moment",
 ]
 
-# Permissive union of every operator the frontend can emit (FILTER_OPERATORS).
+# Every operator the frontend can emit (FILTER_OPERATORS), plus the newer filters' own.
 FilterOperator = Literal[
     "eq",
-    "neq",
-    "gt",
     "gte",
-    "lt",
     "lte",
     "between",
     "contains",

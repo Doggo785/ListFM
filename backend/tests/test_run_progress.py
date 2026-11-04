@@ -55,7 +55,7 @@ def _automation_body(filter_groups: list) -> dict:
 
 
 def _played_groups() -> list:
-    return [{"conditions": [{"field": "playcount", "operator": "gt", "value": 0}]}]
+    return [{"conditions": [{"field": "playcount", "operator": "gte", "value": 1}]}]
 
 
 @pytest.mark.asyncio

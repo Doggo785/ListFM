@@ -23,6 +23,7 @@ vi.mock("@/lib/api", () => ({
   request: vi.fn(async () => ({ lastfm_username: "tester" })),
   setSessionExpiredHandler: vi.fn(),
   getAutomation: vi.fn(),
+  getKnownTags: vi.fn(async () => []),
   updateAutomation: vi.fn(),
   deleteAutomation: vi.fn(),
   previewAutomation: vi.fn(),
@@ -142,7 +143,7 @@ describe("PlaylistDetail progress", () => {
         },
       ]);
     runAutomationNow.mockResolvedValue({ id: "h1", status: "completed" });
-    getRunProgress.mockResolvedValue({ stage: "enrich", done: 3, total: 10, calls: 128 });
+    getRunProgress.mockResolvedValue({ stage: "source", done: 3, total: 10 });
     pollProgress.mockImplementation(async (getSnapshot, opts) => {
       const snapshot = await getSnapshot();
       opts?.onUpdate?.(snapshot);
@@ -155,7 +156,6 @@ describe("PlaylistDetail progress", () => {
       await clickButton(container, "Run now");
       await waitForText(container, "Done");
       expect(container.textContent).toContain("3 of 10 tracks");
-      expect(container.textContent).toContain("128 calls");
       expect(runAutomationNow).toHaveBeenCalledWith("a1", "test-token");
       expect(getRunProgress).toHaveBeenCalledWith("a1", "test-token");
       const entry = container.querySelector('div[role="button"]');
@@ -169,17 +169,18 @@ describe("PlaylistDetail progress", () => {
     }
   });
 
-  it("shows a done summary after preview Load", async () => {
+  it("shows every track and each stage's count after preview Load", async () => {
     getAutomation.mockResolvedValue(AUTOMATION);
     getAutomationHistory.mockResolvedValue([]);
-    const tracks = [1, 2, 3, 4].map((i) => ({ title: `Song ${i}`, artist: "Artist" }));
+    const tracks = Array.from({ length: 20 }, (_, i) => ({ title: `Song ${i + 1}`, artist: "Artist" }));
     previewAutomation.mockResolvedValue({
       tracks,
-      total: 4,
-      before_filter: 4,
+      total: 20,
+      before_filter: 5708,
+      after_filter: 135,
       cancelled: false,
     });
-    getPreviewProgress.mockResolvedValue({ stage: "enrich", done: 2, total: 4 });
+    getPreviewProgress.mockResolvedValue({ stage: "source", done: 2, total: 4 });
     pollProgress.mockImplementation(async (getSnapshot, opts) => {
       const snapshot = await getSnapshot();
       opts?.onUpdate?.(snapshot);
@@ -190,8 +191,73 @@ describe("PlaylistDetail progress", () => {
     try {
       await waitForText(container, "Load");
       await clickButton(container, "Load");
-      await waitForText(container, "Done");
-      expect(container.textContent).toContain("4 of 4 tracks");
+      await waitForText(container, "5708 in window → 135 match filters → 20 in playlist");
+      expect(container.textContent).toContain("Song 20");
+      expect(container.textContent).not.toContain("Settings changed");
+    } finally {
+      await teardown(container, root);
+    }
+  });
+
+  it("marks the preview stale instead of reworking it when a setting changes", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    previewAutomation.mockResolvedValue({
+      tracks: [{ title: "Song", artist: "Artist" }],
+      total: 1,
+      before_filter: 1,
+      after_filter: 1,
+      cancelled: false,
+    });
+    getPreviewProgress.mockResolvedValue({ stage: "source", done: 0, total: 1 });
+    pollProgress.mockImplementation(async (getSnapshot, opts) => {
+      const snapshot = await getSnapshot();
+      opts?.onUpdate?.(snapshot);
+      return snapshot;
+    });
+
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Load");
+      await clickButton(container, "Load");
+      await waitForText(container, "1 in window");
+      await clickButton(container, "Most played");
+      await waitForText(container, "Settings changed");
+      expect(container.textContent).toContain("Song");
+      expect(previewAutomation).toHaveBeenCalledTimes(1);
+    } finally {
+      await teardown(container, root);
+    }
+  });
+
+  it("says how many artists have known tags when a tag filter is on", async () => {
+    getAutomation.mockResolvedValue({
+      ...AUTOMATION,
+      filterGroups: [{ id: "g", conditions: [{ id: "c", field: "tags", operator: "contains", value: "rap" }], groups: [] }],
+    });
+    getAutomationHistory.mockResolvedValue([]);
+    previewAutomation.mockResolvedValue({
+      tracks: [],
+      total: 0,
+      before_filter: 9,
+      after_filter: 0,
+      window_artists: 30,
+      known_tag_artists: 12,
+      cancelled: false,
+    });
+    getPreviewProgress.mockResolvedValue({ stage: "source", done: 0, total: 1 });
+    pollProgress.mockImplementation(async (getSnapshot, opts) => {
+      const snapshot = await getSnapshot();
+      opts?.onUpdate?.(snapshot);
+      return snapshot;
+    });
+
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Load");
+      await clickButton(container, "Load");
+      await waitForText(container, "Tags known for 12 of 30 artists");
+      expect(container.textContent).toContain("No tracks found");
     } finally {
       await teardown(container, root);
     }
@@ -226,7 +292,7 @@ describe("PlaylistDetail progress", () => {
     getAutomation.mockResolvedValue(AUTOMATION);
     getAutomationHistory.mockResolvedValue([]);
     runAutomationNow.mockRejectedValue(new Error("API 409: Automation already running"));
-    getRunProgress.mockResolvedValue({ stage: "enrich", done: 1, total: 5 });
+    getRunProgress.mockResolvedValue({ stage: "source", done: 1, total: 5 });
     pollProgress.mockImplementation(async (getSnapshot, opts) => {
       const snapshot = await getSnapshot();
       opts?.onUpdate?.(snapshot);
@@ -247,7 +313,7 @@ describe("PlaylistDetail progress", () => {
     getAutomation.mockResolvedValue(AUTOMATION);
     getAutomationHistory.mockResolvedValue([]);
     previewAutomation.mockRejectedValue(new Error("API 502: Unable to fetch tracks"));
-    getPreviewProgress.mockResolvedValue({ stage: "enrich", done: 1, total: 5 });
+    getPreviewProgress.mockResolvedValue({ stage: "source", done: 1, total: 5 });
     pollProgress.mockImplementation(async (getSnapshot, opts) => {
       const snapshot = await getSnapshot();
       opts?.onUpdate?.(snapshot);

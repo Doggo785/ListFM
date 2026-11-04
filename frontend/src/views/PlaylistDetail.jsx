@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import {
@@ -37,9 +37,9 @@ import {
   SORT_OPTIONS,
   WINDOW_OPTIONS,
   describeAutomation,
+  usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
-import { applyFilters } from "@/lib/filter-engine";
 import { useAuth } from "../contexts/AuthContext";
 
 const GLOW_COLORS = ["#c084fc", "#f472b6", "#38bdf8"];
@@ -52,7 +52,7 @@ function SectionCard({ title, icon, children, delay = 0 }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
     >
-      <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:border-neutral-700 transition-colors">
+      <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:border-neutral-700 transition-colors">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-neutral-800/80">
           <div className="rounded-lg bg-[#ff530b]/10 p-2">
             <IconComp size={16} className="text-[#ff530b]" />
@@ -78,8 +78,7 @@ function FieldRow({ label, children }) {
 
 const STAGE_LABELS = new Map([
   ["queued", "Starting..."],
-  ["source", "Fetching track list..."],
-  ["enrich", "Enriching tracks..."],
+  ["source", "Reading your listens..."],
   ["filter", "Applying filters..."],
   ["running", "Running..."],
   ["done", "Done"],
@@ -89,7 +88,7 @@ const STAGE_LABELS = new Map([
 
 function ProgressBar({ progress, onCancel }) {
   if (!progress) return null;
-  const { stage, done, total, calls } = progress;
+  const { stage, done, total } = progress;
   // Map lookup (not obj[stage]): stage comes from the server, and computed
   // member access on plain objects is a prototype-pollution-shaped pattern.
   const label = STAGE_LABELS.get(stage) ?? stage;
@@ -103,11 +102,6 @@ function ProgressBar({ progress, onCancel }) {
           {typeof done === "number" && typeof total === "number" && total > 0 && (
             <span className="text-neutral-500 tabular-nums">
               {" "}· {done} of {total} tracks
-            </span>
-          )}
-          {typeof calls === "number" && calls > 0 && (
-            <span className="text-neutral-600 tabular-nums">
-              {" "}· {calls} calls
             </span>
           )}
         </p>
@@ -137,27 +131,9 @@ function ProgressBar({ progress, onCancel }) {
   );
 }
 
-function dedupeTags(tracks, field) {
-  return Object.values(
-    tracks
-      .flatMap((t) => t[field] || [])
-      .reduce((acc, tag) => {
-        const key = tag.name.toLowerCase();
-        if (!acc[key] || tag.count > acc[key].count) {
-          acc[key] = { name: tag.name.toLowerCase(), count: tag.count };
-        }
-        return acc;
-      }, {})
-  ).sort((a, b) => b.count - a.count);
-}
-
-function applyFilterGroups(tracks, groups) {
-  const hasFilters =
-    groups &&
-    groups.length > 0 &&
-    groups.some((g) => g.conditions && g.conditions.length > 0);
-  return hasFilters ? applyFilters(tracks, groups) : tracks;
-}
+/** What a preview depends on: anything else (name, schedule) leaves it valid. */
+const previewSignature = (automation) =>
+  JSON.stringify([automation?.window, automation?.sort, automation?.filterGroups, automation?.output]);
 
 export default function PlaylistDetail() {
   const { id } = useParams();
@@ -178,8 +154,7 @@ export default function PlaylistDetail() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const [rawTracks, setRawTracks] = useState(null);
-  const [previewTracks, setPreviewTracks] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
   const [saveError, setSaveError] = useState(null);
@@ -194,8 +169,6 @@ export default function PlaylistDetail() {
   const [previewProgress, setPreviewProgress] = useState(null);
   const previewTokenRef = useRef(null);
   const previewStoppedRef = useRef(false);
-  const lastPreviewCalls = useRef(0);
-  const lastRunCalls = useRef(0);
   const [expandedId, setExpandedId] = useState(null);
   const [entryTracks, setEntryTracks] = useState({});
   const [tracksLoadingId, setTracksLoadingId] = useState(null);
@@ -309,10 +282,7 @@ export default function PlaylistDetail() {
     const postPromise = runAutomationNow(id, token);
     pollProgress(() => getRunProgress(id, token), {
       onUpdate: (s) => {
-        if (!stopped) {
-          lastRunCalls.current = s.calls ?? 0;
-          setRunProgress(s);
-        }
+        if (!stopped) setRunProgress(s);
       },
       shouldStop: () => stopped,
     }).catch((err) => {
@@ -329,7 +299,6 @@ export default function PlaylistDetail() {
         stage: "done",
         done: latest?.tracks_after_filter ?? 0,
         total: latest?.tracks_before_filter ?? 0,
-        calls: lastRunCalls.current,
       });
     } catch (err) {
       stopped = true;
@@ -396,17 +365,13 @@ export default function PlaylistDetail() {
     previewStoppedRef.current = false;
     setPreviewLoading(true);
     setPreviewError(null);
-    setPreviewTracks(null);
-    setRawTracks(null);
+    setPreview(null);
     setPreviewProgress({ stage: "queued", done: 0, total: 0 });
     // Fire the POST first so the ticket exists ASAP, then poll alongside it.
     const postPromise = previewAutomation(automation, token, id);
     pollProgress(() => getPreviewProgress(token), {
       onUpdate: (s) => {
-        if (!previewStoppedRef.current) {
-          lastPreviewCalls.current = s.calls ?? 0;
-          setPreviewProgress(s);
-        }
+        if (!previewStoppedRef.current) setPreviewProgress(s);
       },
       shouldStop: () => previewStoppedRef.current,
     }).catch((err) => {
@@ -422,16 +387,8 @@ export default function PlaylistDetail() {
         setPreviewProgress({ stage: "cancelled", done: 0, total: 0 });
         return;
       }
-      const enriched = data.tracks || [];
-      setRawTracks(enriched);
-      const filtered = applyFilterGroups(enriched, automation.filterGroups);
-      setPreviewTracks(filtered);
-      setPreviewProgress({
-        stage: "done",
-        done: filtered.length,
-        total: enriched.length,
-        calls: lastPreviewCalls.current,
-      });
+      setPreview({ ...data, signature: previewSignature(automation) });
+      setPreviewProgress(null);
     } catch (err) {
       previewStoppedRef.current = true;
       setPreviewError(err.message || "Failed to load preview");
@@ -452,18 +409,9 @@ export default function PlaylistDetail() {
     }
   };
 
-  useEffect(() => {
-    if (!rawTracks) return;
-    setPreviewTracks(applyFilterGroups(rawTracks, automation?.filterGroups));
-  }, [automation?.filterGroups, rawTracks]);
-
-  const availableTags = useMemo(
-    () =>
-      rawTracks
-        ? { artist: dedupeTags(rawTracks, "artist_tags"), album: dedupeTags(rawTracks, "album_tags") }
-        : { artist: [], album: [] },
-    [rawTracks]
-  );
+  const previewTracks = preview?.tracks ?? null;
+  // The server's answer to the settings it was asked about: never reworked here.
+  const previewStale = preview !== null && preview.signature !== previewSignature(automation);
 
   if (notFound) {
     return (
@@ -643,7 +591,6 @@ export default function PlaylistDetail() {
               <FilterBuilder
                 value={automation.filterGroups || []}
                 onChange={updateFilters}
-                availableTags={availableTags}
               />
             </SectionCard>
 
@@ -840,34 +787,40 @@ export default function PlaylistDetail() {
                   </div>
 
                   <div className="p-5 space-y-3 shrink-0 border-b border-white/5">
-                    <FieldRow label="Last.fm username">
-                      <div className="flex gap-2.5">
-                        <div className="flex-1 h-12 rounded-xl border border-neutral-700 bg-[#141414] px-4 flex items-center text-base text-white/70 shadow-inner">
-                          {username || "Not linked"}
-                        </div>
-                        <Button
-                          size="default"
-                          onClick={loadPreview}
-                          disabled={previewLoading || !username?.trim()}
-                          className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
-                        >
-                          {previewLoading ? (
-                            <IconRefresh size={16} className="animate-spin" />
-                          ) : (
-                            <IconPlayerPlay size={16} className="mr-1.5" />
-                          )}
-                          {previewTracks ? "Refresh" : "Load"}
-                        </Button>
-                      </div>
-                    </FieldRow>
-                    <p className="text-xs text-neutral-500 leading-relaxed">
-                      One API call to Last.fm. Limited to your configured max tracks.
-                      {rawTracks && previewTracks && rawTracks.length !== previewTracks.length && (
-                        <span className="block mt-1 text-[#ff530b]">
-                          {previewTracks.length} of {rawTracks.length} tracks match filters
-                        </span>
+                    <Button
+                      size="default"
+                      onClick={loadPreview}
+                      disabled={previewLoading || !username?.trim()}
+                      className="w-full bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
+                    >
+                      {previewLoading ? (
+                        <IconRefresh size={16} className="animate-spin" />
+                      ) : (
+                        <IconPlayerPlay size={16} className="mr-1.5" />
                       )}
+                      {previewTracks ? "Refresh" : "Load"}
+                    </Button>
+                    <p className="text-xs text-neutral-500 leading-relaxed">
+                      What a run would produce now, from your stored listens.
                     </p>
+                    {preview && (
+                      <p className="text-sm text-neutral-300 tabular-nums">
+                        {preview.before_filter} in window → {preview.after_filter} match filters →{" "}
+                        <span className="text-white font-semibold">{preview.total} in playlist</span>
+                      </p>
+                    )}
+                    {preview && usesTagFilter(automation.filterGroups) &&
+                      preview.known_tag_artists < preview.window_artists && (
+                        <p className="text-xs text-neutral-500 leading-relaxed">
+                          Tags known for {preview.known_tag_artists} of {preview.window_artists} artists so far.
+                          The others match no tag filter yet.
+                        </p>
+                      )}
+                    {previewStale && (
+                      <p className="text-xs font-medium text-amber-400" role="status">
+                        Settings changed. Refresh to update this preview.
+                      </p>
+                    )}
                     <ProgressBar progress={previewProgress} onCancel={handleCancelPreview} />
                   </div>
 
@@ -905,14 +858,14 @@ export default function PlaylistDetail() {
                         </div>
                         <p className="text-sm text-neutral-500 font-medium">No tracks found</p>
                         <p className="text-xs text-neutral-600 mt-1">
-                          Try adjusting your filters or source settings
+                          Try a wider window or looser filters
                         </p>
                       </div>
                     )}
 
                     {previewTracks && previewTracks.length > 0 && (
-                      <div className="space-y-0.5">
-                        {previewTracks.slice(0, 15).map((track, i) => {
+                      <div className={`space-y-0.5 ${previewStale ? "opacity-40" : ""}`}>
+                        {previewTracks.map((track, i) => {
                           const lastfmUrl = `https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.title)}`;
                           return (
                             <motion.a
@@ -922,7 +875,7 @@ export default function PlaylistDetail() {
                               rel="noopener noreferrer"
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.2, delay: i * 0.03 }}
+                              transition={{ duration: 0.2, delay: Math.min(i, 15) * 0.03 }}
                               className="flex items-center gap-4 rounded-lg px-4 py-3 hover:bg-white/5 transition-colors group"
                             >
                               <span className="text-xs text-neutral-600 font-mono w-6 text-right shrink-0 group-hover:text-neutral-400 tabular-nums">
