@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.0](https://github.com/Doggo785/ListFM/compare/v0.2.1...v0.3.0) (2026-11-04)
+
+
+### Features
+
+* **automations:** add a listening moment filter and let the sort count it ([#113](https://github.com/Doggo785/ListFM/issues/113)) ([fc78185](https://github.com/Doggo785/ListFM/commit/fc7818535b56b67c335ac9d9b6825109dd012796))
+* **automations:** add a retry route that keeps the scheduled date ([#115](https://github.com/Doggo785/ListFM/issues/115)) ([e82ad24](https://github.com/Doggo785/ListFM/commit/e82ad24afb34955354c78a4c895b47b561b506e2))
+* **automations:** add first listen and artist rank filters and playlist limits ([#111](https://github.com/Doggo785/ListFM/issues/111)) ([e30d5ec](https://github.com/Doggo785/ListFM/commit/e30d5ec5303c790dde1c296dc4883a859e86f468))
+* **automations:** read listens through a window and a sort ([#109](https://github.com/Doggo785/ListFM/issues/109)) ([c1e88b7](https://github.com/Doggo785/ListFM/commit/c1e88b70442c4849c7004c79085b3a3f37b6e378))
+* **automations:** report stage counts, known tags and tag progress ([#114](https://github.com/Doggo785/ListFM/issues/114)) ([4b9cd62](https://github.com/Doggo785/ListFM/commit/4b9cd622f7d1cee08e7fc6848a4659d11539c007))
+* **logs:** print one readable console line per step of the app's work ([#120](https://github.com/Doggo785/ListFM/issues/120)) ([9836ef8](https://github.com/Doggo785/ListFM/commit/9836ef802e44097b59e02ebc90f6da8f7fb6453b))
+* **sync:** fill a shared artist tag catalogue in the background ([#110](https://github.com/Doggo785/ListFM/issues/110)) ([8099240](https://github.com/Doggo785/ListFM/commit/8099240f25614acf1c9ab048854860975ced9525))
+* **sync:** keep each track's album and add a limit per album ([#112](https://github.com/Doggo785/ListFM/issues/112)) ([2a90caf](https://github.com/Doggo785/ListFM/commit/2a90caf8ad91f2c661efa8a2b12cc6a0ebd9823b))
+* **sync:** store each user's full listening history locally ([#107](https://github.com/Doggo785/ListFM/issues/107)) ([2313008](https://github.com/Doggo785/ListFM/commit/23130080f98de1ec86ae1906fa82341d4530416f))
+
+
+### Bug Fixes
+
+* **automations:** count an album's reissues as one album in the limit ([#119](https://github.com/Doggo785/ListFM/issues/119)) ([8ac3026](https://github.com/Doggo785/ListFM/commit/8ac30269d481621fb8ccadf57646e8cbe8241419))
+* **automations:** make Run honest during the first load and with unsaved changes ([#117](https://github.com/Doggo785/ListFM/issues/117)) ([1b879f7](https://github.com/Doggo785/ListFM/commit/1b879f76ae1de55ce3a55315572855cc701f1f40))
+* **dashboard:** show the stored totals and send the logo to the dashboard ([#118](https://github.com/Doggo785/ListFM/issues/118)) ([13bd00d](https://github.com/Doggo785/ListFM/commit/13bd00dba7b1595a24a73aca8bd4ad3f99ad9218))
+* **filters:** make the filter screen and the preview tell the truth ([#116](https://github.com/Doggo785/ListFM/issues/116)) ([b95ed1e](https://github.com/Doggo785/ListFM/commit/b95ed1ede62a757faa62ae64f7cf2351ad3bded5))
+
 ## [0.2.1](https://github.com/Doggo785/ListFM/compare/v0.2.0...v0.2.1) (2026-11-03)
 
 
