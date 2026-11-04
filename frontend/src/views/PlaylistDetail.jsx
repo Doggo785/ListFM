@@ -400,7 +400,7 @@ export default function PlaylistDetail() {
     setRawTracks(null);
     setPreviewProgress({ stage: "queued", done: 0, total: 0 });
     // Fire the POST first so the ticket exists ASAP, then poll alongside it.
-    const postPromise = previewAutomation(automation, token);
+    const postPromise = previewAutomation(automation, token, id);
     pollProgress(() => getPreviewProgress(token), {
       onUpdate: (s) => {
         if (!previewStoppedRef.current) {

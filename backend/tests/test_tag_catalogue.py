@@ -14,6 +14,7 @@ from models.user import User
 from repositories.scrobbles import get_known_artist_tags, store_scrobbles
 from repositories.tags import mark_artist_tags_fetched, replace_artist_tags
 from services import lastfm, scrobble_sync, tag_catalogue
+from services.progress import store as progress_store
 from services.tag_catalogue import (
     MAX_CONSECUTIVE_FAILURES,
     TAG_VALIDITY,
@@ -21,7 +22,7 @@ from services.tag_catalogue import (
 )
 from sqlalchemy import select, update
 
-from .conftest import _TestSessionLocal, _unique_email
+from .conftest import _register_and_login, _TestSessionLocal, _unique_email
 
 NOW = datetime.now(UTC)
 
@@ -241,3 +242,45 @@ async def test_finished_sync_starts_the_catalogue():
         async with _TestSessionLocal() as db:
             await scrobble_sync.sync_scrobbles(db, user_id, "u")
     start.assert_called_once_with(user_id)
+
+
+@pytest.mark.asyncio
+async def test_sync_status_shows_a_running_pass_only(client):
+    email = _unique_email()
+    await _register_and_login(client, email)
+    async with _TestSessionLocal() as db:
+        user_id = await db.scalar(select(User.id).where(User.email == email))
+
+    async def tags_status():
+        body = (await client.get("/api/scrobbles/sync")).json()
+        return body["tags_done"], body["tags_total"]
+
+    key = tag_catalogue.tags_progress_key(user_id)
+    assert await tags_status() == (0, 0)
+    progress_store.start(key)
+    progress_store.report(key, "tags", 3, 10)
+    assert await tags_status() == (3, 10)
+    progress_store.finish(key)
+    assert await tags_status() == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_background_pass_reports_its_progress():
+    artists = [_name(), _name()]
+    user_id = await _user_listening_to(*artists)
+    key = tag_catalogue.tags_progress_key(user_id)
+    seen = []
+
+    def fake(artist):
+        progress = progress_store.read(key)
+        seen.append((progress.stage, progress.done, progress.total))
+        return []
+
+    with (
+        patch.object(tag_catalogue, "async_session", _TestSessionLocal),
+        patch.object(tag_catalogue, "get_artist_tags", fake),
+    ):
+        tag_catalogue.start_tag_catalogue(user_id)
+        await asyncio.gather(*tag_catalogue._background_tasks)
+    assert seen == [("tags", 0, 2), ("tags", 1, 2)]
+    assert progress_store.read(key).stage == "done"

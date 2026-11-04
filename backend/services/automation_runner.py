@@ -244,7 +244,9 @@ async def run_automation_pipeline_cached(
         if no_repeat_playlists and automation_id
         else set()
     )
-    tracks = apply_limits(apply_filters(candidates, filter_groups), max_tracks, max_per_artist, max_per_album, already_used)
+    filtered = apply_filters(candidates, filter_groups)
+    tracks = apply_limits(filtered, max_tracks, max_per_artist, max_per_album, already_used)
+    window_artists = {track["artist"] for track in candidates}
     if progress_key is not None:
         progress_store.report(progress_key, "filter", len(tracks), len(candidates))
     logger.info("pipeline: %d in window -> %d kept", len(candidates), len(tracks))
@@ -252,6 +254,10 @@ async def run_automation_pipeline_cached(
         "tracks": tracks,
         "total": len(tracks),
         "before_filter": len(candidates),
+        "after_filter": len(filtered),
+        # Rate of known tags: a tag filter sees only these artists (ADR 0003).
+        "window_artists": len(window_artists),
+        "known_tag_artists": len(window_artists & artist_tags.keys()),
         "source_tracks": candidates[:SOURCE_TRACKS_SHOWN],
     }
 

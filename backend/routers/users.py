@@ -14,6 +14,7 @@ from services.lastfm import (
 )
 from services.progress import store as progress_store
 from services.scrobble_sync import is_fresh, progress_key, start_scrobble_sync
+from services.tag_catalogue import tags_progress_key
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,6 +80,8 @@ async def _store_recent_tracks(db: AsyncSession, user_id: str, tracks: list[dict
 
 def _sync_status(user: User) -> ScrobbleSyncStatus:
     progress = progress_store.read(progress_key(user.id))
+    tags = progress_store.read(tags_progress_key(user.id))
+    tags_running = tags is not None and tags.stage == "tags"
     return ScrobbleSyncStatus(
         stage=progress.stage if progress else None,
         done=progress.done if progress else 0,
@@ -86,6 +89,8 @@ def _sync_status(user: User) -> ScrobbleSyncStatus:
         error=progress.error if progress else None,
         complete=user.scrobbles_complete_at is not None,
         synced_at=user.scrobbles_synced_at,
+        tags_done=tags.done if tags and tags_running else 0,
+        tags_total=tags.total if tags and tags_running else 0,
     )
 
 

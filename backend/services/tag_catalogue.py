@@ -16,6 +16,7 @@ from repositories.tags import (
     replace_artist_tags,
 )
 from services.lastfm import PAGE_ERRORS, call_retrying_rate_limit, get_artist_tags
+from services.progress import store as progress_store
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,11 +32,17 @@ _running: set[str] = set()
 _background_tasks: set[asyncio.Task] = set()
 
 
+def tags_progress_key(user_id: str) -> str:
+    return f"tags:{user_id}"
+
+
 async def fill_tag_catalogue(db: AsyncSession, user_id: str) -> None:
     stale_before = datetime.now(UTC) - TAG_VALIDITY
     artists = await get_artists_to_tag(db, user_id, stale_before)
     failures = 0
-    for artist in artists:
+    key = tags_progress_key(user_id)
+    for done, artist in enumerate(artists):
+        progress_store.report(key, "tags", done, len(artists))
         # Another user's pass may have reached this shared artist meanwhile.
         already_fetched = await artist_tags_fetched_since(db, artist, stale_before)
         await db.commit()  # no connection held during the Last.fm call
@@ -62,6 +69,7 @@ async def _fill_in_background(user_id: str) -> None:
     except SQLAlchemyError as exc:
         logger.warning("tag catalogue failed for user %s: %s", user_id, type(exc).__name__)
     finally:
+        progress_store.finish(tags_progress_key(user_id))
         _running.discard(user_id)
 
 
@@ -69,6 +77,7 @@ def start_tag_catalogue(user_id: str) -> None:
     if user_id in _running:
         return
     _running.add(user_id)
+    progress_store.start(tags_progress_key(user_id))
     task = asyncio.create_task(_fill_in_background(user_id))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
