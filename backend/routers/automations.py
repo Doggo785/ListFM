@@ -78,6 +78,7 @@ async def preview_automation(
         filter_groups=automation.filter_groups,
         max_tracks=automation.output.maxSize,
         max_per_artist=automation.output.maxPerArtist,
+        max_per_album=automation.output.maxPerAlbum,
         no_repeat_playlists=automation.output.noRepeatPlaylists,
         automation_id=body.automation_id,
         progress_key=progress_key,

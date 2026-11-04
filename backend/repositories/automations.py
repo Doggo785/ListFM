@@ -68,6 +68,7 @@ async def create_automation(db: AsyncSession, user_id: str, lastfm_username: str
         filter_groups=data.filter_groups,
         output_max_size=data.output.maxSize,
         output_max_per_artist=data.output.maxPerArtist,
+        output_max_per_album=data.output.maxPerAlbum,
         output_no_repeat_playlists=data.output.noRepeatPlaylists,
         enabled=data.enabled,
         created_at=now,
@@ -99,6 +100,7 @@ async def update_automation(
         output = update_data.pop("output")
         update_data["output_max_size"] = output.get("maxSize", automation.output_max_size)
         update_data["output_max_per_artist"] = output.get("maxPerArtist", automation.output_max_per_artist)
+        update_data["output_max_per_album"] = output.get("maxPerAlbum", automation.output_max_per_album)
         update_data["output_no_repeat_playlists"] = output.get(
             "noRepeatPlaylists", automation.output_no_repeat_playlists
         )

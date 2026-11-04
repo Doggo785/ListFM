@@ -90,9 +90,21 @@ def test_limits_keep_the_sort_order():
     tracks = [{"title": t, "artist": a} for t, a in (("a1", "A"), ("a2", "A"), ("b1", "B"), ("a3", "A"), ("b2", "B"))]
     def titles(*args):
         return [t["title"] for t in apply_limits(tracks, *args)]
-    assert titles(10, 1, set()) == ["a1", "b1"]
-    assert titles(3, 2, set()) == ["a1", "a2", "b1"]
-    assert titles(2, None, {("a1", "A")}) == ["a2", "b1"]
+    assert titles(10, 1) == ["a1", "b1"]
+    assert titles(3, 2) == ["a1", "a2", "b1"]
+    assert titles(2, None, None, {("a1", "A")}) == ["a2", "b1"]
+
+
+def test_album_limit_counts_per_artist_and_ignores_unknown_albums():
+    tracks = [
+        {"title": "x1", "artist": "X", "album": "Hits"},
+        {"title": "x2", "artist": "X", "album": "Hits"},
+        {"title": "y1", "artist": "Y", "album": "Hits"},
+        {"title": "x3", "artist": "X", "album": None},
+        {"title": "x4", "artist": "X", "album": None},
+    ]
+    kept = apply_limits(tracks, 10, max_per_album=1)
+    assert [t["title"] for t in kept] == ["x1", "y1", "x3", "x4"]
 
 
 @pytest.mark.asyncio
@@ -143,7 +155,7 @@ async def test_api_round_trips_limits_and_periods_and_bounds_the_depth(client: A
         "period": {"since": "2019-01-01", "until": "2019-12-31"},
     }
     body = _frontend_payload([{"id": "g", "logic": "AND", "conditions": [condition], "groups": []}])
-    body["output"] = {"maxSize": 20, "maxPerArtist": 2, "noRepeatPlaylists": 3}
+    body["output"] = {"maxSize": 20, "maxPerArtist": 2, "maxPerAlbum": 1, "noRepeatPlaylists": 3}
     created = await client.post("/api/automations", json=body)
     assert created.status_code == 201, created.text
     read = created.json()
@@ -152,7 +164,7 @@ async def test_api_round_trips_limits_and_periods_and_bounds_the_depth(client: A
 
     # A partial output keeps the limits it does not mention.
     patched = await client.patch(f"/api/automations/{read['id']}", json={"output": {"maxSize": 30}})
-    assert patched.json()["output"] == {"maxSize": 30, "maxPerArtist": 2, "noRepeatPlaylists": 3}
+    assert patched.json()["output"] == {"maxSize": 30, "maxPerArtist": 2, "maxPerAlbum": 1, "noRepeatPlaylists": 3}
 
     def group(*subs):
         return {"id": str(uuid.uuid4()), "conditions": [], "groups": list(subs)}

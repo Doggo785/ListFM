@@ -209,6 +209,7 @@ class AutomationOutput(BaseModel):
     maxSize: int = Field(default=50, ge=0, le=200)
     # GLOSSARY: Limite. None = no limit.
     maxPerArtist: int | None = Field(default=None, ge=1, le=200)
+    maxPerAlbum: int | None = Field(default=None, ge=1, le=200)
     noRepeatPlaylists: int | None = Field(default=None, ge=1, le=50)
 
     @field_validator("maxSize")
@@ -336,6 +337,7 @@ class AutomationRead(BaseModel):
                 "output": {
                     "maxSize": values.output_max_size,
                     "maxPerArtist": values.output_max_per_artist,
+                    "maxPerAlbum": values.output_max_per_album,
                     "noRepeatPlaylists": values.output_no_repeat_playlists,
                 },
                 "enabled": values.enabled,

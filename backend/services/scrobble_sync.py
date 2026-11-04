@@ -13,7 +13,12 @@ from datetime import UTC, datetime, timedelta
 
 from database import async_session
 from models.user import User
-from repositories.scrobbles import get_latest_played_at, replace_loved, store_scrobbles
+from repositories.scrobbles import (
+    get_latest_played_at,
+    replace_loved,
+    store_scrobbles,
+    store_track_albums,
+)
 from services.lastfm import (
     PAGE_ERRORS,
     call_retrying_rate_limit,
@@ -69,8 +74,9 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
         await store_scrobbles(
             db,
             user_id,
-            [(title, artist, datetime.fromtimestamp(uts, tz=UTC)) for title, artist, uts in listens],
+            [(title, artist, datetime.fromtimestamp(uts, tz=UTC)) for title, artist, uts, _ in listens],
         )
+        await store_track_albums(db, [(title, artist, album) for title, artist, _, album in listens])
         await db.commit()
         progress_store.report(key, "sync", done, total_pages)
         progress_store.bump_calls(key)

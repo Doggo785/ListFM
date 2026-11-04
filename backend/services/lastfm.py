@@ -222,8 +222,8 @@ def _as_list(nodes) -> list:
 
 def get_scrobble_page(
     username: str, page: int, limit: int, time_from: int | None, time_to: int
-) -> tuple[list[tuple[str, str, int]], int]:
-    """One page of dated listens as (title, artist, uts), plus the page count.
+) -> tuple[list[tuple[str, str, int, str | None]], int]:
+    """One page of dated listens as (title, artist, uts, album), plus the page count.
 
     Pages run newest first, so the last page holds the oldest listens. The
     now-playing entry has no date and is skipped. Raises pylast.WSError on a
@@ -240,7 +240,10 @@ def get_scrobble_page(
         artist_name = artist.get("#text") if isinstance(artist, dict) else artist
         uts = (node.get("date") or {}).get("uts")
         if node.get("name") and artist_name and uts:
-            listens.append((node["name"], artist_name, int(uts)))
+            album = node.get("album")
+            listens.append(
+                (node["name"], artist_name, int(uts), (album.get("#text") if isinstance(album, dict) else album) or None)
+            )
     return listens, int(data["@attr"]["totalPages"])
 
 
