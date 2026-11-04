@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import threading
 import time
@@ -19,6 +20,12 @@ LASTFM_MIN_INTERVAL = 0.25
 _throttle_lock = threading.Lock()
 _last_call_monotonic = 0.0
 _rate_limit_until = 0.0
+RATE_LIMIT_RETRIES = 3
+# What a failed Last.fm call raises: an error body, a transport or HTTP error,
+# or an unexpected payload shape.
+PAGE_ERRORS = (pylast.WSError, httpx.HTTPError, KeyError, TypeError, ValueError)
+# Last.fm returns up to 100 tags per artist, the long tail being noise.
+ARTIST_TAGS_KEPT = 10
 
 
 def _throttled_call() -> None:
@@ -64,6 +71,19 @@ def is_rate_limit_error(exc: BaseException) -> bool:
 
 
 
+
+
+async def call_retrying_rate_limit(fn, *args):
+    """One Last.fm call off the event loop, retried after a rate limit (29)."""
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            return await asyncio.to_thread(fn, *args)
+        except pylast.WSError as exc:
+            if not is_rate_limit_error(exc) or attempt == RATE_LIMIT_RETRIES:
+                raise
+            # The shared throttle sleeps out the backoff before the next call.
+            note_rate_limited()
+    raise AssertionError("unreachable")
 
 
 def epoch_to_datetime(ts) -> datetime | None:
@@ -239,6 +259,20 @@ def get_loved_page(username: str, page: int, limit: int) -> tuple[list[tuple[str
     return loved, int(data["@attr"]["totalPages"])
 
 
+
+
+def get_artist_tags(artist: str) -> list[dict]:
+    """An artist's top tags with counts from 0 to 100; an unknown artist has none."""
+    _throttled_call()
+    try:
+        data = _lastfm_json("artist.getTopTags", artist=artist)["toptags"]
+    except pylast.WSError as exc:
+        if str(exc.status) == "6":
+            return []
+        raise
+    return _normalize_tags(
+        [{"name": t["name"], "count": int(t["count"])} for t in _as_list(data.get("tag"))[:ARTIST_TAGS_KEPT]]
+    )
 
 
 def get_recent_tracks(

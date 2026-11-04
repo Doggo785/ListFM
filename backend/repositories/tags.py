@@ -4,9 +4,11 @@ from datetime import UTC, datetime
 from models.album_tag import AlbumTag
 from models.artist import Artist
 from models.artist_tag import ArtistTag
+from models.scrobble import Scrobble
 from models.tag import Tag
+from models.track import Track
 from models.track_tag import TrackTag
-from sqlalchemy import select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -146,3 +148,32 @@ async def mark_artist_tags_fetched(db: AsyncSession, artists: set[str]) -> None:
             index_elements=["name"], set_={"tags_fetched_at": stmt.excluded.tags_fetched_at}
         )
     )
+
+
+async def replace_artist_tags(db: AsyncSession, artist: str, tags: list[dict]) -> None:
+    """Store what Last.fm says about this artist now, tags it dropped included. Caller commits."""
+    await db.execute(delete(ArtistTag).where(ArtistTag.artist == artist))
+    for tag in tags:
+        await upsert_artist_tag(db, artist, tag["name"], tag["count"])
+    await mark_artist_tags_fetched(db, {artist})
+
+
+async def get_artists_to_tag(db: AsyncSession, user_id: str, stale_before: datetime) -> list[str]:
+    """This user's artists with unknown or expired tags, most listened first."""
+    rows = await db.execute(
+        select(Track.artist)
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .outerjoin(Artist, Artist.name == Track.artist)
+        .where(
+            Scrobble.user_id == user_id,
+            or_(Artist.name.is_(None), Artist.tags_fetched_at < stale_before),
+        )
+        .group_by(Track.artist)
+        .order_by(func.count().desc(), Track.artist)
+    )
+    return list(rows.scalars())
+
+
+async def artist_tags_fetched_since(db: AsyncSession, artist: str, since: datetime) -> bool:
+    fetched_at = await db.scalar(select(Artist.tags_fetched_at).where(Artist.name == artist))
+    return fetched_at is not None and fetched_at >= since

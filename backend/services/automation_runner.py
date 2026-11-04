@@ -25,10 +25,9 @@ from repositories.generated_playlists import create_generated_playlist
 from repositories.scrobbles import get_known_artist_tags, get_window_tracks
 from schemas import GeneratedPlaylistCreate, Track
 from services.filter_engine import apply_filters
-from services.lastfm import is_rate_limit_error
+from services.lastfm import PAGE_ERRORS, is_rate_limit_error
 from services.progress import store as progress_store
 from services.scrobble_sync import (
-    PAGE_ERRORS,
     SyncSuperseded,
     is_syncing,
     start_scrobble_sync,
