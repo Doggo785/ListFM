@@ -52,7 +52,7 @@ function SectionCard({ title, icon, children, delay = 0 }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
     >
-      <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:border-neutral-700 transition-colors">
+      <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:border-neutral-700 transition-colors">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-neutral-800/80">
           <div className="rounded-lg bg-[#ff530b]/10 p-2">
             <IconComp size={16} className="text-[#ff530b]" />
