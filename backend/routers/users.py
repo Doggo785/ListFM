@@ -4,10 +4,17 @@ import logging
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, Query
 from models.user import User
-from repositories.scrobbles import get_known_tags
+from repositories.scrobbles import get_known_tags, get_listening_totals
 from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tracks
 from routers.deps import get_current_active_user, get_current_user_lastfm_username
-from schemas import KnownTag, RecentTracksResponse, ScrobbleSyncStatus, Track, UserInfo
+from schemas import (
+    KnownTag,
+    ListeningTotals,
+    RecentTracksResponse,
+    ScrobbleSyncStatus,
+    Track,
+    UserInfo,
+)
 from services.lastfm import (
     epoch_to_datetime,
     get_recent_tracks,
@@ -99,6 +106,17 @@ def _sync_status(user: User) -> ScrobbleSyncStatus:
 async def scrobble_sync_status(current_user: User = Depends(get_current_active_user)):
     """Listening history sync status, for the progress bar and the partial-data banner."""
     return _sync_status(current_user)
+
+
+@router.get("/scrobbles/totals", response_model=ListeningTotals)
+async def listening_totals(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return ListeningTotals(
+        **await get_listening_totals(db, current_user.id),
+        complete=current_user.scrobbles_complete_at is not None,
+    )
 
 
 @router.post("/scrobbles/sync", response_model=ScrobbleSyncStatus, status_code=202)

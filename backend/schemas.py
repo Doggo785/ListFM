@@ -280,6 +280,15 @@ class ScrobbleSyncStatus(BaseModel):
     tags_total: int = 0
 
 
+class ListeningTotals(BaseModel):
+    listens: int
+    tracks: int
+    artists: int
+    albums: int
+    # False during the first full load: the totals are still growing.
+    complete: bool
+
+
 class ProgressRead(BaseModel):
     """Live progress snapshot for a run or preview ticket."""
 

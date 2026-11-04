@@ -126,6 +126,24 @@ async def delete_scrobbles(db: AsyncSession, user_id: str) -> None:
     await db.execute(delete(Scrobble).where(Scrobble.user_id == user_id))
 
 
+async def get_listening_totals(db: AsyncSession, user_id: str) -> dict[str, int]:
+    """What the stored history holds for this user, whatever a window would keep."""
+    row = (
+        await db.execute(
+            select(
+                func.count().label("listens"),
+                func.count(Scrobble.track_id.distinct()).label("tracks"),
+                func.count(Track.artist.distinct()).label("artists"),
+                func.count(Track.album_id.distinct()).label("albums"),
+            )
+            .select_from(Scrobble)
+            .join(Track, Track.id == Scrobble.track_id)
+            .where(Scrobble.user_id == user_id)
+        )
+    ).one()
+    return dict(row._mapping)
+
+
 async def get_window_tracks(
     db: AsyncSession, user_id: str, start: datetime | None, end: datetime
 ) -> list[dict]:
