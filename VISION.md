@@ -16,7 +16,7 @@ Tant que 1→2→3 ne marche pas de bout en bout de façon fiable, ne pas partir
 ## 2. Non-objectifs (ne pas faire maintenant)
 
 - **Social / partage public**: idée future, BIEN plus tard. Ne pas l'architecturer par anticipation.
-- **Export Spotify / YouTube**: jugé complexe et risqué à l'échelle (quotas, OAuth tiers, mapping IDs). Mis de côté. Ne pas l'implémenter sans feu vert explicite.
+- **Import dans les apps de streaming (Spotify, YouTube…)**: le but final du produit (owner, 2026-11-04), mais complexe et risqué à l'échelle (quotas, OAuth tiers, mapping IDs). Ne pas l'implémenter sans feu vert explicite ; date et apps à trancher.
 - **Multi-provider (Spotify/Apple/Deezer comme source)**: NON, Last.fm seul à vie. Justification produit: seul Last.fm log TOUT ce que l'user écoute, les autres ne donnent qu'un historique limité donc pas viable comme source.
 - **Sur-abstraction provider**: ne pas créer une couche "multi-source" générique. Rester Last.fm-first, code simple.
 

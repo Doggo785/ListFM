@@ -43,29 +43,29 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
 
 ### Phase B : identité visuelle avec [Impeccable](https://github.com/pbakaus/impeccable)
 
-Une identité forte, claire et marquée, pas l'allure générique des pages faites par IA.
+But : une seule DA sur tout le site, animée partout, avec un style qui évolue de page en page. DA choisie par l'owner sur prototype (2026-11-04) : **pixel, palette Braise, dark-only**. Un ruban de pixels tramé se balade sur chaque page, guide le regard et change de forme et de chaleur selon la page, en restant secondaire. Changer de page est immédiat : seul le ruban voyage, rien ne recouvre l'écran. On repart de zéro côté front : plus de sidebar, l'ancien style n'est une référence pour rien, et chaque écran est réécrit en phase C. L'API et `lib/api.js` restent.
 
-1. `impeccable init` → `PRODUCT.md`. Nouvelle identité écrite dans `DESIGN.md` (pas `document`, qui décrirait l'ancien style). Trancher dark-only ici.
-2. **Tokens** (couleurs, typo, espacements, rayons, mouvement) à un seul endroit, branchés sur tout le site : toutes les pages changent de peau en une PR.
-3. **Composants de base** refaits sur ces tokens : Button, Select, modales accessibles (role, focus, Échap), Sidebar, SVG OAuth, props Grainient et `SOURCE_OPTIONS` dédoublonnés. **Suivi des tâches de fond** : indicateur discret visible sur toutes les pages, qui remplace `SyncBanner`, reste tant qu'une tâche peut changer les résultats (« Recherche des tags : 1 200 / 9 552 artistes. Les filtres de tag peuvent être incomplets d'ici là. ») et reste muet pour les petites synchros de routine.
+1. *(fait)* `impeccable init` → `PRODUCT.md`, direction validée, contrat dans le brief de surface.
+2. *(fait)* **Socle** : tokens (couleurs, typo, mouvement) à un seul endroit, ruban de pixels, navigation en haut à la place de la sidebar, changement de page immédiat. Les anciens écrans restent utilisables, ruban autour de leur contenu, jusqu'à leur tour en phase C.
+3. **Composants de base** sur ces tokens : Button, Select, modales accessibles (role, focus, Échap), SVG OAuth, `SOURCE_OPTIONS` dédoublonné. **Suivi des tâches de fond** : indicateur discret visible sur toutes les pages, qui remplace `SyncBanner`, reste tant qu'une tâche peut changer les résultats (« Recherche des tags : 1 200 / 9 552 artistes. Les filtres de tag peuvent être incomplets d'ici là. ») et reste muet pour les petites synchros de routine.
 4. **Détecteur bloquant** : `npx impeccable detect` dans `scripts/ci-local.sh` et en CI.
 
 Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
 
-### Phase C : écrans refaits, une PR par écran
+### Phase C : écrans réécrits, une PR par écran
 
-Chaque PR passe `impeccable critique` et `audit` avant le merge.
+Chaque PR passe `impeccable critique` et `audit` avant le merge, branche le ruban sur les vraies données de l'écran et supprime l'ancien code qu'elle remplace. Le Créateur vient en premier : `DESIGN.md` s'écrit à sa fin, depuis le résultat construit (pas `document`, qui décrirait l'ancien style).
 
-1. **Créateur** : le but est une liberté quasi infinie dans une UI soignée, intuitive et jamais chargée (réglages avancés repliés par défaut). Une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Filtres : remplacer les blocs par une liste qui se lit comme une phrase, groupes repliés dans « Avancé », et ajouter à l'écran première écoute, top artistes et moment d'écoute.
-2. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran.
+1. **Créateur** : le but est une liberté quasi infinie dans une UI soignée, intuitive et jamais chargée (réglages avancés repliés par défaut). Une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Filtres : remplacer les blocs par une liste qui se lit comme une phrase, groupes repliés dans « Avancé », et ajouter à l'écran première écoute, top artistes et moment d'écoute. Le ruban dessine les compteurs de la chaîne.
+2. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran, son titre glissant de la liste à la page.
 3. **Historique** : états « nouvel essai prévu », « échec définitif », run vide, « 32/50 ». Le bouton Re-run passe par la route de retry de T5.
 4. **Dashboard**.
-5. **Connexion et réglages**.
+5. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` et `styled-components` s'ils ne servent plus.
 6. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
 
 ### Phase D : finition
 
-Animations, `impeccable polish` et `harden` sur tout le site. Puis v1.0.0 quand l'owner le dit.
+Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impeccable polish` et `harden` sur tout le site. Puis v1.0.0 quand l'owner le dit, et seulement là migration du VPS : le site doit être utilisable par un utilisateur classique.
 
 ## Plus tard (feu vert owner requis)
 

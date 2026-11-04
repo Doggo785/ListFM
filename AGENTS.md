@@ -38,6 +38,8 @@ Lire avant d'agir :
 
 - JSX sans TypeScript malgré la dépendance TS ; imports via l'alias `@/`.
 - `src/lib/api.js` est l'unique client HTTP (refresh JWT auto). Pas de second client.
+- Couleurs, typo et mouvement viennent des tokens de `src/index.css`, pas de valeur en dur dans un nouvel écran. La direction est dans `PRODUCT.md`.
+- Le ruban de pixels (`lib/pixelRibbon.js`) se monte une seule fois dans `App` et n'a pas de raison d'être remonté. Tout bloc de contenu porte `data-quiet` (12 au plus à l'écran) : le ruban se dissout autour et ne passe jamais sous un texte.
 
 ## Base de données locale
 

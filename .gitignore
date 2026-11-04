@@ -1,3 +1,9 @@
+# Impeccable: installed per machine (`npx impeccable@4.8.0 install`), its binary is 21 MB.
+.claude/
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/questions/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
