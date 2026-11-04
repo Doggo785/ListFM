@@ -24,6 +24,7 @@ from sqlalchemy import delete, func, select
 from .conftest import (
     _cleanup_user,
     _get_user_id_from_cookies,
+    _register_and_login,
     _TestSessionLocal,
     _unique_email,
 )
@@ -763,3 +764,71 @@ def test_public_error_names_rate_limits_only():
 
     assert "rate limiting" in _public_error(pylast.WSError(None, "29", "Rate limit exceeded"))
     assert _public_error(RuntimeError("secret")) == "The run failed (Last.fm or server error)."
+
+
+async def _retry(client: AsyncClient, automation_id: str, history_id: str):
+    return await client.post(f"/api/automations/{automation_id}/history/{history_id}/retry")
+
+
+@pytest.mark.asyncio
+async def test_retry_route_keeps_the_scheduled_date_and_the_window(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        automation_id = (await client.post("/api/automations", json=_create_body())).json()["id"]
+        origin = datetime(2026, 1, 15, 8, tzinfo=UTC)
+        failed_id = await _insert_failed_run(automation_id, attempt=2, scheduled_for=origin)
+
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks) as window:
+            resp = await _retry(client, automation_id, failed_id)
+        assert resp.status_code == 200, resp.text
+        # The window ends at the original date, not at the retry's.
+        assert window.call_args.args[3] == origin
+
+        retry = (await _history_rows(automation_id))[1]
+        assert (retry.attempt, retry.scheduled_for, retry.status) == (3, origin, "completed")
+        assert retry.generated_playlist_id is not None
+
+        # It succeeded: nothing left to retry, whichever row is named.
+        assert (await _retry(client, automation_id, retry.id)).status_code == 409
+        assert (await _retry(client, automation_id, failed_id)).status_code == 409
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_retry_route_allows_an_attempt_past_the_automatic_limit(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        automation_id = (await client.post("/api/automations", json=_create_body())).json()["id"]
+        origin = datetime.now(UTC) - timedelta(days=1)
+        failed_id = await _insert_failed_run(automation_id, attempt=MAX_ATTEMPT, scheduled_for=origin)
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks):
+            assert (await _retry(client, automation_id, failed_id)).status_code == 200
+        assert (await _history_rows(automation_id))[1].attempt == MAX_ATTEMPT + 1
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_retry_route_refuses_other_runs_and_other_users(client: AsyncClient):
+    email = _unique_email()
+    other_email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        automation_id = (await client.post("/api/automations", json=_create_body())).json()["id"]
+        now = datetime.now(UTC)
+        older = await _insert_failed_run(automation_id, attempt=1, scheduled_for=now - timedelta(days=2))
+        latest = await _insert_failed_run(automation_id, attempt=1, scheduled_for=now - timedelta(days=1))
+
+        assert (await _retry(client, automation_id, older)).status_code == 409
+        assert (await _retry(client, automation_id, "unknown")).status_code == 404
+
+        await _register_and_login(client, other_email)
+        assert (await _retry(client, automation_id, latest)).status_code == 404
+        assert len(await _history_rows(automation_id)) == 2
+    finally:
+        await _cleanup_user_with_automations(client, other_email)

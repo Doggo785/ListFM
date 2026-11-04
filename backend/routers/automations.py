@@ -176,6 +176,38 @@ async def get_automation_history_entries(
     return await get_automation_history(db, automation.id)
 
 
+async def _lock_or_409(db: AsyncSession, automation: Automation) -> None:
+    """Single-flight per automation, shared with the sweep; released at commit or rollback."""
+    locked = (
+        await db.execute(
+            select(func.pg_try_advisory_xact_lock(func.hashtextextended(automation.id, 0)))
+        )
+    ).scalar()
+    if not locked:
+        raise HTTPException(status_code=409, detail="Automation already running")
+
+
+async def _run_and_commit(
+    db: AsyncSession,
+    automation: Automation,
+    scheduled_for: datetime,
+    attempt: int,
+    body: RunRequest | None,
+):
+    token = body.progress_token if body and body.progress_token else None
+    progress_key = f"run:{token}" if token else f"run:{automation.id}"
+    progress_store.start(progress_key)
+    history = await run_automation(
+        db, automation, scheduled_for=scheduled_for, attempt=attempt, progress_key=progress_key
+    )
+    try:
+        await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to run automation")
+    return history
+
+
 @router.post(
     "/automations/{automation_id}/run", response_model=AutomationHistoryRead
 )
@@ -200,25 +232,33 @@ async def run_automation_now(
     With body.progress_token, progress reports to a client ticket
     (GET run-progress?token=); otherwise to the legacy run:{id} ticket.
     """
-    locked = (
-        await db.execute(
-            select(func.pg_try_advisory_xact_lock(func.hashtextextended(automation.id, 0)))
-        )
-    ).scalar()
-    if not locked:
-        raise HTTPException(status_code=409, detail="Automation already running")
-    token = body.progress_token if body and body.progress_token else None
-    progress_key = f"run:{token}" if token else f"run:{automation.id}"
-    progress_store.start(progress_key)
-    history = await run_automation(
-        db, automation, scheduled_for=datetime.now(UTC), attempt=1, progress_key=progress_key
-    )
-    try:
-        await db.commit()
-    except SQLAlchemyError:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to run automation")
-    return history
+    await _lock_or_409(db, automation)
+    return await _run_and_commit(db, automation, datetime.now(UTC), 1, body)
+
+
+@router.post(
+    "/automations/{automation_id}/history/{history_id}/retry", response_model=AutomationHistoryRead
+)
+async def retry_failed_run(
+    history_id: str,
+    automation: Automation = Depends(get_owned_automation),
+    db: AsyncSession = Depends(get_db),
+    body: RunRequest | None = None,
+):
+    """Run a failed run again: same scheduled date, so the same window, as attempt + 1.
+
+    Only the latest run: an older failure was already superseded, and running
+    it would rewrite which chain the sweep retries. An attempt past the
+    automatic limit is allowed, and stays terminal if it fails.
+    """
+    await _lock_or_409(db, automation)
+    rows = await get_automation_history(db, automation.id)
+    failed = next((row for row in rows if row.id == history_id), None)
+    if failed is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if failed.id != rows[0].id or failed.status != "failed":
+        raise HTTPException(status_code=409, detail="Only the latest failed run can be retried")
+    return await _run_and_commit(db, automation, failed.scheduled_for, failed.attempt + 1, body)
 
 
 @router.post("/automations", response_model=AutomationRead, status_code=201)
