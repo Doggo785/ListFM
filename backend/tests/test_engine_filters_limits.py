@@ -9,6 +9,7 @@ from httpx import AsyncClient
 from models.automation import Automation
 from models.user import User
 from repositories.scrobbles import store_scrobbles
+from repositories.tags import mark_artist_tags_fetched, upsert_artist_tag
 from services.automation_runner import (
     apply_limits,
     run_automation,
@@ -191,3 +192,23 @@ async def test_fixed_dates_are_read_in_the_users_timezone():
     in_2026 = {**rank, "period": {"since": "2026-01-01", "until": "2026-12-31"}}
     assert await _titles(user_id, in_2025) == []
     assert await _titles(user_id, in_2026) == ["Late"]
+
+
+@pytest.mark.asyncio
+async def test_pipeline_counts_each_stage_and_known_tags():
+    user_id = await _user(
+        [("r1", "Rock", 1), ("r2", "Rock", 1), ("b1", "Bare", 1), ("u1", "Unknown", 1)]
+    )
+    async with _TestSessionLocal() as db:
+        await upsert_artist_tag(db, "Rock", "rock", 100)
+        await mark_artist_tags_fetched(db, {"Rock", "Bare"})
+        await db.commit()
+        result = await run_automation_pipeline_cached(
+            db, user_id=user_id, username="u", window={"length": None}, sort="most_played",
+            filter_groups=[{"id": "g", "conditions": [
+                {"id": "c", "field": "tags", "operator": "contains", "value": "rock"},
+            ]}],
+            max_tracks=1, at=NOW,
+        )
+    assert (result["before_filter"], result["after_filter"], result["total"]) == (4, 2, 1)
+    assert (result["known_tag_artists"], result["window_artists"]) == (2, 3)

@@ -268,6 +268,9 @@ class ScrobbleSyncStatus(BaseModel):
     error: str | None = None
     complete: bool
     synced_at: datetime | None = None
+    # The tag catalogue's pass for this user, zero when none is running.
+    tags_done: int = 0
+    tags_total: int = 0
 
 
 class ProgressRead(BaseModel):

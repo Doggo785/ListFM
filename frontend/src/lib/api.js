@@ -80,12 +80,15 @@ export async function getScrobbleSync() {
   return request("/api/scrobbles/sync");
 }
 
-export async function previewAutomation(automation, progressToken) {
+export async function previewAutomation(automation, progressToken, automationId) {
   return request("/api/automations/preview", {
     method: "POST",
-    body: JSON.stringify(
-      progressToken ? { automation, progress_token: progressToken } : { automation }
-    ),
+    body: JSON.stringify({
+      automation,
+      ...(progressToken && { progress_token: progressToken }),
+      // A saved automation: the preview skips the tracks of its last playlists.
+      ...(automationId && { automation_id: automationId }),
+    }),
   });
 }
 

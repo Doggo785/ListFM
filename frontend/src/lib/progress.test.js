@@ -55,6 +55,17 @@ describe("progress endpoints", () => {
     expect(JSON.parse(options.body)).toEqual({ automation: { name: "x" } });
   });
 
+  it("previewAutomation names the saved automation when given", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ tracks: [] }),
+    });
+    await previewAutomation({ name: "x" }, undefined, "auto-1");
+    const [, options] = globalThis.fetch.mock.calls[0];
+    expect(JSON.parse(options.body)).toEqual({ automation: { name: "x" }, automation_id: "auto-1" });
+  });
+
   it("getPreviewProgress GETs the ticket URL", async () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,

@@ -224,6 +224,7 @@ async def test_sync_status_reports_progress(client: AsyncClient):
     assert resp.status_code == 200
     assert resp.json() == {
         "stage": None, "done": 0, "total": 0, "error": None, "complete": False, "synced_at": None,
+        "tags_done": 0, "tags_total": 0,
     }
 
 
