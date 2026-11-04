@@ -1,12 +1,10 @@
 """Shared pipeline for running automations (preview + scheduled sweep).
 
-Pipeline (ADR 0002): the user's stored listens in the window -> sort ->
-filters (enriching through the DB cache only when a filter reads Last.fm
-data) -> cut to the playlist size.
+Pipeline (ADR 0002, 0003): the user's stored listens in the window -> sort
+-> filters on stored data -> cut to the playlist size.
 
 ``run_automation_pipeline_cached`` is used by the sweep and the preview
-endpoint. Blocking pylast calls always run in the default executor, never
-on the event loop.
+endpoint.
 """
 
 import calendar
@@ -24,9 +22,8 @@ from models.user import User
 from repositories.automation_history import create_automation_history
 from repositories.automations import get_automations_by_ids
 from repositories.generated_playlists import create_generated_playlist
-from repositories.scrobbles import get_window_tracks
+from repositories.scrobbles import get_known_artist_tags, get_window_tracks
 from schemas import GeneratedPlaylistCreate, Track
-from services.enrich_cache import enrich_tracks_cached
 from services.filter_engine import apply_filters
 from services.lastfm import is_rate_limit_error
 from services.progress import store as progress_store
@@ -53,14 +50,9 @@ RETRY_DELAYS = {
 MAX_ATTEMPT = 4
 
 
-# Each run enriches at most this many tracks live-or-cached, walking the
-# sorted window until the playlist is full (owner: "a limit against abuse").
-MAX_ENRICHED_TRACKS = 1000
 # Tracks returned to the client next to the result, for the builder preview.
 # shortcut: the client refilters these; drop the field with filter-engine.js (phase C).
 SOURCE_TRACKS_SHOWN = 500
-# Filter fields read from the stored listens: they never need enrichment.
-LOCAL_FIELDS = frozenset({"playcount", "userplaycount", "userloved", "timestamp", "first_played", "rank"})
 
 
 def _months_back(at: datetime, months: int) -> datetime:
@@ -110,61 +102,28 @@ async def run_automation_pipeline_cached(
 ) -> dict:
     """Window of stored listens -> sort -> filter -> cut to size (ADR 0002).
 
-    Fields Last.fm alone knows (tags, global counts) are enriched through the
-    DB cache batch by batch, in sort order, until the playlist is full or
-    MAX_ENRICHED_TRACKS is reached. Returns the tracks plus counts and cache
-    stats for logs and UI.
+    Reads the database only: no Last.fm call, so a preview can run on every
+    change (ADR 0003). A track whose artist has no stored tags yet matches no
+    tag filter.
     """
     start, end = window_bounds(window, at or datetime.now(UTC))
     candidates = sort_tracks(await get_window_tracks(db, user_id, start, end), sort)
+    artist_tags = await get_known_artist_tags(db, user_id)
     for rank, track in enumerate(candidates, start=1):
         track["rank"] = rank
+        if track["artist"] in artist_tags:
+            track["artist_tags"] = artist_tags[track["artist"]]
     if progress_key is not None:
         progress_store.report(progress_key, "source", 0, len(candidates))
-
-    stats = {"hits": 0, "misses": 0, "lastfm_calls": 0}
-    if not needed_fields(filter_groups):
-        kept = apply_filters(candidates, filter_groups)
-    else:
-        kept = []
-        batch_size = max(max_tracks, 50)
-        for offset in range(0, min(len(candidates), MAX_ENRICHED_TRACKS), batch_size):
-            batch = candidates[offset : offset + batch_size]
-            enriched, batch_stats = await enrich_tracks_cached(
-                db,
-                user_id=user_id,
-                username=username,
-                tracks=batch,
-                max_enrich=len(batch),
-                progress_key=progress_key,
-            )
-            for key in stats:
-                stats[key] += batch_stats[key]
-            # The stored listens are the truth for the user's own fields.
-            for local, track in zip(batch, enriched, strict=True):
-                track.update({field: local[field] for field in LOCAL_FIELDS if field in local})
-            kept.extend(apply_filters(enriched, filter_groups))
-            if len(kept) >= max_tracks:
-                break
-    tracks = kept[:max_tracks]
+    tracks = apply_filters(candidates, filter_groups)[:max_tracks]
     if progress_key is not None:
         progress_store.report(progress_key, "filter", len(tracks), len(candidates))
-    logger.info(
-        "pipeline: %d in window -> %d kept (%d cache hits, %d misses, %d Last.fm calls)",
-        len(candidates),
-        len(tracks),
-        stats["hits"],
-        stats["misses"],
-        stats["lastfm_calls"],
-    )
+    logger.info("pipeline: %d in window -> %d kept", len(candidates), len(tracks))
     return {
         "tracks": tracks,
         "total": len(tracks),
         "before_filter": len(candidates),
         "source_tracks": candidates[:SOURCE_TRACKS_SHOWN],
-        "cache_hits": stats["hits"],
-        "cache_misses": stats["misses"],
-        "lastfm_calls": stats["lastfm_calls"],
     }
 
 
@@ -213,59 +172,6 @@ def _filter_groups_to_json(filter_groups):
         g.model_dump(mode="json") if hasattr(g, "model_dump") else g
         for g in filter_groups
     ]
-
-
-# Enrich keys a filter tree can read. LOCAL_FIELDS come from the stored
-# listens, so they need no enrichment. Anything unknown falls
-# back to the full set (safe: fetch more, never filter on missing data).
-# Non-empty needs always run a FULL fetch + write-back (today's behavior):
-# partial fetches skip write-back only once per-group freshness lands
-# (next tranche), so repeated runs keep warming the cache like before.
-FULL_FETCH_KEYS = frozenset(
-    {
-        "listeners",
-        "global_playcount",
-        "artist_tags",
-        "album",
-        "album_tags",
-    }
-)
-_FIELD_TO_ENRICH_KEYS = {
-    "global_playcount": {"global_playcount"},
-    "listeners": {"listeners"},
-    "tags": {"artist_tags", "album", "album_tags"},
-}
-
-
-def _fg_get(obj, key, default=None):
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
-
-
-def needed_fields(filter_groups) -> set[str]:
-    """Enrich keys the active filters actually read (empty = skip enrich).
-
-    Walks conditions and nested groups (dicts or Pydantic models, like the
-    filter engine). Unknown field -> full set: fetch more rather than risk
-    filtering on defaults.
-    """
-    if not filter_groups:
-        return set()
-    needed: set[str] = set()
-    for group in filter_groups:
-        for condition in _fg_get(group, "conditions") or []:
-            field = _fg_get(condition, "field")
-            if field in _FIELD_TO_ENRICH_KEYS:
-                needed.update(_FIELD_TO_ENRICH_KEYS[field])
-            elif field in LOCAL_FIELDS or field is None:
-                continue
-            else:
-                return set(FULL_FETCH_KEYS)
-        needed.update(needed_fields(_fg_get(group, "groups") or []))
-        if needed >= FULL_FETCH_KEYS:
-            return set(FULL_FETCH_KEYS)
-    return needed
 
 
 async def _mark_success(db: AsyncSession, history, result: dict, automation: Automation) -> None:

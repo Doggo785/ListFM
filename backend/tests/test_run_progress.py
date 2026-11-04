@@ -6,7 +6,6 @@ Previews carry a client-made ticket, runs reuse f"run:{automation_id}"
 (single-flight guarantees one run per automation at a time).
 """
 
-import asyncio
 import time
 import uuid
 from unittest.mock import patch
@@ -15,10 +14,8 @@ import pytest
 from httpx import AsyncClient
 from models.user import User
 from repositories.automation_history import create_automation_history
-from services import lastfm
 from services.automation_runner import run_automation_pipeline_cached
-from services.lastfm import enrich_tracks
-from services.progress import PipelineCancelled, store as progress_store
+from services.progress import store as progress_store
 
 from .conftest import (
     _cleanup_user,
@@ -58,30 +55,15 @@ def _automation_body(filter_groups: list) -> dict:
     }
 
 
-def _live_info(artist: str, title: str) -> dict:
-    return {
-        "artist": artist,
-        "title": title,
-        "listeners": 10,
-        "global_playcount": 20,
-        "userplaycount": 5,
-        "userloved": True,
-        "artist_tags": [{"name": "rock", "count": 100}],
-        "album": "Prog Album",
-        "album_tags": [{"name": "indie", "count": 90}],
-    }
-
-
-def _userplaycount_groups() -> list:
+def _listeners_groups() -> list:
     return [{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}]
 
 
 @pytest.mark.asyncio
 async def test_pipeline_reports_progress_to_store():
-    """The cached pipeline leaves stage/filter reports on the ticket."""
+    """The pipeline leaves stage/filter reports on the ticket."""
     suffix = uuid.uuid4().hex[:8]
     base = {"artist": f"PA {suffix}", "title": f"PS {suffix}"}
-    live = [{**base, **_live_info(base["artist"], base["title"])}]
     key = f"test:{suffix}"
     async with _TestSessionLocal() as db:
         db.add(User(id=f"u-{suffix}"))
@@ -91,9 +73,8 @@ async def test_pipeline_reports_progress_to_store():
         with (
             patch(
                 "services.automation_runner.get_window_tracks",
-                return_value=[dict(base)],
+                return_value=[{**base, "listeners": 10}],
             ),
-            patch("services.enrich_cache.enrich_tracks", return_value=live),
         ):
             await run_automation_pipeline_cached(
                 db,
@@ -101,7 +82,7 @@ async def test_pipeline_reports_progress_to_store():
                 username="u",
                 window={"length": None},
                 sort="most_played",
-                filter_groups=_userplaycount_groups(),
+                filter_groups=_listeners_groups(),
                 max_tracks=50,
                 progress_key=key,
             )
@@ -111,59 +92,10 @@ async def test_pipeline_reports_progress_to_store():
     assert progress.total == 1
 
 
-def test_enrich_cancel_aborts_before_first_track():
-    """A cancelled ticket raises instead of touching the network."""
-    tracks = [{"artist": "A", "title": "one"}]
-    key = "cancel-me"
-    progress_store.start(key)
-    progress_store.cancel(key)
-    with (
-        patch("services.lastfm.get_network", return_value=object()),
-        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),pytest.raises(PipelineCancelled)
-    ):
-        enrich_tracks("user", tracks, progress_key=key)
 
 
-def test_enrich_reports_completion_counts():
-    """Each finished track reports (done, total) on the ticket."""
-    tracks = [{"artist": "A", "title": "one"}, {"artist": "B", "title": "two"}]
-    key = "count-me"
-    progress_store.start(key)
-    with (
-        patch("services.lastfm.get_network", return_value=object()),
-        patch(
-            "services.lastfm.get_track_full_info",
-            side_effect=lambda *args, **kwargs: {},
-        ),
-        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
-    ):
-        enrich_tracks("user", tracks, progress_key=key)
-    progress = progress_store.read(key)
-    assert (progress.stage, progress.done, progress.total) == ("enrich", 2, 2)
 
 
-def test_cancel_aborts_between_calls_mid_track():
-    """A cancel landing mid-track stops the remaining calls of that track."""
-    from services.lastfm import get_track_full_info
-
-    key = "mid-track"
-    progress_store.start(key)
-
-    def _info_then_cancel(*_args):
-        progress_store.cancel(key)
-        return {"listeners": "11"}
-
-    with (
-        patch("services.lastfm._track_info", side_effect=_info_then_cancel),
-        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
-    ):
-        out = get_track_full_info(
-            object(), "u", "A", "T", progress_key=key
-        )
-    assert out["listeners"] == 11
-    assert out["artist_tags"] == []
-    assert progress_store.read(key).stage == "cancelled"
-    assert progress_store.read(key).calls == 1
 
 
 @pytest.mark.asyncio
@@ -174,7 +106,6 @@ async def test_preview_with_token_reports_done(client: AsyncClient):
         await _register_login_link(client, email)
         suffix = uuid.uuid4().hex[:8]
         base = {"artist": f"PV {suffix}", "title": f"PT {suffix}"}
-        live = [{**base, **_live_info(base["artist"], base["title"])}]
         token = uuid.uuid4().hex
         body = {
             "automation": _automation_body(
@@ -204,7 +135,6 @@ async def test_preview_with_token_reports_done(client: AsyncClient):
                 "services.automation_runner.get_window_tracks",
                 return_value=[dict(base)],
             ),
-            patch("services.enrich_cache.enrich_tracks", return_value=live),
         ):
             resp = await client.post("/api/automations/preview", json=body)
         assert resp.status_code == 200
@@ -243,22 +173,6 @@ async def test_preview_cancel_known_ticket(client: AsyncClient):
         await _cleanup_user(client, email)
 
 
-@pytest.mark.asyncio
-async def test_preview_cancelled_pipeline_returns_flag(client: AsyncClient):
-    """A pipeline aborted mid-flight answers 200 with cancelled=True."""
-    email = _unique_email()
-    try:
-        await _register_login_link(client, email)
-        body = {"automation": _automation_body([]), "progress_token": uuid.uuid4().hex}
-        with patch(
-            "routers.automations.run_automation_pipeline_cached",
-            side_effect=PipelineCancelled(),
-        ):
-            resp = await client.post("/api/automations/preview", json=body)
-        assert resp.status_code == 200
-        assert resp.json()["cancelled"] is True
-    finally:
-        await _cleanup_user(client, email)
 
 
 @pytest.mark.asyncio
@@ -274,10 +188,6 @@ async def test_run_progress_live_then_db_fallback(client: AsyncClient):
         with (
             patch(
                 "services.automation_runner.get_window_tracks", return_value=tracks
-            ),
-            patch(
-                "services.enrich_cache.enrich_tracks",
-                side_effect=lambda u, t, max_enrich=50, **kwargs: t,
             ),
         ):
             run = await client.post(f"/api/automations/{automation_id}/run")
@@ -305,10 +215,6 @@ async def test_run_with_token_reports_on_ticket(client: AsyncClient):
         with (
             patch(
                 "services.automation_runner.get_window_tracks", return_value=tracks
-            ),
-            patch(
-                "services.enrich_cache.enrich_tracks",
-                side_effect=lambda u, t, max_enrich=50, **kwargs: t,
             ),
         ):
             run = await client.post(
@@ -430,110 +336,5 @@ def _slow_info(*args, **kwargs):
     }
 
 
-@pytest.mark.asyncio
-async def test_pipeline_reports_live_counts():
-    """Polling the store during a slow run sees enrich counts climb."""
-    suffix = uuid.uuid4().hex[:8]
-    tracks = [{"artist": f"RA {suffix}", "title": f"RT {suffix} {i}"} for i in range(12)]
-    key = f"live:{suffix}"
-    async with _TestSessionLocal() as db:
-        db.add(User(id=f"u-{suffix}"))
-        await db.commit()
-
-    async def drive():
-        async with _TestSessionLocal() as db:
-            with (
-                patch(
-                    "services.automation_runner.get_window_tracks",
-                    return_value=[dict(t) for t in tracks],
-                ),
-                patch("services.lastfm.get_network", return_value=object()),
-                patch(
-                    "services.lastfm.get_track_full_info", side_effect=_slow_info
-                ),
-                patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
-            ):
-                return await run_automation_pipeline_cached(
-                    db,
-                    user_id=f"u-{suffix}",
-                    username="u",
-                    window={"length": None},
-                    sort="most_played",
-                    filter_groups=[{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}],
-                    max_tracks=50,
-                    progress_key=key,
-                )
-
-    progress_store.start(key)
-    task = asyncio.create_task(drive())
-    seen = []
-    while not task.done():
-        progress = progress_store.read(key)
-        if progress is not None:
-            seen.append((progress.stage, progress.done, progress.total))
-        await asyncio.sleep(0.02)
-    result = await task
-    assert result["total"] == 12
-    enrich_reports = [s for s in seen if s[0] == "enrich"]
-    assert enrich_reports, f"never saw enrich progress, saw: {seen[:12]}"
-    assert enrich_reports[-1][1] > enrich_reports[0][1], f"counts never climbed: {seen[:12]}"
-    assert progress_store.read(key).stage == "filter"
 
 
-@pytest.mark.asyncio
-async def test_pipeline_cancel_aborts_midrun():
-    """Cancelling mid-run aborts the pipeline instead of finishing it."""
-    suffix = uuid.uuid4().hex[:8]
-    tracks = [{"artist": f"CA {suffix}", "title": f"CT {suffix} {i}"} for i in range(20)]
-    key = f"cancel:{suffix}"
-    finished = []
-
-    def slow_info(*args, **kwargs):
-        time.sleep(0.4)
-        finished.append(args[3])
-        return {
-            "listeners": 1,
-            "global_playcount": 2,
-            "userplaycount": 3,
-            "userloved": False,
-            "artist_tags": [],
-            "album": None,
-            "album_tags": [],
-        }
-
-    async with _TestSessionLocal() as db:
-        db.add(User(id=f"u-{suffix}"))
-        await db.commit()
-
-    async def drive():
-        async with _TestSessionLocal() as db:
-            with (
-                patch(
-                    "services.automation_runner.get_window_tracks",
-                    return_value=[dict(t) for t in tracks],
-                ),
-                patch("services.lastfm.get_network", return_value=object()),
-                patch("services.lastfm.get_track_full_info", side_effect=slow_info),
-                patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
-            ):
-                return await run_automation_pipeline_cached(
-                    db,
-                    user_id=f"u-{suffix}",
-                    username="u",
-                    window={"length": None},
-                    sort="most_played",
-                    filter_groups=[{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}],
-                    max_tracks=50,
-                    progress_key=key,
-                )
-
-    progress_store.start(key)
-    task = asyncio.create_task(drive())
-    await asyncio.sleep(0.3)
-    assert progress_store.cancel(key) is True
-    with pytest.raises(PipelineCancelled):
-        await task
-    assert len(finished) < len(tracks), (
-        f"server kept working after cancel: {len(finished)}/{len(tracks)}"
-    )
-    assert progress_store.read(key).stage == "cancelled"

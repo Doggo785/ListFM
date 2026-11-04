@@ -13,10 +13,6 @@ from dataclasses import dataclass, field
 STAGES = ("queued", "source", "enrich", "filter", "done", "error", "cancelled")
 
 
-class PipelineCancelled(Exception):
-    """Raised when a progress ticket is cancelled mid-pipeline."""
-
-
 @dataclass
 class Progress:
     stage: str = "queued"

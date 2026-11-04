@@ -1,6 +1,9 @@
 from datetime import datetime
 
+from models.artist import Artist
+from models.artist_tag import ArtistTag
 from models.scrobble import Scrobble
+from models.tag import Tag
 from models.track import Track
 from models.user_track import UserTrack
 from repositories.user_tracks import bulk_store_recent_plays, ensure_tracks
@@ -66,7 +69,9 @@ async def get_window_tracks(
     """One row per track played in [start, end), with the user's local stats.
 
     ``playcount`` and ``timestamp`` (last play) are read inside the window;
-    ``userplaycount`` and ``first_played`` cover every stored listen.
+    ``userplaycount`` and ``first_played`` cover every stored listen. Global
+    counts are left out until Last.fm gave them: a filter must not read the
+    column default as a real zero.
     """
     in_window = Scrobble.played_at < end
     if start is not None:
@@ -76,6 +81,9 @@ async def get_window_tracks(
         select(
             Track.title,
             Track.artist,
+            Track.listeners,
+            Track.global_playcount,
+            Track.last_fetched_at,
             plays.label("plays"),
             func.count().label("all_plays"),
             func.min(Scrobble.played_at).label("first_played"),
@@ -100,6 +108,37 @@ async def get_window_tracks(
             "userloved": row.loved,
             "timestamp": int(row.last_played.timestamp()),
             "first_played": int(row.first_played.timestamp()),
+            **(
+                {"listeners": row.listeners, "global_playcount": row.global_playcount}
+                if row.last_fetched_at
+                else {}
+            ),
         }
         for row in rows
     ]
+
+
+async def get_known_artist_tags(db: AsyncSession, user_id: str) -> dict[str, list[dict]]:
+    """Stored tags of the artists this user listened to (ADR 0003).
+
+    An artist with no entry was never looked up; an empty list means Last.fm
+    has no tags for them.
+    """
+    listened = (
+        select(Track.artist)
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .where(Scrobble.user_id == user_id)
+        .distinct()
+    )
+    rows = await db.execute(
+        select(Artist.name, Tag.name, ArtistTag.weight)
+        .outerjoin(ArtistTag, ArtistTag.artist == Artist.name)
+        .outerjoin(Tag, Tag.id == ArtistTag.tag_id)
+        .where(Artist.name.in_(listened))
+    )
+    known: dict[str, list[dict]] = {}
+    for artist, tag, weight in rows.all():
+        tags = known.setdefault(artist, [])
+        if tag is not None:
+            tags.append({"name": tag, "count": weight})
+    return known

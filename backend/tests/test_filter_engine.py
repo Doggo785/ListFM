@@ -234,3 +234,13 @@ class TestGroupLogic:
         tracks = [_track(title="a"), _track(title="b")]
         assert apply_filters(tracks, []) == tracks
         assert apply_filters(tracks, None) == tracks
+
+
+def test_unknown_tags_match_no_tag_operator():
+    unknown = {"title": "x", "artist": "y"}
+    known_empty = {"title": "x", "artist": "y", "artist_tags": []}
+    for operator in ("contains", "not_contains", "eq"):
+        groups = [{"conditions": [{"field": "tags", "operator": operator, "value": "rock"}]}]
+        assert apply_filters([unknown], groups) == []
+    groups = [{"conditions": [{"field": "tags", "operator": "not_contains", "value": "rock"}]}]
+    assert apply_filters([known_empty], groups) == [known_empty]

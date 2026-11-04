@@ -8,8 +8,10 @@ import pylast
 import pytest
 from models.automation import Automation
 from models.automation_history import AutomationHistory
+from models.track import Track
 from models.user import User
 from repositories.scrobbles import get_window_tracks, replace_loved, store_scrobbles
+from repositories.tags import mark_artist_tags_fetched, upsert_artist_tag
 from services import automation_runner
 from services.automation_runner import (
     HistoryLoading,
@@ -19,7 +21,7 @@ from services.automation_runner import (
     sort_tracks,
     window_bounds,
 )
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from .conftest import _TestSessionLocal, _unique_email
 
@@ -89,27 +91,38 @@ async def test_pipeline_sorts_filters_and_cuts_to_size():
             filter_groups=played_twice, max_tracks=1, at=NOW,
         )
     assert [t["title"] for t in result["tracks"]] == ["C"]
-    assert (result["before_filter"], result["total"], result["lastfm_calls"]) == (3, 1, 0)
+    assert (result["before_filter"], result["total"]) == (3, 1)
+
+
 
 
 @pytest.mark.asyncio
-async def test_pipeline_enriches_in_sort_order_until_full():
-    user_id = await _user_with_listens([(f"T{n}", 1) for n in range(120)])
-    needs_listeners = [{"conditions": [{"field": "listeners", "operator": "gte", "value": 0}]}]
+async def test_filters_read_stored_data_only():
+    user_id = await _user_with_listens([("Known", 1), ("Bare", 1), ("Unknown", 1)])
+    async with _TestSessionLocal() as db:
+        for title, artist in (("Known", "Rockers"), ("Bare", "Tagless"), ("Unknown", "Stranger")):
+            await store_scrobbles(db, user_id, [(title, artist, NOW - timedelta(days=2))])
+        await upsert_artist_tag(db, "Rockers", "rock", 80)
+        await mark_artist_tags_fetched(db, {"Rockers", "Tagless"})
+        await db.execute(
+            update(Track).where(Track.artist == "Rockers").values(listeners=7, last_fetched_at=NOW)
+        )
+        await db.commit()
 
-    async def fake_enrich(db, *, tracks, **kwargs):
-        return [{**t, "listeners": 1} for t in tracks], {"hits": len(tracks), "misses": 0, "lastfm_calls": 0}
-
-    with patch.object(automation_runner, "enrich_tracks_cached", side_effect=fake_enrich) as enrich:
+    async def titles(condition):
         async with _TestSessionLocal() as db:
             result = await run_automation_pipeline_cached(
-                db, user_id=user_id, username="u", window={"length": None}, sort="last_played",
-                filter_groups=needs_listeners, max_tracks=10, at=NOW,
+                db, user_id=user_id, username="u", window={"length": None}, sort="most_played",
+                filter_groups=[{"conditions": [condition]}], max_tracks=10, at=NOW,
             )
-    # One batch of max(size, 50) is enough to fill 10 tracks.
-    assert enrich.call_count == 1
-    assert len(enrich.call_args.kwargs["tracks"]) == 50
-    assert result["total"] == 10
+        return {(t["artist"]) for t in result["tracks"]}
+
+    with patch("httpx.get", side_effect=AssertionError("no Last.fm call")):
+        assert await titles({"field": "tags", "operator": "contains", "value": "rock"}) == {"Rockers"}
+        # Tagless is known to have no tag; Stranger and Artist were never looked up.
+        assert await titles({"field": "tags", "operator": "not_contains", "value": "rock"}) == {"Tagless"}
+        # A column default of 0 is not a real count.
+        assert await titles({"field": "listeners", "operator": "lt", "value": 100}) == {"Rockers"}
 
 
 async def _automation(user_id):

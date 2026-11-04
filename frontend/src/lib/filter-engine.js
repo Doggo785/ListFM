@@ -4,8 +4,7 @@ function getFieldValue(track, field, tagSource) {
     return Math.floor(Date.now() / 1000) - track.timestamp;
   }
   if (field === "tags") {
-    if (tagSource === "album") return track.album_tags || [];
-    return track.artist_tags || [];
+    return tagSource === "album" ? track.album_tags : track.artist_tags;
   }
   return track[field];
 }
@@ -15,8 +14,9 @@ function evaluateCondition(track, condition) {
   const fieldValue = getFieldValue(track, field, tagSource);
 
   if (field === "tags") {
-    const tags = Array.isArray(fieldValue) ? fieldValue : [];
-    const match = tags.find(
+    // Tags never looked up match nothing, not even not_contains: unknown is not "no tag".
+    if (!Array.isArray(fieldValue)) return false;
+    const match = fieldValue.find(
       (t) => t.name && t.name.toLowerCase() === String(value).toLowerCase() && t.count >= (countMin || 0),
     );
     switch (operator) {
