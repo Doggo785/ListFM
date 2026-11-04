@@ -112,3 +112,25 @@ async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id:
     playlist.deleted_at = datetime.now(UTC)
     await db.flush()
     return True
+
+
+async def get_tracks_of_recent_playlists(
+    db: AsyncSession, user_id: str, automation_id: str, playlists: int
+) -> set[tuple[str, str]]:
+    """(title, artist) of the automation's last playlists. Scoped to the owner."""
+    recent = (
+        select(GeneratedPlaylist.id)
+        .where(
+            GeneratedPlaylist.user_id == user_id,
+            GeneratedPlaylist.automation_id == automation_id,
+            GeneratedPlaylist.deleted_at.is_(None),
+        )
+        .order_by(GeneratedPlaylist.generated_at.desc())
+        .limit(playlists)
+    )
+    rows = await db.execute(
+        select(Track.title, Track.artist)
+        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .where(PlaylistTrack.playlist_id.in_(recent))
+    )
+    return {(row.title, row.artist) for row in rows}

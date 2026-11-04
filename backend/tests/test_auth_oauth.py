@@ -699,7 +699,7 @@ async def test_relink_other_lastfm_account_moves_automations_and_drops_personal_
                 "name": "Relink",
                 "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
                 "cron": "0 0 1 * *",
-                "filter_groups": [],
+                "filterGroups": [],
                 "output": {"maxSize": 10},
                 "enabled": True,
             },

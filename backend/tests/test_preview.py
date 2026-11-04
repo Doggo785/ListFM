@@ -99,9 +99,9 @@ async def test_preview_max_size_zero_means_default(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         tracks = [
-            {"artist": "Artist A", "title": "Song A"},
-            {"artist": "Artist B", "title": "Song B"},
-            {"artist": "Artist C", "title": "Song C"},
+            {"artist": "Artist A", "first_played": 0, "title": "Song A"},
+            {"artist": "Artist B", "first_played": 0, "title": "Song B"},
+            {"artist": "Artist C", "first_played": 0, "title": "Song C"},
         ]
         body = _preview_body()
         body["automation"]["output"] = {"maxSize": 0}
@@ -153,8 +153,8 @@ async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         tracks = [
-            {"artist": "Artist A", "title": "Song A"},
-            {"artist": "Artist B", "title": "Song B"},
+            {"artist": "Artist A", "first_played": 0, "title": "Song A"},
+            {"artist": "Artist B", "first_played": 0, "title": "Song B"},
         ]
         with patch("services.automation_runner.get_window_tracks", return_value=tracks):
             resp = await client.post(
@@ -177,8 +177,8 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         tracks = [
-            {"artist": "Artist A", "title": "Song A", "userplaycount": 5},
-            {"artist": "Artist B", "title": "Song B", "userplaycount": 20},
+            {"artist": "Artist A", "first_played": 0, "title": "Song A", "userplaycount": 5},
+            {"artist": "Artist B", "first_played": 0, "title": "Song B", "userplaycount": 20},
         ]
         body = {
             "automation": {

@@ -57,7 +57,7 @@ def _create_body() -> dict:
         "description": "test",
         "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "0 0 1 * *",
-        "filter_groups": [],
+        "filterGroups": [],
         "output": {"maxSize": 50},
         "enabled": True,
     }
@@ -103,7 +103,7 @@ async def test_scheduler_tick_runs_due_automation(client: AsyncClient):
         assert created.status_code == 201
         automation_id = created.json()["id"]
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
         ):
@@ -158,8 +158,8 @@ async def test_scheduler_run_persists_playlist_and_links_history(client: AsyncCl
         automation_id = created.json()["id"]
 
         tracks = [
-            {"artist": "Artist A", "title": "Song A"},
-            {"artist": "Artist B", "title": "Song B"},
+            {"artist": "Artist A", "first_played": 0, "title": "Song A"},
+            {"artist": "Artist B", "first_played": 0, "title": "Song B"},
         ]
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
@@ -276,7 +276,7 @@ async def test_history_endpoint_returns_entries_newest_first(client: AsyncClient
         assert created.status_code == 201
         automation_id = created.json()["id"]
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch("services.automation_runner.is_due", return_value=True), patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
         ):
@@ -336,7 +336,7 @@ async def test_run_now_triggers_manual_run(client: AsyncClient):
         assert created.status_code == 201
         automation_id = created.json()["id"]
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
         ):
@@ -389,8 +389,8 @@ async def test_playlist_tracks_endpoint_returns_ordered_tracks(client: AsyncClie
         automation_id = created.json()["id"]
 
         tracks = [
-            {"artist": "Artist A", "title": "Song A"},
-            {"artist": "Artist B", "title": "Song B"},
+            {"artist": "Artist A", "first_played": 0, "title": "Song A"},
+            {"artist": "Artist B", "first_played": 0, "title": "Song B"},
         ]
         with patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
@@ -424,7 +424,7 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
         created = await client.post("/api/automations", json=_create_body())
         automation_id = created.json()["id"]
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
         ):
@@ -472,7 +472,7 @@ async def test_run_now_concurrent_returns_409_then_succeeds(client: AsyncClient)
             # Session-level locks survive ROLLBACK and pool reuse: unlock now.
             await db.execute(select(func.pg_advisory_unlock(func.hashtextextended(automation_id, 0))))
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
         ):
@@ -546,7 +546,7 @@ async def test_retry_reruns_failed_with_original_scheduled_for(client: AsyncClie
         origin = datetime.now(UTC) - timedelta(minutes=6)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         p1, p2 = _sweep_patches(tracks)
         with p1, p2:
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -574,7 +574,7 @@ async def test_retry_waits_for_backoff(client: AsyncClient):
         origin = datetime.now(UTC) - timedelta(minutes=1)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         p1, p2 = _sweep_patches(tracks)
         with p1, p2:
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -598,7 +598,7 @@ async def test_retry_stops_after_max_attempt(client: AsyncClient):
             automation_id, attempt=MAX_ATTEMPT, scheduled_for=origin
         )
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         p1, p2 = _sweep_patches(tracks)
         with p1, p2:
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -631,7 +631,7 @@ async def test_newer_chain_supersedes_old_failure(client: AsyncClient):
             )
             await db.commit()
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         p1, p2 = _sweep_patches(tracks)
         with p1, p2:
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -657,7 +657,7 @@ async def test_retry_skips_disabled_automation(client: AsyncClient):
         origin = datetime.now(UTC) - timedelta(minutes=6)
         await _insert_failed_run(automation_id, attempt=1, scheduled_for=origin)
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         p1, p2 = _sweep_patches(tracks)
         with p1, p2:
             await run_due_automations(session_factory=_TestSessionLocal)
@@ -685,7 +685,7 @@ async def test_sweep_skips_when_lock_held(client: AsyncClient):
             await db.execute(
                 select(func.pg_advisory_lock(func.hashtextextended(automation_id, 0)))
             )
-            tracks = [{"artist": "Artist A", "title": "Song A"}]
+            tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
             with patch(
                 "services.automation_runner.is_due", return_value=True
             ), patch(
@@ -711,7 +711,7 @@ async def test_run_now_starts_fresh_chain(client: AsyncClient):
         created = await client.post("/api/automations", json=_create_body())
         automation_id = created.json()["id"]
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch(
             "services.automation_runner.get_window_tracks", return_value=tracks
         ):

@@ -132,3 +132,20 @@ async def get_known_artist_tags(db: AsyncSession, user_id: str) -> dict[str, lis
         if tag is not None:
             tags.append({"name": tag, "count": weight})
     return known
+
+
+async def get_artist_ranks(
+    db: AsyncSession, user_id: str, start: datetime | None, end: datetime
+) -> dict[str, int]:
+    """Artists by listens in [start, end): 1 is the most listened, ties by name."""
+    in_period = and_(Scrobble.user_id == user_id, Scrobble.played_at < end)
+    if start is not None:
+        in_period = and_(in_period, Scrobble.played_at >= start)
+    rows = await db.execute(
+        select(Track.artist)
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .where(in_period)
+        .group_by(Track.artist)
+        .order_by(func.count().desc(), Track.artist)
+    )
+    return {artist: rank for rank, artist in enumerate(rows.scalars(), start=1)}

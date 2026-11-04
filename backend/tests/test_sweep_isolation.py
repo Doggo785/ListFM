@@ -55,7 +55,7 @@ async def test_sweep_commits_per_automation(client):
             created = await client.post("/api/automations", json=_create_body())
             assert created.status_code == 201
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
 
         real_factory = _TestSessionLocal
 
@@ -97,7 +97,7 @@ async def test_sweep_isolates_run_failure(client):
         created2 = await client.post("/api/automations", json=_create_body())
         assert created2.status_code == 201
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         calls = {"n": 0}
         rollbacks = []
         real_run = automation_runner.run_automation
@@ -236,7 +236,7 @@ async def test_retries_run_oldest_season_first(client):
             call_order.append(automation.id)
             return await real_run(db, automation, **kwargs)
 
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with (
             patch.object(automation_runner, "is_due", return_value=False),
             patch.object(automation_runner, "get_window_tracks", return_value=tracks),

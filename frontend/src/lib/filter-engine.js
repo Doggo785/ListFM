@@ -6,12 +6,15 @@ function getFieldValue(track, field, tagSource) {
   if (field === "tags") {
     return tagSource === "album" ? track.album_tags : track.artist_tags;
   }
+  if (field === "first_played") return track.first_played_age;
   return track[field];
 }
 
 function evaluateCondition(track, condition) {
   const { field, operator, value, valueMax, countMin, tagSource } = condition;
-  const fieldValue = getFieldValue(track, field, tagSource);
+  // Each condition has its own period: the server ranks per condition id.
+  const fieldValue =
+    field === "artist_rank" ? track.artist_ranks?.[condition.id] : getFieldValue(track, field, tagSource);
 
   if (field === "tags") {
     // Tags never looked up match nothing, not even not_contains: unknown is not "no tag".

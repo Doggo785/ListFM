@@ -4,7 +4,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
-from filter_types import FilterGroups
+from filter_types import AutomationWindow, FilterGroups, WindowSpan, check_group_depth
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
@@ -196,23 +196,6 @@ class ErrorResponse(BaseModel):
     error: str
 
 
-class WindowSpan(BaseModel):
-    amount: int = Field(ge=1, le=1000)
-    unit: Literal["day", "week", "month", "year"]
-
-
-class AutomationWindow(BaseModel):
-    """Which listens an automation reads (GLOSSARY: Fenêtre).
-
-    Counted back from the run's scheduled time: ``ago`` shifts the end
-    ("a year ago"), ``length`` is the span before it. No length = every
-    listen up to the end.
-    """
-
-    length: WindowSpan | None = None
-    ago: WindowSpan | None = None
-
-
 def _default_window() -> AutomationWindow:
     return AutomationWindow(length=WindowSpan(amount=3, unit="month"))
 
@@ -224,6 +207,9 @@ SortKey = Literal["most_played", "last_played", "first_played", "random", "rando
 class AutomationOutput(BaseModel):
     # Wire key stays camelCase to match the frontend contract (#12).
     maxSize: int = Field(default=50, ge=0, le=200)
+    # GLOSSARY: Limite. None = no limit.
+    maxPerArtist: int | None = Field(default=None, ge=1, le=200)
+    noRepeatPlaylists: int | None = Field(default=None, ge=1, le=50)
 
     @field_validator("maxSize")
     @classmethod
@@ -242,18 +228,24 @@ class AutomationCreate(BaseModel):
     output: AutomationOutput = Field(default_factory=AutomationOutput)
     enabled: bool = True
 
-    model_config = ConfigDict(populate_by_name=True)
-
     @field_validator("cron")
     @classmethod
     def validate_cron(cls, v: str) -> str:
         return _validate_cron(v)
+
+    @field_validator("filter_groups")
+    @classmethod
+    def validate_filter_depth(cls, v: FilterGroups) -> FilterGroups:
+        check_group_depth(v)
+        return v
 
 
 class PreviewRequest(BaseModel):
     """Preview body: the full automation draft, validated like a create."""
 
     automation: AutomationCreate
+    # The saved automation being edited, so the preview applies noRepeatPlaylists.
+    automation_id: str | None = Field(default=None, max_length=36)
     # Client-generated ticket for live progress polling during the request.
     # The client polls GET /automations/preview-progress/{token} while the
     # POST runs; absent token = today's fire-and-wait behavior.
@@ -297,12 +289,15 @@ class AutomationUpdate(BaseModel):
     output: AutomationOutput | None = None
     enabled: bool | None = None
 
-    model_config = ConfigDict(populate_by_name=True)
-
     @field_validator("cron")
     @classmethod
     def validate_cron(cls, v: str | None) -> str | None:
         return _validate_cron(v) if v is not None else v
+
+    @field_validator("filter_groups")
+    @classmethod
+    def validate_filter_depth(cls, v: FilterGroups | None) -> FilterGroups | None:
+        return check_group_depth(v)
 
 
 class AutomationRead(BaseModel):
@@ -338,7 +333,11 @@ class AutomationRead(BaseModel):
                 "sort": values.sort,
                 "cron": values.cron,
                 "filter_groups": values.filter_groups or [],
-                "output": {"maxSize": values.output_max_size},
+                "output": {
+                    "maxSize": values.output_max_size,
+                    "maxPerArtist": values.output_max_per_artist,
+                    "noRepeatPlaylists": values.output_no_repeat_playlists,
+                },
                 "enabled": values.enabled,
                 "created_at": values.created_at,
                 "updated_at": values.updated_at,

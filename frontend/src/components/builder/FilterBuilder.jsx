@@ -485,14 +485,17 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, availableTags = [],
               <IconPlus size={14} />
               Add condition
             </button>
-            <button
-              type="button"
-              onClick={addSubGroup}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/15 transition-all"
-            >
-              <IconGitBranch size={14} />
-              Add sub-group
-            </button>
+            {/* Same bound as the API: a group and its sub-groups, no deeper. */}
+            {!isNested && (
+              <button
+                type="button"
+                onClick={addSubGroup}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/15 transition-all"
+              >
+                <IconGitBranch size={14} />
+                Add sub-group
+              </button>
+            )}
           </div>
         ) : (
           <button

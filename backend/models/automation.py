@@ -20,6 +20,8 @@ class Automation(Base):
     cron: Mapped[str | None] = mapped_column(String(100), nullable=True)
     filter_groups: Mapped[list[FilterGroup]] = mapped_column(FilterGroupListJSONB, default=list)  # Recursive filter tree as JSONB
     output_max_size: Mapped[int] = mapped_column(Integer, default=50)
+    output_max_per_artist: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_no_repeat_playlists: Mapped[int | None] = mapped_column(Integer, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
