@@ -13,6 +13,7 @@ import random
 import re
 from collections import Counter
 from datetime import UTC, datetime, time, timedelta
+from time import monotonic
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
@@ -35,6 +36,7 @@ from repositories.scrobbles import (
     get_window_tracks,
 )
 from schemas import GeneratedPlaylistCreate, Track
+from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.filter_engine import apply_filters, conditions_on
 from services.lastfm import PAGE_ERRORS, is_rate_limit_error
 from services.progress import store as progress_store
@@ -264,7 +266,6 @@ async def run_automation_pipeline_cached(
     window_artists = {track["artist"] for track in candidates}
     if progress_key is not None:
         progress_store.report(progress_key, "filter", len(tracks), len(candidates))
-    logger.info("pipeline: %d in window -> %d kept", len(candidates), len(tracks))
     return {
         "tracks": tracks,
         "total": len(tracks),
@@ -355,7 +356,7 @@ async def _sync_before_run(db: AsyncSession, automation: Automation) -> None:
     try:
         await sync_scrobbles(db, automation.user_id, automation.lastfm_username)
     except (*PAGE_ERRORS, SyncSuperseded):
-        logger.warning("pre-run sync failed for automation %s, using stored listens", automation.id)
+        log_activity("sync", automation.lastfm_username, "échec, le run utilise les écoutes déjà en base")
         await db.rollback()
 
 
@@ -416,8 +417,10 @@ async def run_automation(
         started_at=started_at,
     )
 
+    label = automation_label(automation.name)
     try:
         await _sync_before_run(db, automation)
+        pipeline_started = monotonic()
         result = await run_automation_pipeline_cached(
             db,
             user_id=automation.user_id,
@@ -435,12 +438,17 @@ async def run_automation(
             progress_key=progress_key,
         )
     except Exception as exc:
-        logger.exception("run failed for automation %s", automation.id)
+        if isinstance(exc, HistoryLoading):
+            log_activity("run", label, "historique en cours de chargement, nouvel essai prévu")
+        else:
+            logger.exception("run failed for automation %s", automation.id)
+            log_activity("run", label, f"échec : {type(exc).__name__}")
         await _mark_failure(db, history, exc, automation)
         if progress_key is not None:
             progress_store.finish(progress_key, error=_public_error(exc))
         return history
 
+    log_activity("run", label, pipeline_summary(result, monotonic() - pipeline_started))
     if result["total"]:
         playlist = await _persist_result_playlist(db, automation, result)
         history.generated_playlist_id = playlist.id

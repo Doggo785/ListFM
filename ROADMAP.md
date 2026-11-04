@@ -38,7 +38,8 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
 4. *(fait)* **Catalogue de tags** (ADR 0003) : tâche de fond après la synchro, un appel par artiste, les plus écoutés d'abord, partagé entre utilisateurs, valable 90 jours. Tags d'album plus tard.
 5. *(fait)* **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage et le taux de tags connus. Aucun appel Last.fm. L'écran affiche cette réponse sans la retravailler et signale quand les réglages ont changé depuis. L'API expose aussi l'avancement des tâches de fond (écoutes, tags) pour le suivi de la phase B.
 6. *(fait, côté serveur ; le bouton arrive en phase C)* **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
-7. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
+7. *(fait, côté console ; l'écran arrive en phase B)* **Logs lisibles** : une ligne par page de synchro, tous les 100 artistes, par run, aperçu et appel Last.fm, sans clé API.
+8. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
 
 ### Phase B : identité visuelle avec [Impeccable](https://github.com/pbakaus/impeccable)
 

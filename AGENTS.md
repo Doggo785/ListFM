@@ -21,6 +21,7 @@ Lire avant d'agir :
 ## Pièges backend
 
 - `services/lastfm.py` est du `pylast` synchrone : l'appeler via `asyncio.to_thread` (routers) ou `run_in_executor` (runner), jamais directement dans du code async.
+- La console passe par `services/activity_log.py` : une ligne lisible par étape. Jamais d'URL Last.fm ni de message d'exception dedans : une erreur httpx porte l'URL, donc la clé API (#86).
 - Les appels Last.fm de la synchro passent par `_throttled_call` (cadence `LASTFM_MIN_INTERVAL`, repli sur l'erreur 29). Les tests patchent l'intervalle à 0.
 - Le moteur de filtres n'existe que côté serveur (`services/filter_engine.py`) : l'écran affiche la réponse de l'aperçu sans la retravailler. Une condition sans valeur et un groupe vide sont ignorés.
 - `filter_groups` est validé à la lecture en base : retirer un champ ou un opérateur demande une migration qui réécrit les automations stockées.

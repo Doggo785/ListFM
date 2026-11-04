@@ -189,6 +189,20 @@ async def test_totals_count_this_users_stored_history(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_sync_prints_a_line_per_page_oldest_first(activity_lines):
+    user_id = await _new_user()
+    await _sync(user_id, FakeLastfm([_listen(n) for n in range(3)], loved=[("Song 1", "Artist")]), page_size=2)
+    lines = activity_lines()
+    assert lines[:4] == [
+        "sync   someone   début, 2 pages",
+        "sync   someone   page 1/2  +1 écoutes",
+        "sync   someone   page 2/2  +2 écoutes",
+        "sync   someone   1 morceaux aimés",
+    ]
+    assert lines[4].startswith("sync   someone   terminé  ")
+
+
+@pytest.mark.asyncio
 async def test_sync_endpoint_skips_a_fresh_history(client: AsyncClient):
     await _register_and_login(client, _unique_email())
     with patch("routers.auth_oauth.get_user_info", return_value={"username": "me", "image": None}):

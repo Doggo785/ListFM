@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 import httpx
 import pylast
 from config import get_settings
+from services.activity_log import log_activity
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ def note_rate_limited(retry_after: float = 60.0) -> None:
     global _rate_limit_until
     with _throttle_lock:
         _rate_limit_until = max(_rate_limit_until, time.monotonic() + retry_after)
+    log_activity("lastfm", "", f"limite atteinte (erreur 29), pause de {retry_after:.0f} s")
 
 
 def is_rate_limit_error(exc: BaseException) -> bool:
@@ -97,6 +99,7 @@ def epoch_to_datetime(ts) -> datetime | None:
 def get_user_info(username: str) -> dict:
     """Profile in one user.getInfo call; unknown users raise pylast.WSError (6)."""
     user = _lastfm_json("user.getInfo", user=username)["user"]
+    log_activity("lastfm", username, "profil")
     return {
         "username": username,
         "image": _pick_image(user.get("image")),
@@ -283,10 +286,12 @@ def get_recent_tracks(
 ) -> list[dict]:
     extended = get_recent_tracks_extended(username, limit, time_from, time_to)
     if extended is not None:
+        log_activity("lastfm", username, f"{len(extended)} écoutes récentes")
         return extended
     network = get_network()
     user = network.get_user(username)
     recent = user.get_recent_tracks(limit=limit, time_from=time_from, time_to=time_to)
+    log_activity("lastfm", username, f"{len(recent)} écoutes récentes")
     return [
         {
             "title": t.track.title,

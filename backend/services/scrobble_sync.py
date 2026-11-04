@@ -8,7 +8,7 @@ in full each time.
 """
 
 import asyncio
-import logging
+import time
 from datetime import UTC, datetime, timedelta
 
 from database import async_session
@@ -19,6 +19,7 @@ from repositories.scrobbles import (
     store_scrobbles,
     store_track_albums,
 )
+from services.activity_log import format_duration, log_activity
 from services.lastfm import (
     PAGE_ERRORS,
     call_retrying_rate_limit,
@@ -30,8 +31,6 @@ from services.progress import store as progress_store
 from services.tag_catalogue import start_tag_catalogue
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-
-logger = logging.getLogger(__name__)
 
 # 1000 is past Last.fm's documented maximum of 200 but works (felhag/lastfm-stats-web);
 # 200 is the fallback when a large page fails.
@@ -68,6 +67,7 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
     key = progress_key(user_id)
 
     _, total_pages = await call_retrying_rate_limit(get_scrobble_page, username, 1, page_size, time_from, time_to)
+    log_activity("sync", username, f"début, {total_pages} pages")
     for done, page in enumerate(range(total_pages, 0, -1), start=1):
         listens, _ = await call_retrying_rate_limit(get_scrobble_page, username, page, page_size, time_from, time_to)
         _check_current(user_id, username)
@@ -80,6 +80,7 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
         await db.commit()
         progress_store.report(key, "sync", done, total_pages)
         progress_store.bump_calls(key)
+        log_activity("sync", username, f"page {done}/{total_pages}  +{len(listens)} écoutes")
 
 
 async def _sync_loved(db: AsyncSession, user_id: str, username: str) -> None:
@@ -89,16 +90,18 @@ async def _sync_loved(db: AsyncSession, user_id: str, username: str) -> None:
         loved.extend(more)
     _check_current(user_id, username)
     await replace_loved(db, user_id, loved)
+    log_activity("sync", username, f"{len(loved)} morceaux aimés")
 
 
 async def sync_scrobbles(db: AsyncSession, user_id: str, username: str) -> None:
     """Bring a user's stored listens and loved flags up to date with Last.fm."""
+    started = time.monotonic()
     try:
         await _sync_listens(db, user_id, username, PAGE_SIZE)
     except PAGE_ERRORS as exc:
         if is_rate_limit_error(exc):
             raise
-        logger.warning("scrobble sync: pages of %d failed, retrying with %d", PAGE_SIZE, FALLBACK_PAGE_SIZE)
+        log_activity("sync", username, f"pages de {PAGE_SIZE} refusées, nouvel essai par {FALLBACK_PAGE_SIZE}")
         await db.rollback()
         # Committed pages stay: the retry starts after the newest stored listen.
         await _sync_listens(db, user_id, username, FALLBACK_PAGE_SIZE)
@@ -110,7 +113,8 @@ async def sync_scrobbles(db: AsyncSession, user_id: str, username: str) -> None:
         user.scrobbles_synced_at = now
         user.scrobbles_complete_at = user.scrobbles_complete_at or now
     await db.commit()
-    start_tag_catalogue(user_id)
+    log_activity("sync", username, f"terminé  {format_duration(time.monotonic() - started)}")
+    start_tag_catalogue(user_id, username)
 
 
 def is_fresh(user: User, max_age: timedelta = PREVIEW_SYNC_INTERVAL) -> bool:
@@ -125,9 +129,9 @@ async def _sync_in_background(user_id: str, username: str) -> None:
             await sync_scrobbles(db, user_id, username)
         progress_store.finish(key)
     except SyncSuperseded:
-        logger.info("scrobble sync for user %s superseded by a relink", user_id)
+        log_activity("sync", username, "annulé, un autre compte Last.fm a été lié")
     except (*PAGE_ERRORS, SQLAlchemyError) as exc:
-        logger.warning("scrobble sync failed for user %s: %s", user_id, type(exc).__name__)
+        log_activity("sync", username, f"échec : {type(exc).__name__}, reprise à la prochaine synchro")
         progress_store.finish(key, error="Listening history sync failed. It will resume on the next sync.")
     finally:
         if _running.get(user_id) == username:

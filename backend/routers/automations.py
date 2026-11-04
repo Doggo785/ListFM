@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import UTC, datetime
 
 from database import get_db
@@ -27,6 +28,7 @@ from schemas import (
     ProgressRead,
     RunRequest,
 )
+from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.automation_runner import (
     run_automation,
     run_automation_pipeline_cached,
@@ -70,6 +72,7 @@ async def preview_automation(
     if progress_key is not None:
         progress_store.start(progress_key)
 
+    started = time.monotonic()
     result = await run_automation_pipeline_cached(
         db,
         user_id=current_user.id,
@@ -85,6 +88,7 @@ async def preview_automation(
         automation_id=body.automation_id,
         progress_key=progress_key,
     )
+    log_activity("aperçu", automation_label(automation.name), pipeline_summary(result, time.monotonic() - started))
     if progress_key is not None:
         progress_store.finish(progress_key)
     result["cancelled"] = False
