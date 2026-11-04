@@ -165,7 +165,7 @@ function Dashboard() {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto min-h-screen">
+    <main className="page-enter flex-1 overflow-y-auto min-h-screen">
       <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 md:py-16" data-quiet>
         <motion.div
           variants={stagger}

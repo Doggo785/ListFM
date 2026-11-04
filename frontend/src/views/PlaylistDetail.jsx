@@ -472,7 +472,7 @@ export default function PlaylistDetail() {
 
 
   return (
-    <div className="h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
+    <div className="page-enter h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
       <div className="mx-auto max-w-[1400px]" data-quiet>
         <motion.header
           className="mb-8"

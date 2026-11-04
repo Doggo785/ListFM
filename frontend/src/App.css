@@ -413,13 +413,21 @@ html, body, #root {
   }
 }
 .page-enter {
-  animation: page-enter var(--duration-enter) var(--ease-out) both;
+  animation: page-enter var(--duration-enter) step-end backwards;
 }
 
 @keyframes page-enter {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+  0% {
+    mask-image: var(--dither-1);
+  }
+  33% {
+    mask-image: var(--dither-2);
+  }
+  66% {
+    mask-image: var(--dither-3);
+  }
+  100% {
+    mask-image: none;
   }
 }
 
