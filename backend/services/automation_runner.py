@@ -10,6 +10,7 @@ endpoint.
 import calendar
 import logging
 import random
+import re
 from collections import Counter
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -101,6 +102,23 @@ def sort_tracks(tracks: list[dict], sort: str, plays_field: str = "playcount") -
     return sorted(tracks, key=lambda t: (t.get(field, 0), t.get("timestamp", 0)), reverse=True)
 
 
+# A reissue's end suffix: "(Bonus)", "[Deluxe Edition]", " - Remastered 2009". A live
+# or acoustic version is other recordings, so it stays its own album.
+_EDITION_WORDS = r"\b(?:bonus|deluxe|edition|édition|remaster(?:ed)?|expanded|anniversary)\b"
+_NOT_A_VERSION = r"(?![^)\]]*\b(?:live|acoustic)\b)"
+_EDITION_SUFFIX = re.compile(
+    rf"\s*(?:[(\[]{_NOT_A_VERSION}[^)\]]*{_EDITION_WORDS}[^)\]]*[)\]]|\s-\s{_NOT_A_VERSION}.*{_EDITION_WORDS}.*)$"
+)
+
+
+def album_key(album: str) -> str:
+    """The album a name counts as for a limit; the track keeps its original name."""
+    key = album.casefold().strip()
+    while (shorter := _EDITION_SUFFIX.sub("", key)) not in (key, ""):
+        key = shorter
+    return key
+
+
 def apply_limits(
     tracks: list[dict],
     max_tracks: int,
@@ -121,12 +139,12 @@ def apply_limits(
         if max_per_artist is not None and per_artist[track["artist"]] >= max_per_artist:
             continue
         album = track.get("album")
-        album_key = (track["artist"], album) if album else None
-        if album_key and max_per_album is not None and per_album[album_key] >= max_per_album:
+        counted_as = (track["artist"], album_key(album)) if album else None
+        if counted_as and max_per_album is not None and per_album[counted_as] >= max_per_album:
             continue
         per_artist[track["artist"]] += 1
-        if album_key:
-            per_album[album_key] += 1
+        if counted_as:
+            per_album[counted_as] += 1
         kept.append(track)
     return kept
 

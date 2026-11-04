@@ -11,6 +11,7 @@ from models.user import User
 from repositories.scrobbles import store_scrobbles
 from repositories.tags import mark_artist_tags_fetched, upsert_artist_tag
 from services.automation_runner import (
+    album_key,
     apply_limits,
     run_automation,
     run_automation_pipeline_cached,
@@ -94,6 +95,60 @@ def test_limits_keep_the_sort_order():
     assert titles(10, 1) == ["a1", "b1"]
     assert titles(3, 2) == ["a1", "a2", "b1"]
     assert titles(2, None, None, {("a1", "A")}) == ["a2", "b1"]
+
+
+@pytest.mark.parametrize(
+    ("reissue", "original"),
+    [
+        ("M.A.N (Black Roses & Lost Feelings) (Bonus)", "M.A.N (Black Roses & Lost Feelings)"),
+        ("Album (Deluxe)", "Album"),
+        ("Album [Super Deluxe Edition]", "Album"),
+        ("Album (2011 Remaster)", "Album"),
+        ("Album (Remastered 2009)", "Album"),
+        ("Album - Remastered 2009", "Album"),
+        ("Album (Expanded Edition)", "Album"),
+        ("Album (25th Anniversary Edition)", "Album"),
+        ("Album (Édition Deluxe)", "Album"),
+        ("Album (Deluxe) (Remastered)", "Album"),
+        ("ALBUM (BONUS TRACK VERSION)", "album"),
+    ],
+)
+def test_a_reissue_counts_as_its_album(reissue, original):
+    assert album_key(reissue) == album_key(original)
+
+
+@pytest.mark.parametrize(
+    ("one", "other"),
+    [
+        ("M.A.N", "M.A.N (Black Roses & Lost Feelings)"),
+        ("Album", "Album (Live)"),
+        ("Album", "Album (Acoustic)"),
+        ("Album", "Album (Live Deluxe Edition)"),
+        ("Album", "Album - Live at Wembley"),
+        ("Album", "Album - Acoustic Deluxe"),
+        ("Album", "Album, Part 2"),
+    ],
+)
+def test_another_recording_or_title_stays_its_own_album(one, other):
+    assert album_key(one) != album_key(other)
+
+
+def test_album_named_like_a_suffix_keeps_its_name():
+    assert album_key("(Deluxe)") == "(deluxe)"
+    assert album_key("Bonus") == "bonus"
+
+
+def test_album_limit_merges_a_reissue_and_keeps_each_tracks_album_name():
+    tracks = [
+        {"title": "a", "artist": "X", "album": "M.A.N (Black Roses & Lost Feelings)"},
+        {"title": "b", "artist": "X", "album": "M.A.N (Black Roses & Lost Feelings) (Bonus)"},
+        {"title": "c", "artist": "X", "album": "M.A.N"},
+        {"title": "d", "artist": "X", "album": "M.A.N (Black Roses & Lost Feelings) (Bonus)"},
+    ]
+    assert [t["title"] for t in apply_limits(tracks, 10, max_per_album=1)] == ["a", "c"]
+    # Original name untouched, the first of the album kept.
+    bonus_first = [tracks[1], tracks[0]]
+    assert apply_limits(bonus_first, 10, max_per_album=1)[0]["album"].endswith("(Bonus)")
 
 
 def test_album_limit_counts_per_artist_and_ignores_unknown_albums():
