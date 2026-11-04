@@ -6,8 +6,6 @@ Covers:
   with 422 (proving server-side validation)
 - the wire contract accepts the frontend camelCase filterGroups key and
   serializes responses with it (PlaylistDetail reads automation.filterGroups)
-- snake_case filter_groups input (legacy callers) still accepted via
-  populate_by_name
 - PATCH updates filter groups
 """
 
@@ -63,7 +61,7 @@ def _create_body(filter_groups: list) -> dict:
         "description": "test",
         "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "",
-        "filter_groups": filter_groups,
+        "filterGroups": filter_groups,
         "output": {"maxSize": 50},
         "enabled": True,
     }
@@ -85,6 +83,7 @@ def _mixed_tree() -> list:
                     "valueMax": None,
                     "countMin": 0,
                     "tagSource": "artist",
+                    "period": None,
                 },
                 {
                     "id": "c2",
@@ -94,6 +93,7 @@ def _mixed_tree() -> list:
                     "valueMax": None,
                     "countMin": 50,
                     "tagSource": "artist",
+                    "period": None,
                 },
             ],
             "groups": [
@@ -109,6 +109,7 @@ def _mixed_tree() -> list:
                             "valueMax": None,
                             "countMin": 0,
                             "tagSource": "artist",
+                            "period": None,
                         },
                         {
                             "id": "c4",
@@ -118,6 +119,7 @@ def _mixed_tree() -> list:
                             "valueMax": 20,
                             "countMin": 0,
                             "tagSource": "artist",
+                            "period": None,
                         },
                     ],
                     "groups": [],
@@ -136,6 +138,7 @@ def _mixed_tree() -> list:
                     "valueMax": None,
                     "countMin": 0,
                     "tagSource": "artist",
+                    "period": None,
                 }
             ],
             "groups": [],
@@ -182,6 +185,7 @@ async def test_invalid_filter_tree_rejected_422(client: AsyncClient):
                         "valueMax": None,
                         "countMin": 0,
                         "tagSource": "artist",
+                        "period": None,
                     }
                 ],
                 "groups": [],
@@ -212,6 +216,7 @@ async def test_invalid_condition_value_type_rejected_422(client: AsyncClient):
                         "valueMax": None,
                         "countMin": 0,
                         "tagSource": "artist",
+                        "period": None,
                     }
                 ],
                 "groups": [],
@@ -292,6 +297,7 @@ async def test_update_automation_accepts_camelCase_filterGroups(client: AsyncCli
                         "valueMax": None,
                         "countMin": 0,
                         "tagSource": "artist",
+                        "period": None,
                     }
                 ],
                 "groups": [],
@@ -308,27 +314,8 @@ async def test_update_automation_accepts_camelCase_filterGroups(client: AsyncCli
 
 
 @pytest.mark.asyncio
-async def test_snake_case_filter_groups_legacy_input_still_accepted(client: AsyncClient):
-    """Backward-compat: the snake_case key (used by older API callers and the
-    pre-contract tests) must keep working thanks to populate_by_name=True."""
-    email = _unique_email()
-    try:
-        await _register_login_link(client, email)
-        tree = _mixed_tree()
-        resp = await client.post("/api/automations", json=_create_body(tree))
-        assert resp.status_code == 201
-        assert resp.json()["filterGroups"] == tree
-
-        got = await client.get(f"/api/automations/{resp.json()['id']}")
-        assert got.status_code == 200
-        assert got.json()["filterGroups"] == tree
-    finally:
-        await _cleanup_user_with_automations(client, email)
-
-
-@pytest.mark.asyncio
 async def test_update_automation_filter_groups(client: AsyncClient):
-    """PATCH with new filter_groups (legacy snake input) persists and returns
+    """PATCH with new filterGroups persists and returns
     the updated tree under filterGroups."""
     email = _unique_email()
     try:
@@ -352,6 +339,7 @@ async def test_update_automation_filter_groups(client: AsyncClient):
                         "valueMax": None,
                         "countMin": 0,
                         "tagSource": "artist",
+                        "period": None,
                     }
                 ],
                 "groups": [],
@@ -359,7 +347,7 @@ async def test_update_automation_filter_groups(client: AsyncClient):
         ]
         resp = await client.patch(
             f"/api/automations/{automation_id}",
-            json={"filter_groups": new_tree},
+            json={"filterGroups": new_tree},
         )
         assert resp.status_code == 200
         assert resp.json()["filterGroups"] == new_tree

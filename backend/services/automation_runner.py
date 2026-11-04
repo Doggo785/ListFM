@@ -1,7 +1,7 @@
 """Shared pipeline for running automations (preview + scheduled sweep).
 
 Pipeline (ADR 0002, 0003): the user's stored listens in the window -> sort
--> filters on stored data -> cut to the playlist size.
+-> filters on stored data -> limits.
 
 ``run_automation_pipeline_cached`` is used by the sweep and the preview
 endpoint.
@@ -10,21 +10,30 @@ endpoint.
 import calendar
 import logging
 import random
-from datetime import UTC, datetime, timedelta
+from collections import Counter
+from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
 from database import async_session
+from filter_types import ArtistRankPeriod
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.user import User
 from repositories.automation_history import create_automation_history
 from repositories.automations import get_automations_by_ids
-from repositories.generated_playlists import create_generated_playlist
-from repositories.scrobbles import get_known_artist_tags, get_window_tracks
+from repositories.generated_playlists import (
+    create_generated_playlist,
+    get_tracks_of_recent_playlists,
+)
+from repositories.scrobbles import (
+    get_artist_ranks,
+    get_known_artist_tags,
+    get_window_tracks,
+)
 from schemas import GeneratedPlaylistCreate, Track
-from services.filter_engine import apply_filters
+from services.filter_engine import apply_filters, artist_rank_conditions
 from services.lastfm import PAGE_ERRORS, is_rate_limit_error
 from services.progress import store as progress_store
 from services.scrobble_sync import (
@@ -91,6 +100,52 @@ def sort_tracks(tracks: list[dict], sort: str) -> list[dict]:
     return sorted(tracks, key=lambda t: (t.get(field, 0), t.get("timestamp", 0)), reverse=True)
 
 
+def apply_limits(
+    tracks: list[dict], max_tracks: int, max_per_artist: int | None, already_used: set[tuple[str, str]]
+) -> list[dict]:
+    """Take tracks in sort order until the size is reached (GLOSSARY: Limite)."""
+    kept: list[dict] = []
+    per_artist: Counter[str] = Counter()
+    for track in tracks:
+        if len(kept) == max_tracks:
+            break
+        if (track["title"], track["artist"]) in already_used:
+            continue
+        if max_per_artist is not None and per_artist[track["artist"]] >= max_per_artist:
+            continue
+        per_artist[track["artist"]] += 1
+        kept.append(track)
+    return kept
+
+
+def _period_bounds(period: ArtistRankPeriod, at: datetime) -> tuple[datetime | None, datetime]:
+    if period.since is not None and period.until is not None:
+        # shortcut: fixed dates are read in UTC, use the user's timezone when the moment filter brings it.
+        return (
+            datetime.combine(period.since, time.min, tzinfo=UTC),
+            datetime.combine(period.until + timedelta(days=1), time.min, tzinfo=UTC),
+        )
+    return window_bounds(period.model_dump(), at)
+
+
+async def _artist_ranks_by_condition(
+    db: AsyncSession,
+    user_id: str,
+    filter_groups: list,
+    window_range: tuple[datetime | None, datetime],
+    at: datetime,
+) -> dict[str, dict[str, int]]:
+    """Artist ranks for each artist_rank condition; one query per distinct period."""
+    by_range: dict[tuple[datetime | None, datetime], dict[str, int]] = {}
+    by_condition: dict[str, dict[str, int]] = {}
+    for condition_id, period in artist_rank_conditions(filter_groups):
+        bounds = window_range if period is None else _period_bounds(ArtistRankPeriod.model_validate(period), at)
+        if bounds not in by_range:
+            by_range[bounds] = await get_artist_ranks(db, user_id, *bounds)
+        by_condition[condition_id] = by_range[bounds]
+    return by_condition
+
+
 async def run_automation_pipeline_cached(
     db: AsyncSession,
     *,
@@ -100,25 +155,43 @@ async def run_automation_pipeline_cached(
     sort: str,
     filter_groups: list,
     max_tracks: int,
+    max_per_artist: int | None = None,
+    no_repeat_playlists: int | None = None,
+    automation_id: str | None = None,
     at: datetime | None = None,
     progress_key: str | None = None,
 ) -> dict:
-    """Window of stored listens -> sort -> filter -> cut to size (ADR 0002).
+    """Window of stored listens -> sort -> filter -> limits (ADR 0002).
 
     Reads the database only: no Last.fm call, so a preview can run on every
     change (ADR 0003). A track whose artist has no stored tags yet matches no
     tag filter.
     """
-    start, end = window_bounds(window, at or datetime.now(UTC))
+    at = at or datetime.now(UTC)
+    start, end = window_bounds(window, at)
     candidates = sort_tracks(await get_window_tracks(db, user_id, start, end), sort)
     artist_tags = await get_known_artist_tags(db, user_id)
+    ranks_by_condition = await _artist_ranks_by_condition(db, user_id, filter_groups, (start, end), at)
+    at_epoch = int(at.timestamp())
     for rank, track in enumerate(candidates, start=1):
         track["rank"] = rank
+        # Counted from the run's date, so a retry judges the same tracks.
+        track["first_played_age"] = at_epoch - track["first_played"]
+        track["artist_ranks"] = {
+            condition_id: ranks[track["artist"]]
+            for condition_id, ranks in ranks_by_condition.items()
+            if track["artist"] in ranks
+        }
         if track["artist"] in artist_tags:
             track["artist_tags"] = artist_tags[track["artist"]]
     if progress_key is not None:
         progress_store.report(progress_key, "source", 0, len(candidates))
-    tracks = apply_filters(candidates, filter_groups)[:max_tracks]
+    already_used = (
+        await get_tracks_of_recent_playlists(db, user_id, automation_id, no_repeat_playlists)
+        if no_repeat_playlists and automation_id
+        else set()
+    )
+    tracks = apply_limits(apply_filters(candidates, filter_groups), max_tracks, max_per_artist, already_used)
     if progress_key is not None:
         progress_store.report(progress_key, "filter", len(tracks), len(candidates))
     logger.info("pipeline: %d in window -> %d kept", len(candidates), len(tracks))
@@ -279,6 +352,9 @@ async def run_automation(
             sort=automation.sort,
             filter_groups=automation.filter_groups,
             max_tracks=automation.output_max_size,
+            max_per_artist=automation.output_max_per_artist,
+            no_repeat_playlists=automation.output_no_repeat_playlists,
+            automation_id=automation.id,
             at=scheduled_for,
             progress_key=progress_key,
         )

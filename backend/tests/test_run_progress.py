@@ -62,7 +62,7 @@ def _played_groups() -> list:
 async def test_pipeline_reports_progress_to_store():
     """The pipeline leaves stage/filter reports on the ticket."""
     suffix = uuid.uuid4().hex[:8]
-    base = {"artist": f"PA {suffix}", "title": f"PS {suffix}"}
+    base = {"artist": f"PA {suffix}", "first_played": 0, "title": f"PS {suffix}"}
     key = f"test:{suffix}"
     async with _TestSessionLocal() as db:
         db.add(User(id=f"u-{suffix}"))
@@ -104,7 +104,7 @@ async def test_preview_with_token_reports_done(client: AsyncClient):
     try:
         await _register_login_link(client, email)
         suffix = uuid.uuid4().hex[:8]
-        base = {"artist": f"PV {suffix}", "title": f"PT {suffix}"}
+        base = {"artist": f"PV {suffix}", "first_played": 0, "title": f"PT {suffix}"}
         token = uuid.uuid4().hex
         body = {
             "automation": _automation_body(
@@ -183,7 +183,7 @@ async def test_run_progress_live_then_db_fallback(client: AsyncClient):
         created = await client.post("/api/automations", json=_automation_body([]))
         assert created.status_code == 201
         automation_id = created.json()["id"]
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with (
             patch(
                 "services.automation_runner.get_window_tracks", return_value=tracks
@@ -210,7 +210,7 @@ async def test_run_with_token_reports_on_ticket(client: AsyncClient):
         await _register_login_link(client, email)
         created = await client.post("/api/automations", json=_automation_body([]))
         automation_id = created.json()["id"]
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with (
             patch(
                 "services.automation_runner.get_window_tracks", return_value=tracks
@@ -256,7 +256,7 @@ async def test_run_progress_failed_and_running_fallbacks(client: AsyncClient):
         await _register_login_link(client, email)
         created = await client.post("/api/automations", json=_automation_body([]))
         automation_id = created.json()["id"]
-        tracks = [{"artist": "Artist A", "title": "Song A"}]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with (
             patch(
                 "services.automation_runner.get_window_tracks", return_value=tracks
