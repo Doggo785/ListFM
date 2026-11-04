@@ -66,14 +66,14 @@ export default function CronEditor({ value, onChange }) {
           onClick={toggleEnabled}
           className={`w-full flex items-center justify-between rounded-xl border p-5 transition-all ${
             enabled
-              ? "border-[#ff530b] bg-[#ff530b]/10"
+              ? "border-[var(--ember)] bg-[var(--ember)]/10"
               : "border-neutral-700 bg-[#1c1c1c] hover:border-neutral-500"
           }`}
         >
           <div className="flex items-center gap-3">
             <IconCalendarRepeat
               size={22}
-              className={enabled ? "text-[#ff530b]" : "text-neutral-400"}
+              className={enabled ? "text-[var(--ember)]" : "text-neutral-400"}
             />
             <div className="text-left">
               <div className="text-sm font-semibold text-white">Auto-update</div>
@@ -81,7 +81,7 @@ export default function CronEditor({ value, onChange }) {
           </div>
           <div
             className={`w-11 h-6 rounded-full p-0.5 transition-colors ${
-              enabled ? "bg-[#ff530b]" : "bg-neutral-600"
+              enabled ? "bg-[var(--ember)]" : "bg-neutral-600"
             }`}
           >
             <div
@@ -95,8 +95,8 @@ export default function CronEditor({ value, onChange }) {
         {enabled && (
           <>
             {description && (
-              <div className="rounded-xl border border-[#ff530b]/20 bg-[#ff530b]/5 px-4 py-3 text-center">
-                <span className="text-sm font-medium text-[#ff530b]">
+              <div className="rounded-xl border border-[var(--ember)]/20 bg-[var(--ember)]/5 px-4 py-3 text-center">
+                <span className="text-sm font-medium text-[var(--ember)]">
                   {description} ({Intl.DateTimeFormat().resolvedOptions().timeZone})
                 </span>
               </div>
@@ -121,7 +121,7 @@ export default function CronEditor({ value, onChange }) {
                       value={parts[field.key]}
                       onChange={(e) => updatePart(field.key, e.target.value)}
                       placeholder={field.placeholder}
-                      className="w-full rounded-lg border border-neutral-600 bg-[#121212] px-2 py-2.5 text-center text-sm text-white font-mono focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors"
+                      className="w-full rounded-lg border border-neutral-600 bg-[var(--ground)] px-2 py-2.5 text-center text-sm text-white font-mono focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-colors"
                     />
                   </div>
                 ))}
@@ -143,7 +143,7 @@ export default function CronEditor({ value, onChange }) {
                     onClick={() => onChange(preset.cron)}
                     className={`flex flex-col items-start rounded-lg border px-3.5 py-2.5 text-left transition-all ${
                       value === preset.cron
-                        ? "border-[#ff530b]/40 bg-[#ff530b]/10 text-[#ff530b]"
+                        ? "border-[var(--ember)]/40 bg-[var(--ember)]/10 text-[var(--ember)]"
                         : "border-neutral-700/50 bg-neutral-800/30 text-neutral-300 hover:border-neutral-600 hover:bg-neutral-800/60"
                     }`}
                   >
@@ -169,7 +169,7 @@ export default function CronEditor({ value, onChange }) {
                 <div className="border-t border-neutral-700/50 px-5 py-4 space-y-2.5">
                   {CHEATSHEET.map((item) => (
                     <div key={item.char} className="flex items-center gap-3">
-                      <code className="text-xs font-mono text-[#ff530b] bg-[#ff530b]/10 px-2 py-0.5 rounded min-w-[2rem] text-center">
+                      <code className="text-xs font-mono text-[var(--ember)] bg-[var(--ember)]/10 px-2 py-0.5 rounded min-w-[2rem] text-center">
                         {item.char}
                       </code>
                       <span className="text-xs text-neutral-400">{item.desc}</span>

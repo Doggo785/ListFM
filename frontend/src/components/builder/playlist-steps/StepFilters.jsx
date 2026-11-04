@@ -16,9 +16,9 @@ export function StepFilters({ data, onChange }) {
           You can skip this step for no filters.
         </p>
         {filterCount > 0 && (
-          <div className="inline-flex items-center gap-2 mt-3 rounded-full bg-[#ff530b]/10 border border-[#ff530b]/20 px-4 py-1.5">
-            <IconFilter size={13} className="text-[#ff530b]" />
-            <span className="text-xs font-medium text-[#ff530b]">
+          <div className="inline-flex items-center gap-2 mt-3 rounded-full bg-[var(--ember)]/10 border border-[var(--ember)]/20 px-4 py-1.5">
+            <IconFilter size={13} className="text-[var(--ember)]" />
+            <span className="text-xs font-medium text-[var(--ember)]">
               {filterCount} active condition{filterCount !== 1 ? "s" : ""}
             </span>
           </div>

@@ -24,13 +24,13 @@ export function StepSource({ data, onChange }) {
                 onClick={() => onChange({ ...data, sort: opt.value })}
                 className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all ${
                   isSelected
-                    ? "border-[#ff530b] bg-[#ff530b]/10"
+                    ? "border-[var(--ember)] bg-[var(--ember)]/10"
                     : "border-neutral-700 bg-[#1c1c1c] hover:border-neutral-500"
                 }`}
               >
                 <div
                   className={`mt-0.5 rounded-lg p-2 ${
-                    isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400"
+                    isSelected ? "bg-[var(--ember)]/20 text-[var(--ember)]" : "bg-neutral-800 text-neutral-400"
                   }`}
                 >
                   <Icon size={18} />
@@ -60,7 +60,7 @@ export function StepSource({ data, onChange }) {
                 window: WINDOW_OPTIONS.find((o) => o.value === e.target.value).window,
               })
             }
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors appearance-none"
+            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-colors appearance-none"
           >
             {WINDOW_OPTIONS.map((p) => (
               <option key={p.value} value={p.value}>

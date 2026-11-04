@@ -85,8 +85,8 @@ export default function PlaylistNew() {
   };
 
   return (
-    <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
-      <div className="mx-auto flex h-full max-w-3xl flex-col">
+    <div className="h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
+      <div className="mx-auto flex h-full max-w-3xl flex-col" data-quiet>
         <header className="mb-6 shrink-0">
           <button
             type="button"
@@ -131,7 +131,7 @@ export default function PlaylistNew() {
                 size="lg"
                 disabled={!canGoNext()}
                 onClick={() => setStep(step + 1)}
-                className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next
                 <IconArrowRight size={16} className="ml-2" />
@@ -141,7 +141,7 @@ export default function PlaylistNew() {
                 size="lg"
                 onClick={handleCreate}
                 disabled={creating}
-                className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <IconCheck size={16} className="mr-2" />
                 {creating ? "Creating..." : "Create automation"}

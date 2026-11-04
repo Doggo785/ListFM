@@ -1,7 +1,7 @@
 import { Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "motion/react";
 import "./App.css";
-import AppSidebar from "./components/ui/AppSidebar";
+import TopNav from "./components/ui/TopNav";
+import PixelRibbon from "./components/ui/PixelRibbon";
 import ScrollToTop from "./components/elements/ScrollToTop";
 import SyncBanner from "./components/elements/SyncBanner";
 import Landing from "./views/Landing";
@@ -15,80 +15,69 @@ import PlaylistDetail from "./views/PlaylistDetail";
 import Playlists from "./views/Playlists";
 import AuthGuard from "./components/AuthGuard";
 
-const NO_SIDEBAR_PATHS = ["/", "/login", "/register", "/auth/callback", "/link-lastfm"];
+const NO_NAV_PATHS = ["/", "/login", "/register", "/auth/callback", "/link-lastfm"];
 
 function App() {
   const location = useLocation();
-  const showSidebar = !NO_SIDEBAR_PATHS.includes(location.pathname);
+  const showNav = !NO_NAV_PATHS.includes(location.pathname);
 
   return (
     <div className="app-container">
       <ScrollToTop />
-      <div
-        className={showSidebar ? "app-main app-main-with-sidebar" : "app-main"}
-      >
-        {showSidebar && (
-          <AppSidebar />
-        )}
+      <PixelRibbon />
+      {showNav && <TopNav />}
+      <div className="app-main">
         <div className="min-w-0 flex-1">
-          {showSidebar && <SyncBanner />}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.25, ease: "easeInOut" }}
-              className="h-full"
-            >
-              <Routes location={location}>
-                <Route path="/" element={<Landing />} />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <AuthGuard>
-                      <Dashboard />
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/playlists"
-                  element={
-                    <AuthGuard>
-                      <Playlists />
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/playlists/new"
-                  element={
-                    <AuthGuard>
-                      <PlaylistNew />
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/playlists/:id"
-                  element={
-                    <AuthGuard>
-                      <PlaylistDetail />
-                    </AuthGuard>
-                  }
-                />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route
-                  path="/link-lastfm"
-                  element={
-                    <AuthGuard>
-                      <LinkLastfm />
-                    </AuthGuard>
-                  }
-                />
-              </Routes>
-            </motion.div>
-          </AnimatePresence>
+          {showNav && <SyncBanner />}
+          {/* The new page is there at once: nothing waits for the old one to leave. */}
+          <div key={location.pathname} className="page-enter h-full">
+            <Routes location={location}>
+              <Route path="/" element={<Landing />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <AuthGuard>
+                    <Dashboard />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/playlists"
+                element={
+                  <AuthGuard>
+                    <Playlists />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/playlists/new"
+                element={
+                  <AuthGuard>
+                    <PlaylistNew />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/playlists/:id"
+                element={
+                  <AuthGuard>
+                    <PlaylistDetail />
+                  </AuthGuard>
+                }
+              />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route
+                path="/link-lastfm"
+                element={
+                  <AuthGuard>
+                    <LinkLastfm />
+                  </AuthGuard>
+                }
+              />
+            </Routes>
+          </div>
         </div>
       </div>
     </div>

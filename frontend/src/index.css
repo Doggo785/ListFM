@@ -104,9 +104,34 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
+  /* Braise: the single source of the site's colours, type and motion. */
+  --ink: #03071e;
+  --ember-1: #370617;
+  --ember-2: #6a040f;
+  --ember-3: #9d0208;
+  --ember-4: #d00000;
+  --ember-5: #dc2f02;
+  --ember-6: #e85d04;
+  --ember-7: #f48c06;
+  --ember-8: #faa307;
+  --ember-9: #ffba08;
+
+  --ground: var(--ink);
+  --text: #fff3d6;
+  --text-muted: #e0bd9c;
+  --ember: var(--ember-8);
+  --on-ember: var(--ink);
+  --line: #ffba0838;
+
+  --font-display: "Jersey 25", "Geist Variable", sans-serif;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-quick: 0.2s;
+  --duration-enter: 0.34s;
+  --duration-slide: 0.42s;
+
+  --text-h: var(--text);
+  --bg: var(--ground);
   --border: oklch(0.922 0 0);
   --code-bg: #f4f3ec;
   --accent: oklch(0.97 0 0);
@@ -117,7 +142,7 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -129,9 +154,9 @@
     font-size: 16px;
   }
 
-  --background: oklch(1 0 0);
+  --background: var(--ground);
 
-  --foreground: oklch(0.145 0 0);
+  --foreground: var(--text);
 
   --card: oklch(1 0 0);
 
@@ -188,17 +213,6 @@
   --sidebar-border: oklch(0.922 0 0);
 
   --sidebar-ring: oklch(0.708 0 0)
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-  }
 }
 
 body {
@@ -344,3 +358,13 @@ code {
     @apply bg-background text-foreground;}
   html {
     @apply font-sans;}}
+
+::selection {
+  background: var(--ember);
+  color: var(--on-ember);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}

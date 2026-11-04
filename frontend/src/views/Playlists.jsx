@@ -53,7 +53,7 @@ function Playlists() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
+      <div className="flex h-screen w-full items-center justify-center bg-[var(--ground)]">
         <Loader />
       </div>
     );
@@ -64,8 +64,8 @@ function Playlists() {
   );
 
   return (
-    <main className="flex-1 overflow-y-auto bg-[#121212] min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 md:py-16">
+    <main className="flex-1 overflow-y-auto min-h-screen">
+      <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 md:py-16" data-quiet>
         <motion.div
           variants={stagger}
           initial="hidden"
@@ -87,7 +87,7 @@ function Playlists() {
                 <p className="text-sm text-red-400">{error}</p>
                 <button
                   onClick={() => refetch()}
-                  className="mt-3 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[#ff530b] transition-colors"
+                  className="mt-3 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[var(--ember)] transition-colors"
                 >
                   Retry
                 </button>
@@ -104,7 +104,7 @@ function Playlists() {
                 </p>
                 <button
                   onClick={() => navigate("/playlists/new")}
-                  className="px-4 py-2 bg-[#ff530b] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
+                  className="px-4 py-2 bg-[var(--ember)] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
                 >
                   Create a playlist
                 </button>

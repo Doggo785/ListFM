@@ -44,7 +44,7 @@ function Dashboard() {
   const [playlist, setPlaylist] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [ringColors, setRingColors] = useState(['#ff530b', '#c084fc', '#17AEFF']);
+  const [ringColors, setRingColors] = useState(['var(--ember)', '#c084fc', '#17AEFF']);
 
   const lastVisit = useMemo(() => getLastVisit(username), [username]);
   const isFirstVisit = lastVisit === null;
@@ -142,7 +142,7 @@ function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
+      <div className="flex h-screen w-full items-center justify-center bg-[var(--ground)]">
         <Loader />
       </div>
     );
@@ -150,12 +150,12 @@ function Dashboard() {
 
   if (error) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#121212]">
+      <div className="flex h-screen w-full items-center justify-center bg-[var(--ground)]">
         <div className="text-center">
           <p className="text-[#FF5900] font-medium">{error}</p>
           <button
             onClick={() => navigate("/")}
-            className="mt-4 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[#ff530b] transition-colors"
+            className="mt-4 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[var(--ember)] transition-colors"
           >
             Back to Home
           </button>
@@ -165,8 +165,8 @@ function Dashboard() {
   }
 
   return (
-    <main className="flex-1 overflow-y-auto bg-[#121212] min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 md:py-16">
+    <main className="flex-1 overflow-y-auto min-h-screen">
+      <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 md:py-16" data-quiet>
         <motion.div
           variants={stagger}
           initial="hidden"
@@ -192,7 +192,7 @@ function Dashboard() {
                     animationDuration: '8s',
                   }}
                 />
-                <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden bg-[#121212] p-[3px]">
+                <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden bg-[var(--ground)] p-[3px]">
                   <img
                     src={avatar}
                     alt={username}
@@ -218,7 +218,7 @@ function Dashboard() {
             <StatBlock value={totals?.listens ?? 0} label="Listens" color="#ffffff" delay={0} />
             <StatBlock value={totals?.tracks ?? 0} label="Tracks" color="#17AEFF" delay={0.1} />
             <StatBlock value={totals?.artists ?? 0} label="Artists" color="#c084fc" delay={0.2} />
-            <StatBlock value={totals?.albums ?? 0} label="Albums" color="#ff530b" delay={0.3} />
+            <StatBlock value={totals?.albums ?? 0} label="Albums" color="var(--ember)" delay={0.3} />
             <StatBlock value={automations.length} label="Automations" color="#22c55e" delay={0.4} />
           </motion.div>
 
@@ -232,7 +232,7 @@ function Dashboard() {
                 Most played · last 50 plays
               </p>
               <div className="flex items-center justify-center gap-3">
-                <IconHeadphones size={18} className="text-[#ff530b]" strokeWidth={1.5} />
+                <IconHeadphones size={18} className="text-[var(--ember)]" strokeWidth={1.5} />
                 <span className="text-xl font-bold text-white">{topArtist.name}</span>
                 <span className="text-sm text-neutral-500">{topArtist.plays} plays</span>
               </div>

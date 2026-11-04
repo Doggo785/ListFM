@@ -55,8 +55,8 @@ function SectionCard({ title, icon, children, delay = 0 }) {
     >
       <div className="rounded-2xl border border-neutral-800 bg-[#1a1a1a] shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:border-neutral-700 transition-colors">
         <div className="flex items-center gap-3 px-6 py-4 border-b border-neutral-800/80">
-          <div className="rounded-lg bg-[#ff530b]/10 p-2">
-            <IconComp size={16} className="text-[#ff530b]" />
+          <div className="rounded-lg bg-[var(--ember)]/10 p-2">
+            <IconComp size={16} className="text-[var(--ember)]" />
           </div>
           <h3 className="text-base font-bold text-white">{title}</h3>
         </div>
@@ -110,7 +110,7 @@ function ProgressBar({ progress, onCancel }) {
           <button
             type="button"
             onClick={onCancel}
-            className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[#ff530b] hover:text-[#ff530b] transition-colors"
+            className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[var(--ember)] hover:text-[var(--ember)] transition-colors"
           >
             Cancel
           </button>
@@ -119,10 +119,10 @@ function ProgressBar({ progress, onCancel }) {
       {active && (
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-800">
           {pct === null ? (
-            <div className="h-full w-1/3 animate-pulse rounded-full bg-[#ff530b]" />
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-[var(--ember)]" />
           ) : (
             <div
-              className="h-full rounded-full bg-[#ff530b] transition-all"
+              className="h-full rounded-full bg-[var(--ember)] transition-all"
               style={{ width: `${pct}%` }}
             />
           )}
@@ -445,8 +445,8 @@ export default function PlaylistDetail() {
 
   if (notFound) {
     return (
-      <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
-        <div className="mx-auto max-w-3xl text-center py-20">
+      <div className="h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
+        <div className="mx-auto max-w-3xl text-center py-20" data-quiet>
           <div className="rounded-2xl bg-neutral-800/40 p-4 mb-6 inline-flex">
             <IconMusic size={32} className="text-neutral-600" />
           </div>
@@ -454,7 +454,7 @@ export default function PlaylistDetail() {
           <p className="text-neutral-400 mb-6">
             This automation may have been deleted or the link is invalid.
           </p>
-          <Button onClick={() => navigate("/playlists")} className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90">
+          <Button onClick={() => navigate("/playlists")} className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90">
             Back to playlists
           </Button>
         </div>
@@ -464,7 +464,7 @@ export default function PlaylistDetail() {
 
   if (!automation) {
     return (
-      <div className="h-screen w-full min-w-0 flex-1 bg-[#121212] flex items-center justify-center">
+      <div className="h-full w-full min-w-0 flex-1 flex items-center justify-center">
         <Loader />
       </div>
     );
@@ -472,8 +472,8 @@ export default function PlaylistDetail() {
 
 
   return (
-    <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
-      <div className="mx-auto max-w-[1400px]">
+    <div className="h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
+      <div className="mx-auto max-w-[1400px]" data-quiet>
         <motion.header
           className="mb-8"
           initial={{ opacity: 0, y: -20 }}
@@ -513,7 +513,7 @@ export default function PlaylistDetail() {
                 size="sm"
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
+                className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
               >
                 {saving ? (
                   "Saving..."
@@ -550,7 +550,7 @@ export default function PlaylistDetail() {
                   type="text"
                   value={automation.name}
                   onChange={(e) => update({ name: e.target.value })}
-                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all shadow-inner"
+                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white placeholder:text-neutral-500 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-all shadow-inner"
                 />
               </FieldRow>
               <FieldRow label="Description">
@@ -559,7 +559,7 @@ export default function PlaylistDetail() {
                   onChange={(e) => update({ description: e.target.value })}
                   rows={2}
                   placeholder="Optional description"
-                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all resize-none shadow-inner"
+                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white placeholder:text-neutral-500 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-all resize-none shadow-inner"
                 />
               </FieldRow>
             </SectionCard>
@@ -576,13 +576,13 @@ export default function PlaylistDetail() {
                       onClick={() => updateListens({ sort: opt.value })}
                       className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
                         isSelected
-                          ? "border-[#ff530b] bg-[#ff530b]/10 shadow-[0_0_20px_rgba(255,83,11,0.1)]"
+                          ? "border-[var(--ember)] bg-[var(--ember)]/10 shadow-[0_0_20px_rgba(255,83,11,0.1)]"
                           : "border-neutral-700 bg-[#141414] hover:border-neutral-500 hover:bg-[#1a1a1a] hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)]"
                       }`}
                     >
                       <div
                         className={`rounded-lg p-1.5 transition-colors ${
-                          isSelected ? "bg-[#ff530b]/20 text-[#ff530b]" : "bg-neutral-800 text-neutral-400"
+                          isSelected ? "bg-[var(--ember)]/20 text-[var(--ember)]" : "bg-neutral-800 text-neutral-400"
                         }`}
                       >
                         <Icon size={16} />
@@ -602,7 +602,7 @@ export default function PlaylistDetail() {
                   onChange={(e) =>
                     updateListens({ window: WINDOW_OPTIONS.find((o) => o.value === e.target.value).window })
                   }
-                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all appearance-none shadow-inner"
+                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-all appearance-none shadow-inner"
                 >
                   {WINDOW_OPTIONS.map((p) => (
                     <option key={p.value} value={p.value}>
@@ -630,7 +630,7 @@ export default function PlaylistDetail() {
                   size="default"
                   onClick={handleRunNow}
                   disabled={runningNow || listensLoading}
-                  className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
+                  className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
                 >
                   {runningNow ? (
                     <IconRefresh size={16} className="animate-spin mr-1.5" />
@@ -716,7 +716,7 @@ export default function PlaylistDetail() {
                               handleRunNow();
                             }}
                             disabled={runningNow || listensLoading}
-                            className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[#ff530b] hover:text-[#ff530b] transition-colors disabled:opacity-40"
+                            className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[var(--ember)] hover:text-[var(--ember)] transition-colors disabled:opacity-40"
                           >
                             {runningNow ? "Running..." : unsavedChanges ? "Save & run" : "Re-run"}
                           </button>
@@ -809,8 +809,8 @@ export default function PlaylistDetail() {
                 <div className="flex flex-col max-h-[calc(100vh-8rem)]">
                   <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                     <div className="flex items-center gap-3">
-                      <div className="rounded-lg bg-[#ff530b]/10 p-2">
-                        <IconEye size={16} className="text-[#ff530b]" />
+                      <div className="rounded-lg bg-[var(--ember)]/10 p-2">
+                        <IconEye size={16} className="text-[var(--ember)]" />
                       </div>
                       <h3 className="text-base font-bold text-white">Preview</h3>
                     </div>
@@ -821,7 +821,7 @@ export default function PlaylistDetail() {
                       size="default"
                       onClick={loadPreview}
                       disabled={previewLoading || !username?.trim()}
-                      className="w-full bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
+                      className="w-full bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
                     >
                       {previewLoading ? (
                         <IconRefresh size={16} className="animate-spin" />
@@ -873,7 +873,7 @@ export default function PlaylistDetail() {
                           <IconEye size={28} className="text-neutral-600" />
                         </div>
                         <p className="text-sm text-neutral-500 font-medium">
-                          Click <span className="text-[#ff530b]">Load</span> to preview
+                          Click <span className="text-[var(--ember)]">Load</span> to preview
                         </p>
                         <p className="text-xs text-neutral-600 mt-1">
                           See what this automation produces right now
