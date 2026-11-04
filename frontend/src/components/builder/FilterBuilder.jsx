@@ -185,7 +185,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
                       >
                         <IconTag size={12} className="shrink-0 text-neutral-500" />
                         <span className="flex-1 truncate">{tag.name}</span>
-                        <span className="text-[10px] font-mono tabular-nums shrink-0 text-neutral-500">
+                        <span className="text-xs font-mono tabular-nums shrink-0 text-neutral-500">
                           {tag.artists} artist{tag.artists === 1 ? "" : "s"}
                         </span>
                       </button>
@@ -199,7 +199,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
             <span className="text-neutral-600 text-xs">Min tag strength:</span>
             <span className="group/tooltip relative flex items-center">
               <IconHelp size={12} className="text-neutral-600 hover:text-neutral-400 transition-colors cursor-help" />
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-2 text-[11px] text-neutral-300 leading-relaxed shadow-[0_8px_24px_rgba(0,0,0,0.5)] opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto transition-opacity z-50">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-2 text-xs text-neutral-300 leading-relaxed shadow-[0_8px_24px_rgba(0,0,0,0.5)] opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto transition-opacity z-50">
                 How strongly Last.fm listeners link this tag to the artist. The artist&apos;s top tag is always 100. Leave at 0 to accept any strength.
                 <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#1a1a1a]" />
               </span>
@@ -299,7 +299,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
       </div>
 
       <div className="px-4 pb-3.5 pt-0">
-        <p className="text-[11px] mb-2.5 leading-relaxed text-neutral-600">{fieldDef.description}</p>
+        <p className="text-xs mb-2.5 leading-relaxed text-neutral-600">{fieldDef.description}</p>
         {renderValueInput()}
       </div>
     </div>
@@ -500,7 +500,7 @@ export default function FilterBuilder({ value, onChange }) {
           {i > 0 && (
             <div className="flex items-center gap-3 justify-center py-2 mb-4">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-neutral-700 to-transparent" />
-              <span className="text-[10px] text-neutral-600 uppercase tracking-[0.2em] font-bold px-2">OR</span>
+              <span className="text-xs text-neutral-600 uppercase font-bold px-2">OR</span>
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-neutral-700 to-transparent" />
             </div>
           )}
