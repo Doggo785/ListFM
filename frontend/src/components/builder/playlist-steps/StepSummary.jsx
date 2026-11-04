@@ -3,8 +3,8 @@ import {
   isValidCron,
   windowOption,
   describeCron,
+  countActiveConditions,
 } from "@/lib/automation-rules";
-import { countActiveConditions } from "@/lib/filter-engine";
 
 export function StepSummary({ data }) {
   const sortLabel = SORT_OPTIONS.find((o) => o.value === data.sort)?.label ?? data.sort;

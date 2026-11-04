@@ -108,25 +108,20 @@ export const FILTER_FIELDS = {
   userplaycount: { label: "Your plays (all time)", type: "number", description: "Total times you played this track across all time" },
   userloved: { label: "Loved", type: "boolean", description: "Whether you've loved this track on Last.fm" },
   playcount: { label: "Your plays (window)", type: "number", description: "Times you played this track within the time window" },
-  rank: { label: "Rank", type: "number", description: "Position after sorting (1 = first)" },
-  tags: { label: "Tag", type: "text", description: "Genre or mood tag associated with the track" },
+  tags: { label: "Tag", type: "text", description: "Genre or mood tag of the track's artist" },
   timestamp: { label: "Last listened", type: "date", description: "When you last played this track (in days ago)" },
 };
 
 export const FILTER_OPERATORS = {
   number: [
-    { value: "eq", label: "=" },
-    { value: "neq", label: "≠" },
-    { value: "gt", label: ">" },
-    { value: "gte", label: "≥" },
-    { value: "lt", label: "<" },
-    { value: "lte", label: "≤" },
+    { value: "gte", label: "at least" },
+    { value: "lte", label: "at most" },
+    { value: "eq", label: "exactly" },
     { value: "between", label: "between" },
   ],
   text: [
-    { value: "contains", label: "contains" },
-    { value: "not_contains", label: "not contains" },
-    { value: "eq", label: "equals" },
+    { value: "contains", label: "has" },
+    { value: "not_contains", label: "doesn't have" },
   ],
   date: [
     { value: "within_days", label: "Less than X days ago" },
@@ -152,12 +147,48 @@ export function createCondition(overrides = {}) {
     id: crypto.randomUUID(),
     field: "userplaycount",
     operator: "gte",
-    value: 0,
+    value: "",
     valueMax: null,
     countMin: 0,
     tagSource: "artist",
     ...overrides,
   };
+}
+
+/** The same condition on another field: the old value means nothing there. */
+export function conditionForField(condition, field) {
+  const type = FILTER_FIELDS[field]?.type ?? "number";
+  return {
+    ...condition,
+    field,
+    operator: FILTER_OPERATORS[type][0].value,
+    value: type === "boolean" ? true : "",
+    valueMax: null,
+    countMin: 0,
+  };
+}
+
+// Same rule as the server (services/filter_engine.py): without its value a condition is ignored.
+function isCompleteCondition({ operator, value, valueMax }) {
+  if (value == null || String(value).trim() === "") return false;
+  return operator !== "between" || (valueMax != null && valueMax !== "");
+}
+
+export function countActiveConditions(filterGroups) {
+  let count = 0;
+  for (const group of filterGroups ?? []) {
+    count += (group.conditions ?? []).filter(isCompleteCondition).length;
+    count += countActiveConditions(group.groups);
+  }
+  return count;
+}
+
+export function usesTagFilter(filterGroups) {
+  return (filterGroups ?? []).some(
+    (group) =>
+      (group.conditions ?? []).some((c) => c.field === "tags" && isCompleteCondition(c)) ||
+      usesTagFilter(group.groups),
+  );
 }
 
 export function createDefaultAutomation() {
