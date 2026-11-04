@@ -270,7 +270,7 @@ async def test_rate_limited_page_is_retried():
         return real_page(*args)
 
     fake.scrobble_page = flaky
-    with patch.object(scrobble_sync, "note_rate_limited") as backoff:
+    with patch("services.lastfm.note_rate_limited") as backoff:
         await _sync(user_id, fake)
     assert backoff.call_count == 1
     assert await _count(user_id) == 1

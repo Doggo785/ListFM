@@ -11,18 +11,18 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-import httpx
-import pylast
 from database import async_session
 from models.user import User
 from repositories.scrobbles import get_latest_played_at, replace_loved, store_scrobbles
 from services.lastfm import (
+    PAGE_ERRORS,
+    call_retrying_rate_limit,
     get_loved_page,
     get_scrobble_page,
     is_rate_limit_error,
-    note_rate_limited,
 )
 from services.progress import store as progress_store
+from services.tag_catalogue import start_tag_catalogue
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 # 200 is the fallback when a large page fails.
 PAGE_SIZE = 1000
 FALLBACK_PAGE_SIZE = 200
-RATE_LIMIT_RETRIES = 3
 # Previews sync at most this often; a run always syncs.
 PREVIEW_SYNC_INTERVAL = timedelta(minutes=10)
 
@@ -40,10 +39,6 @@ PREVIEW_SYNC_INTERVAL = timedelta(minutes=10)
 # AGENTS.md), and strong references so running tasks are not collected.
 _running: dict[str, str] = {}
 _background_tasks: set[asyncio.Task] = set()
-
-# What a failed Last.fm page raises: an error body, a transport or HTTP
-# error, or an unexpected payload shape.
-PAGE_ERRORS = (pylast.WSError, httpx.HTTPError, KeyError, TypeError, ValueError)
 
 
 class SyncSuperseded(Exception):
@@ -60,19 +55,6 @@ def _check_current(user_id: str, username: str) -> None:
         raise SyncSuperseded
 
 
-async def _call(fn, *args):
-    """One Last.fm page off the event loop, retried after a rate limit (29)."""
-    for attempt in range(RATE_LIMIT_RETRIES + 1):
-        try:
-            return await asyncio.to_thread(fn, *args)
-        except pylast.WSError as exc:
-            if not is_rate_limit_error(exc) or attempt == RATE_LIMIT_RETRIES:
-                raise
-            # The shared throttle sleeps out the backoff before the next call.
-            note_rate_limited()
-    raise AssertionError("unreachable")
-
-
 async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size: int) -> None:
     latest = await get_latest_played_at(db, user_id)
     time_from = int(latest.timestamp()) + 1 if latest else None
@@ -80,9 +62,9 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
     time_to = int(datetime.now(UTC).timestamp())
     key = progress_key(user_id)
 
-    _, total_pages = await _call(get_scrobble_page, username, 1, page_size, time_from, time_to)
+    _, total_pages = await call_retrying_rate_limit(get_scrobble_page, username, 1, page_size, time_from, time_to)
     for done, page in enumerate(range(total_pages, 0, -1), start=1):
-        listens, _ = await _call(get_scrobble_page, username, page, page_size, time_from, time_to)
+        listens, _ = await call_retrying_rate_limit(get_scrobble_page, username, page, page_size, time_from, time_to)
         _check_current(user_id, username)
         await store_scrobbles(
             db,
@@ -95,9 +77,9 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
 
 
 async def _sync_loved(db: AsyncSession, user_id: str, username: str) -> None:
-    loved, total_pages = await _call(get_loved_page, username, 1, PAGE_SIZE)
+    loved, total_pages = await call_retrying_rate_limit(get_loved_page, username, 1, PAGE_SIZE)
     for page in range(2, total_pages + 1):
-        more, _ = await _call(get_loved_page, username, page, PAGE_SIZE)
+        more, _ = await call_retrying_rate_limit(get_loved_page, username, page, PAGE_SIZE)
         loved.extend(more)
     _check_current(user_id, username)
     await replace_loved(db, user_id, loved)
@@ -122,6 +104,7 @@ async def sync_scrobbles(db: AsyncSession, user_id: str, username: str) -> None:
         user.scrobbles_synced_at = now
         user.scrobbles_complete_at = user.scrobbles_complete_at or now
     await db.commit()
+    start_tag_catalogue(user_id)
 
 
 def is_fresh(user: User, max_age: timedelta = PREVIEW_SYNC_INTERVAL) -> bool:

@@ -1,0 +1,243 @@
+"""Tag catalogue (ADR 0003): which artists, in what order, and how failures behave."""
+
+import asyncio
+import uuid
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
+import pylast
+import pytest
+from models.artist import Artist
+from models.artist_tag import ArtistTag
+from models.tag import Tag
+from models.user import User
+from repositories.scrobbles import get_known_artist_tags, store_scrobbles
+from repositories.tags import mark_artist_tags_fetched, replace_artist_tags
+from services import lastfm, scrobble_sync, tag_catalogue
+from services.tag_catalogue import (
+    MAX_CONSECUTIVE_FAILURES,
+    TAG_VALIDITY,
+    fill_tag_catalogue,
+)
+from sqlalchemy import select, update
+
+from .conftest import _TestSessionLocal, _unique_email
+
+NOW = datetime.now(UTC)
+
+
+def _name(label="artist"):
+    """The catalogue is shared and survives between tests: never reuse a name."""
+    return f"{label}-{uuid.uuid4()}"
+
+
+async def _user_listening_to(*artists):
+    """Each artist gets as many listens as their rank from the end: first is most listened."""
+    user_id = str(uuid.uuid4())
+    listens = []
+    for rank, artist in enumerate(reversed(artists), start=1):
+        listens += [(f"t{n}", artist, NOW - timedelta(days=n + 1)) for n in range(rank)]
+    async with _TestSessionLocal() as db:
+        db.add(User(id=user_id, email=_unique_email()))
+        await db.flush()
+        await store_scrobbles(db, user_id, listens)
+        await db.commit()
+    return user_id
+
+
+async def _fill(user_id, tags_of):
+    """Run a pass with get_artist_tags replaced; returns the artists asked for, in order."""
+    asked = []
+
+    def fake(artist):
+        asked.append(artist)
+        return tags_of(artist)
+
+    with patch.object(tag_catalogue, "get_artist_tags", fake):
+        async with _TestSessionLocal() as db:
+            await fill_tag_catalogue(db, user_id)
+    return asked
+
+
+async def _known(user_id):
+    async with _TestSessionLocal() as db:
+        return await get_known_artist_tags(db, user_id)
+
+
+@pytest.mark.asyncio
+async def test_most_listened_artists_come_first_and_tags_are_stored():
+    top, mid, low = _name("top"), _name("mid"), _name("low")
+    user_id = await _user_listening_to(top, mid, low)
+    asked = await _fill(user_id, lambda artist: [{"name": "rock", "count": 80}] if artist == top else [])
+    assert asked == [top, mid, low]
+    # An artist Last.fm has no tags for is known, not unknown.
+    assert await _known(user_id) == {top: [{"name": "rock", "count": 80}], mid: [], low: []}
+    assert await _fill(user_id, lambda artist: []) == []
+
+
+@pytest.mark.asyncio
+async def test_catalogue_is_shared_between_users():
+    shared = _name()
+    first, second = await _user_listening_to(shared), await _user_listening_to(shared)
+    await _fill(first, lambda artist: [])
+    assert await _fill(second, lambda artist: []) == []
+
+
+@pytest.mark.asyncio
+async def test_expired_tags_are_refetched_and_replaced():
+    artist = _name()
+    user_id = await _user_listening_to(artist)
+    await _fill(user_id, lambda a: [{"name": "dropped", "count": 50}])
+
+    async with _TestSessionLocal() as db:
+        await db.execute(
+            update(Artist)
+            .where(Artist.name == artist)
+            .values(tags_fetched_at=NOW - TAG_VALIDITY + timedelta(days=1))
+        )
+        await db.commit()
+    assert await _fill(user_id, lambda a: []) == []  # still valid
+
+    async with _TestSessionLocal() as db:
+        await db.execute(
+            update(Artist)
+            .where(Artist.name == artist)
+            .values(tags_fetched_at=NOW - TAG_VALIDITY - timedelta(days=1))
+        )
+        await db.commit()
+    assert await _fill(user_id, lambda a: [{"name": "kept", "count": 90}]) == [artist]
+    assert await _known(user_id) == {artist: [{"name": "kept", "count": 90}]}
+
+
+@pytest.mark.asyncio
+async def test_artist_fetched_by_another_pass_is_not_asked_again():
+    first, second = _name("first"), _name("second")
+    user_id = await _user_listening_to(first, second)
+
+    asked = []
+
+    async def racing_call(fn, artist):
+        asked.append(artist)
+        async with _TestSessionLocal() as other:
+            await mark_artist_tags_fetched(other, {second})
+            await other.commit()
+        return []
+
+    with patch.object(tag_catalogue, "call_retrying_rate_limit", racing_call):
+        async with _TestSessionLocal() as db:
+            await fill_tag_catalogue(db, user_id)
+    assert asked == [first]
+
+
+@pytest.mark.asyncio
+async def test_failed_artist_stays_unknown_and_the_pass_continues():
+    bad, good = _name("bad"), _name("good")
+    user_id = await _user_listening_to(bad, good)
+
+    def tags_of(artist):
+        if artist == bad:
+            raise pylast.WSError(None, "8", "Operation failed")
+        return []
+
+    assert await _fill(user_id, tags_of) == [bad, good]
+    assert await _known(user_id) == {good: []}
+    # Unknown means due: the next sync tries it again.
+    assert await _fill(user_id, lambda artist: []) == [bad]
+
+
+@pytest.mark.asyncio
+async def test_pass_stops_when_last_fm_is_down():
+    artists = [_name() for _ in range(MAX_CONSECUTIVE_FAILURES + 3)]
+    user_id = await _user_listening_to(*artists)
+
+    def down(artist):
+        raise pylast.WSError(None, "8", "Operation failed")
+
+    assert len(await _fill(user_id, down)) == MAX_CONSECUTIVE_FAILURES
+
+
+@pytest.mark.asyncio
+async def test_a_database_error_on_one_artist_does_not_lose_the_others():
+    long_tag, fine = _name("long"), _name("fine")
+    user_id = await _user_listening_to(long_tag, fine)
+    # Tag.name holds 255 characters: storing this one fails in the database.
+    tags = {long_tag: [{"name": "x" * 300, "count": 100}], fine: [{"name": "ok", "count": 100}]}
+    await _fill(user_id, tags.__getitem__)
+    assert await _known(user_id) == {fine: [{"name": "ok", "count": 100}]}
+
+
+@pytest.mark.asyncio
+async def test_replacing_tags_leaves_the_shared_tag_rows():
+    artist = _name()
+    tag = _name("tag")
+    async with _TestSessionLocal() as db:
+        await replace_artist_tags(db, artist, [{"name": tag, "count": 10}])
+        await replace_artist_tags(db, artist, [])
+        await db.commit()
+        assert await db.scalar(select(Tag.name).where(Tag.name == tag)) == tag
+        assert await db.scalar(select(ArtistTag.artist).where(ArtistTag.artist == artist)) is None
+
+
+@pytest.mark.asyncio
+async def test_background_pass_runs_once_per_user_and_then_allows_another():
+    artist = _name()
+    user_id = await _user_listening_to(artist)
+    asked = []
+
+    def fake(name):
+        asked.append(name)
+        return []
+
+    with (
+        patch.object(tag_catalogue, "async_session", _TestSessionLocal),
+        patch.object(tag_catalogue, "get_artist_tags", fake),
+    ):
+        tag_catalogue.start_tag_catalogue(user_id)
+        tag_catalogue.start_tag_catalogue(user_id)
+        assert len(tag_catalogue._background_tasks) == 1
+        await asyncio.gather(*tag_catalogue._background_tasks)
+    assert asked == [artist]
+    assert user_id not in tag_catalogue._running
+
+
+def _tags_response(payload):
+    response = MagicMock()
+    response.json.return_value = payload
+    return response
+
+
+def test_artist_tags_parsing_normalizes_and_keeps_the_top_ones():
+    many = [{"name": f"t{n}", "count": 100 - n} for n in range(lastfm.ARTIST_TAGS_KEPT + 5)]
+    with (
+        patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0),
+        patch("httpx.get", return_value=_tags_response({"toptags": {"tag": many}})),
+    ):
+        tags = lastfm.get_artist_tags("X")
+    assert len(tags) == lastfm.ARTIST_TAGS_KEPT
+    assert tags[0] == {"name": "t0", "count": 100}
+
+
+def test_artist_tags_of_an_unknown_artist_are_empty_but_other_errors_raise():
+    with patch.object(lastfm, "LASTFM_MIN_INTERVAL", 0):
+        with patch("httpx.get", return_value=_tags_response({"error": 6, "message": "not found"})):
+            assert lastfm.get_artist_tags("Nobody") == []
+        with patch("httpx.get", return_value=_tags_response({"toptags": {}})):
+            assert lastfm.get_artist_tags("Tagless") == []
+        with (
+            patch("httpx.get", return_value=_tags_response({"error": 8, "message": "failed"})),
+            pytest.raises(pylast.WSError),
+        ):
+            lastfm.get_artist_tags("Down")
+
+
+@pytest.mark.asyncio
+async def test_finished_sync_starts_the_catalogue():
+    user_id = await _user_listening_to()
+    with (
+        patch.object(scrobble_sync, "get_scrobble_page", return_value=([], 0)),
+        patch.object(scrobble_sync, "get_loved_page", return_value=([], 1)),
+        patch.object(scrobble_sync, "start_tag_catalogue") as start,
+    ):
+        async with _TestSessionLocal() as db:
+            await scrobble_sync.sync_scrobbles(db, user_id, "u")
+    start.assert_called_once_with(user_id)
