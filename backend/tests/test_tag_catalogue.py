@@ -64,7 +64,7 @@ async def _fill(user_id, tags_of):
 
     with patch.object(tag_catalogue, "get_artist_tags", fake):
         async with _TestSessionLocal() as db:
-            await fill_tag_catalogue(db, user_id)
+            await fill_tag_catalogue(db, user_id, "someone")
     return asked
 
 
@@ -134,7 +134,7 @@ async def test_artist_fetched_by_another_pass_is_not_asked_again():
 
     with patch.object(tag_catalogue, "call_retrying_rate_limit", racing_call):
         async with _TestSessionLocal() as db:
-            await fill_tag_catalogue(db, user_id)
+            await fill_tag_catalogue(db, user_id, "someone")
     assert asked == [first]
 
 
@@ -201,8 +201,8 @@ async def test_background_pass_runs_once_per_user_and_then_allows_another():
         patch.object(tag_catalogue, "async_session", _TestSessionLocal),
         patch.object(tag_catalogue, "get_artist_tags", fake),
     ):
-        tag_catalogue.start_tag_catalogue(user_id)
-        tag_catalogue.start_tag_catalogue(user_id)
+        tag_catalogue.start_tag_catalogue(user_id, "someone")
+        tag_catalogue.start_tag_catalogue(user_id, "someone")
         assert len(tag_catalogue._background_tasks) == 1
         await asyncio.gather(*tag_catalogue._background_tasks)
     assert asked == [artist]
@@ -249,7 +249,22 @@ async def test_finished_sync_starts_the_catalogue():
     ):
         async with _TestSessionLocal() as db:
             await scrobble_sync.sync_scrobbles(db, user_id, "u")
-    start.assert_called_once_with(user_id)
+    start.assert_called_once_with(user_id, "u")
+
+
+@pytest.mark.asyncio
+async def test_a_pass_prints_every_few_artists_not_every_call(activity_lines):
+    user_id = await _user_listening_to(*[_name() for _ in range(5)])
+    with patch.object(tag_catalogue, "LOG_EVERY", 2):
+        await _fill(user_id, lambda _artist: [])
+    lines = activity_lines()
+    assert lines[:3] == [
+        "tags   someone   début, 5 artistes à chercher",
+        "tags   someone   2/5 artistes",
+        "tags   someone   4/5 artistes",
+    ]
+    assert lines[3].startswith("tags   someone   terminé, 5 artistes  ")
+    assert len(lines) == 4
 
 
 @pytest.mark.asyncio
@@ -288,7 +303,7 @@ async def test_background_pass_reports_its_progress():
         patch.object(tag_catalogue, "async_session", _TestSessionLocal),
         patch.object(tag_catalogue, "get_artist_tags", fake),
     ):
-        tag_catalogue.start_tag_catalogue(user_id)
+        tag_catalogue.start_tag_catalogue(user_id, "someone")
         await asyncio.gather(*tag_catalogue._background_tasks)
     assert seen == [("tags", 0, 2), ("tags", 1, 2)]
     assert progress_store.read(key).stage == "done"

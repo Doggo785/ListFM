@@ -143,6 +143,16 @@ async def test_run_with_no_listens_in_window_is_empty_not_failed():
 
 
 @pytest.mark.asyncio
+async def test_run_prints_its_counts(activity_lines):
+    user_id = await _user_with_listens([("A", 1), ("B", 2)])
+    automation = await _automation(user_id)
+    async with _TestSessionLocal() as db:
+        await run_automation(db, automation, scheduled_for=NOW)
+        await db.commit()
+    assert activity_lines()[0].startswith('run    "t"       2 → 2 → 2 morceaux  ')
+
+
+@pytest.mark.asyncio
 async def test_run_waits_for_the_first_full_sync():
     user_id = str(uuid.uuid4())
     async with _TestSessionLocal() as db:

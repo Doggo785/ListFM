@@ -15,6 +15,7 @@ from schemas import (
     Track,
     UserInfo,
 )
+from services.activity_log import log_activity
 from services.lastfm import (
     epoch_to_datetime,
     get_recent_tracks,
@@ -39,7 +40,7 @@ def user_info(username: str = Depends(get_current_user_lastfm_username)):
         info = get_user_info(username)
         return UserInfo(**info)
     except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
-        logger.error("Last.fm API error: %s", e)
+        log_activity("lastfm", username, f"échec : {type(e).__name__}")
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
 
@@ -56,11 +57,11 @@ async def user_recent_tracks(
         # Single Last.fm call; run it off the loop.
         tracks = await asyncio.to_thread(get_recent_tracks, username, limit)
     except Exception as e:  # noqa: BLE001 -- deliberate boundary: log, fall back, never leak upstream internals
-        logger.error("Last.fm API error: %s", e)
+        log_activity("lastfm", username, f"échec : {type(e).__name__}")
         stored = await get_recent_user_tracks(db, current_user.id, limit)
         if not stored:
             raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
-        logger.info("recent-tracks: Last.fm down, serving %d stored plays", len(stored))
+        log_activity("lastfm", username, f"{len(stored)} écoutes en base servies à la place")
         return RecentTracksResponse(
             tracks=[Track(title=t["title"], artist=t["artist"], album=t["album"]) for t in stored]
         )

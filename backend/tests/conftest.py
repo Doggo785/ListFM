@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -100,6 +101,15 @@ async def _cleanup_db():
     # between tests keeps the pool working while still reusing connections
     # within a single test's many sessions.
     await _test_engine.dispose()
+
+
+@pytest.fixture
+def activity_lines(caplog):
+    """The console lines of services/activity_log.py, which skip the root logger."""
+    logger = logging.getLogger("listfm")
+    logger.addHandler(caplog.handler)
+    yield lambda: caplog.messages
+    logger.removeHandler(caplog.handler)
 
 
 @pytest.fixture(autouse=True)
