@@ -44,9 +44,7 @@ def get_field_value(track, field, tag_source):
             return None
         return math.floor(time.time()) - track["timestamp"]
     if field == "tags":
-        if tag_source == "album":
-            return track.get("album_tags") or []
-        return track.get("artist_tags") or []
+        return track.get("album_tags" if tag_source == "album" else "artist_tags")
     return track.get(field)
 
 
@@ -73,9 +71,13 @@ _TAG_OPERATORS = {
 
 
 def _evaluate_tag_condition(field_value, operator, value, count_min):
-    """tags field: match by name (case-insensitive) AND count >= countMin."""
-    tags = field_value if isinstance(field_value, list) else []
-    match = _find_tag_match(tags, value, count_min)
+    """tags field: match by name (case-insensitive) AND count >= countMin.
+
+    Tags never looked up match nothing, not even not_contains: unknown is not "no tag".
+    """
+    if not isinstance(field_value, list):
+        return False
+    match = _find_tag_match(field_value, value, count_min)
     handler = _TAG_OPERATORS.get(operator)
     return handler(match) if handler is not None else False
 

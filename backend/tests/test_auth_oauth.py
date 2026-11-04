@@ -697,7 +697,7 @@ async def test_relink_other_lastfm_account_moves_automations_and_drops_personal_
             "/api/automations",
             json={
                 "name": "Relink",
-                "source": {"type": "top_tracks", "period": "3m"},
+                "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
                 "cron": "0 0 1 * *",
                 "filter_groups": [],
                 "output": {"maxSize": 10},

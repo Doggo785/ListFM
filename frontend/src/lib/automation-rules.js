@@ -1,25 +1,56 @@
-export const SOURCE_TYPES = {
-  TOP_TRACKS: "top_tracks",
-  RECENT_TRACKS: "recent_tracks",
-  LOVED_TRACKS: "loved_tracks",
-  TOP_ARTISTS: "top_artists",
-};
+import {
+  IconArrowsShuffle,
+  IconBolt,
+  IconClock,
+  IconDice5,
+  IconSparkles,
+} from "@tabler/icons-react";
 
-export const SOURCE_TYPE_LABELS = {
-  top_tracks: "Top Tracks",
-  recent_tracks: "Recent Tracks",
-  loved_tracks: "Loved Tracks",
-  top_artists: "Top Artists",
-};
-
-export const PERIOD_OPTIONS = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "1m", label: "Last month" },
-  { value: "3m", label: "Last 3 months" },
-  { value: "6m", label: "Last 6 months" },
-  { value: "12m", label: "Last 12 months" },
-  { value: "overall", label: "All time" },
+// GLOSSARY: Tri. Values mirror backend schemas.SortKey.
+export const SORT_OPTIONS = [
+  { value: "most_played", label: "Most played", icon: IconBolt, description: "Your most played tracks in the window" },
+  { value: "last_played", label: "Recently played", icon: IconClock, description: "What you listened to last" },
+  { value: "first_played", label: "Recently discovered", icon: IconSparkles, description: "Tracks you heard for the first time most recently" },
+  { value: "random", label: "Random", icon: IconArrowsShuffle, description: "A fresh draw every run" },
+  { value: "random_weighted", label: "Random, favorites first", icon: IconDice5, description: "A draw that favors what you play most" },
 ];
+
+const month = (amount) => ({ length: { amount, unit: "month" }, ago: null });
+
+// GLOSSARY: Fenêtre. Counted back from the run's scheduled time.
+export const WINDOW_OPTIONS = [
+  { value: "7d", label: "Last 7 days", window: { length: { amount: 7, unit: "day" }, ago: null } },
+  { value: "1m", label: "Last month", window: month(1) },
+  { value: "3m", label: "Last 3 months", window: month(3) },
+  { value: "6m", label: "Last 6 months", window: month(6) },
+  { value: "12m", label: "Last 12 months", window: month(12) },
+  {
+    value: "year_ago",
+    label: "Same month, a year ago",
+    window: { length: { amount: 1, unit: "month" }, ago: { amount: 1, unit: "year" } },
+  },
+  { value: "all", label: "All time", window: { length: null, ago: null } },
+];
+
+const sameSpan = (a, b) => (a ?? null) === (b ?? null) || (a?.amount === b?.amount && a?.unit === b?.unit);
+
+export function windowOption(window) {
+  return WINDOW_OPTIONS.find(
+    (o) => sameSpan(o.window.length, window?.length) && sameSpan(o.window.ago, window?.ago),
+  );
+}
+
+/** Summary with the schedule first when there is one (dashboard cards). */
+export function describeAutomationWithSchedule(auto) {
+  const summary = describeAutomation(auto);
+  return isValidCron(auto?.cron) ? `${describeCron(auto.cron)} · ${summary}` : summary;
+}
+
+/** One-line summary of an automation, e.g. "Most played · Last 3 months". */
+export function describeAutomation(auto) {
+  const sort = SORT_OPTIONS.find((o) => o.value === auto?.sort)?.label ?? auto?.sort;
+  return `${sort} · ${windowOption(auto?.window)?.label ?? "Custom window"}`;
+}
 
 export const DEFAULT_CRON = "0 0 1 * *";
 
@@ -76,10 +107,8 @@ function nthSuffix(n) {
 export const FILTER_FIELDS = {
   userplaycount: { label: "Your plays (all time)", type: "number", description: "Total times you played this track across all time" },
   userloved: { label: "Loved", type: "boolean", description: "Whether you've loved this track on Last.fm" },
-  playcount: { label: "Your plays (period)", type: "number", description: "Times you played this track within the selected period" },
-  global_playcount: { label: "Global plays", type: "number", description: "Total plays across all Last.fm users" },
-  listeners: { label: "Listeners", type: "number", description: "Number of unique Last.fm users who played this track" },
-  rank: { label: "Rank", type: "number", description: "Position in your top tracks chart (1 = #1)" },
+  playcount: { label: "Your plays (window)", type: "number", description: "Times you played this track within the time window" },
+  rank: { label: "Rank", type: "number", description: "Position after sorting (1 = first)" },
   tags: { label: "Tag", type: "text", description: "Genre or mood tag associated with the track" },
   timestamp: { label: "Last listened", type: "date", description: "When you last played this track (in days ago)" },
 };
@@ -136,10 +165,8 @@ export function createDefaultAutomation() {
     id: crypto.randomUUID(),
     name: "",
     description: "",
-    source: {
-      type: SOURCE_TYPES.RECENT_TRACKS,
-      period: "3m",
-    },
+    window: month(3),
+    sort: "most_played",
     cron: "",
     filterGroups: [createGroup()],
     output: {
@@ -151,35 +178,3 @@ export function createDefaultAutomation() {
     lastRun: null,
   };
 }
-
-export function sanitizeAutomation(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  if (!raw.id || !raw.source) return null;
-
-  return {
-    id: raw.id,
-    name: String(raw.name || ""),
-    description: String(raw.description || ""),
-    source: {
-      type: Object.values(SOURCE_TYPES).includes(raw.source.type)
-        ? raw.source.type
-        : SOURCE_TYPES.RECENT_TRACKS,
-      period: PERIOD_OPTIONS.some((p) => p.value === raw.source.period)
-        ? raw.source.period
-        : "3m",
-    },
-    cron: isValidCron(raw.cron) ? raw.cron.trim() : "",
-    filterGroups: Array.isArray(raw.filterGroups)
-      ? raw.filterGroups
-      : [createGroup()],
-    output: {
-      // Mirrors the backend bound (AutomationOutput: 1-200, 0 -> 50).
-      maxSize: Math.min(200, Math.max(1, parseInt(raw.output?.maxSize) || 50)),
-    },
-    enabled: raw.enabled !== false,
-    createdAt: raw.createdAt || new Date().toISOString(),
-    updatedAt: raw.updatedAt || new Date().toISOString(),
-    lastRun: raw.lastRun || null,
-  };
-}
-

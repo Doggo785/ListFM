@@ -8,12 +8,7 @@ import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
 import CountUp from "../components/elements/CountUp";
 import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
 import { getAutomations, getRecentTracks } from "@/lib/api";
-import {
-  SOURCE_TYPE_LABELS,
-  PERIOD_OPTIONS,
-  describeCron,
-  isValidCron,
-} from "@/lib/automation-rules";
+import { describeAutomationWithSchedule } from "@/lib/automation-rules";
 import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
 import {
   getGreeting,
@@ -38,18 +33,6 @@ function StatBlock({ value, label, color, delay = 0 }) {
       </p>
     </motion.div>
   );
-}
-
-function buildDescription(auto) {
-  const source = SOURCE_TYPE_LABELS[auto.source?.type] || auto.source?.type;
-  const period =
-    PERIOD_OPTIONS.find((p) => p.value === auto.source?.period)?.label ||
-    auto.source?.period;
-  if (isValidCron(auto.cron)) {
-    const schedule = describeCron(auto.cron);
-    return `${schedule} · ${source} · ${period}`;
-  }
-  return `${source} · ${period}`;
 }
 
 function Dashboard() {
@@ -130,7 +113,7 @@ function Dashboard() {
     if (!username) return [];
     return automations.map((auto) => ({
       ...buildAutomationCardBase(auto),
-      description: buildDescription(auto),
+      description: describeAutomationWithSchedule(auto),
     }));
   }, [username, automations]);
 

@@ -49,7 +49,8 @@ const AUTOMATION = {
   id: "a1",
   name: "Test automation",
   description: "",
-  source: { type: "recent_tracks", period: "3m" },
+  window: { length: { amount: 3, unit: "month" }, ago: null },
+  sort: "last_played",
   cron: "0 8 * * *",
   filterGroups: [],
 };
@@ -99,6 +100,27 @@ async function teardown(container, root) {
   container.remove();
   vi.clearAllMocks();
 }
+
+describe("PlaylistDetail listens", () => {
+  it("changes the sort and the window", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Recently played · Last 3 months");
+      await clickButton(container, "Most played");
+      await waitForText(container, "Most played · Last 3 months");
+      const select = [...container.querySelectorAll("select")].find((s) => s.value === "3m");
+      await act(async () => {
+        select.value = "all";
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await waitForText(container, "Most played · All time");
+    } finally {
+      await teardown(container, root);
+    }
+  });
+});
 
 describe("PlaylistDetail progress", () => {
   it("shows a done summary after Run now", async () => {

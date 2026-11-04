@@ -28,11 +28,10 @@ from schemas import (
     RunRequest,
 )
 from services.automation_runner import (
-    UnsupportedSourceTypeError,
     run_automation,
     run_automation_pipeline_cached,
 )
-from services.progress import PipelineCancelled, store as progress_store
+from services.progress import store as progress_store
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,47 +69,16 @@ async def preview_automation(
     if progress_key is not None:
         progress_store.start(progress_key)
 
-    # Cache-first pipeline: repeated previews of the same tracks hit the DB
-    # instead of Last.fm. Cache writes commit below (a broken cache layer
-    # fails the preview loudly instead of degrading silently).
-    try:
-        result = await run_automation_pipeline_cached(
-            db,
-            user_id=current_user.id,
-            username=username,
-            source_type=automation.source.type,
-            period=automation.source.period,
-            filter_groups=automation.filter_groups,
-            max_tracks=automation.output.maxSize,
-            progress_key=progress_key,
-        )
-    except PipelineCancelled:
-        if progress_key is not None:
-            progress_store.finish(progress_key)
-        logger.info("preview ticket %s cancelled by user", body.progress_token)
-        return {
-            "tracks": [],
-            "total": 0,
-            "before_filter": 0,
-            "source_tracks": [],
-            "cache_hits": 0,
-            "cache_misses": 0,
-            "lastfm_calls": 0,
-            "cancelled": True,
-        }
-    except UnsupportedSourceTypeError:
-        raise HTTPException(status_code=422, detail="Unsupported source type")
-    except HTTPException:
-        raise
-    except Exception:  # noqa: BLE001 -- any upstream failure becomes a clean 502
-        raise HTTPException(status_code=502, detail="Unable to fetch tracks from Last.fm")
-
-    try:
-        await db.commit()
-    except SQLAlchemyError:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to save preview cache")
-
+    result = await run_automation_pipeline_cached(
+        db,
+        user_id=current_user.id,
+        username=username,
+        window=automation.window.model_dump(),
+        sort=automation.sort,
+        filter_groups=automation.filter_groups,
+        max_tracks=automation.output.maxSize,
+        progress_key=progress_key,
+    )
     if progress_key is not None:
         progress_store.finish(progress_key)
     result["cancelled"] = False
@@ -168,7 +136,7 @@ async def run_progress(
     if not rows:
         raise HTTPException(status_code=404, detail="No runs yet")
     latest = rows[0]
-    if latest.status == "completed":
+    if latest.status in ("completed", "empty"):
         done = latest.tracks_after_filter or 0
         return ProgressRead(stage="done", done=done, total=done)
     if latest.status == "failed":

@@ -7,10 +7,6 @@ import {
   IconTrash,
   IconPlayerPlay,
   IconRefresh,
-  IconBolt,
-  IconHeart,
-  IconClock,
-  IconUsers,
   IconCalendarRepeat,
   IconSettings,
   IconEye,
@@ -38,19 +34,13 @@ import {
 } from "@/lib/api";
 import { useAutomation } from "@/hooks/useAutomation";
 import {
-  SOURCE_TYPES,
-  SOURCE_TYPE_LABELS,
-  PERIOD_OPTIONS,
+  SORT_OPTIONS,
+  WINDOW_OPTIONS,
+  describeAutomation,
+  windowOption,
 } from "@/lib/automation-rules";
 import { applyFilters } from "@/lib/filter-engine";
 import { useAuth } from "../contexts/AuthContext";
-
-const SOURCE_OPTIONS = [
-  { type: SOURCE_TYPES.TOP_TRACKS, icon: IconBolt, description: "Most played tracks" },
-  { type: SOURCE_TYPES.RECENT_TRACKS, icon: IconClock, description: "Recent listens" },
-  { type: SOURCE_TYPES.LOVED_TRACKS, icon: IconHeart, description: "Loved tracks" },
-  { type: SOURCE_TYPES.TOP_ARTISTS, icon: IconUsers, description: "From favorite artists" },
-];
 
 const GLOW_COLORS = ["#c084fc", "#f472b6", "#38bdf8"];
 
@@ -234,10 +224,10 @@ export default function PlaylistDetail() {
     setSaved(false);
   }, []);
 
-  const updateSource = useCallback((patch) => {
+  const updateListens = useCallback((patch) => {
     setAutomation((prev) => ({
       ...prev,
-      source: { ...prev.source, ...patch },
+      ...patch,
       updatedAt: new Date().toISOString(),
     }));
     setSaved(false);
@@ -502,10 +492,6 @@ export default function PlaylistDetail() {
     );
   }
 
-  const sourceLabel = SOURCE_TYPE_LABELS[automation.source?.type] || automation.source?.type;
-  const periodLabel =
-    PERIOD_OPTIONS.find((p) => p.value === automation.source?.period)?.label ||
-    automation.source?.period;
 
   return (
     <div className="h-screen w-full min-w-0 flex-1 overflow-y-auto bg-[#121212] p-5 md:p-10">
@@ -531,7 +517,7 @@ export default function PlaylistDetail() {
                 <span className="text-[#17AEFF]">Edit</span> automation
               </h2>
               <p className="mt-2 text-neutral-400 text-sm">
-                {sourceLabel} · {periodLabel}
+                {describeAutomation(automation)}
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -600,16 +586,16 @@ export default function PlaylistDetail() {
               </FieldRow>
             </SectionCard>
 
-            <SectionCard title="Source" icon={IconMusic} delay={0.2}>
+            <SectionCard title="Listens" icon={IconMusic} delay={0.2}>
               <div className="grid grid-cols-2 gap-3">
-                {SOURCE_OPTIONS.map((opt) => {
+                {SORT_OPTIONS.map((opt) => {
                   const Icon = opt.icon;
-                  const isSelected = automation.source?.type === opt.type;
+                  const isSelected = automation.sort === opt.value;
                   return (
                     <button
-                      key={opt.type}
+                      key={opt.value}
                       type="button"
-                      onClick={() => updateSource({ type: opt.type })}
+                      onClick={() => updateListens({ sort: opt.value })}
                       className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 text-left transition-all ${
                         isSelected
                           ? "border-[#ff530b] bg-[#ff530b]/10 shadow-[0_0_20px_rgba(255,83,11,0.1)]"
@@ -624,7 +610,7 @@ export default function PlaylistDetail() {
                         <Icon size={16} />
                       </div>
                       <div>
-                        <div className="text-sm font-semibold text-white">{SOURCE_TYPE_LABELS[opt.type]}</div>
+                        <div className="text-sm font-semibold text-white">{opt.label}</div>
                         <div className="text-xs text-neutral-500">{opt.description}</div>
                       </div>
                     </button>
@@ -632,13 +618,15 @@ export default function PlaylistDetail() {
                 })}
               </div>
 
-              <FieldRow label="Time period">
+              <FieldRow label="Time window">
                 <select
-                  value={automation.source?.period || "3m"}
-                  onChange={(e) => updateSource({ period: e.target.value })}
+                  value={windowOption(automation.window)?.value ?? ""}
+                  onChange={(e) =>
+                    updateListens({ window: WINDOW_OPTIONS.find((o) => o.value === e.target.value).window })
+                  }
                   className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-all appearance-none shadow-inner"
                 >
-                  {PERIOD_OPTIONS.map((p) => (
+                  {WINDOW_OPTIONS.map((p) => (
                     <option key={p.value} value={p.value}>
                       {p.label}
                     </option>
@@ -656,7 +644,6 @@ export default function PlaylistDetail() {
                 value={automation.filterGroups || []}
                 onChange={updateFilters}
                 availableTags={availableTags}
-                disabledFields={automation.source?.type !== "recent_tracks" ? ["timestamp"] : []}
               />
             </SectionCard>
 

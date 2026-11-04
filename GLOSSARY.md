@@ -38,6 +38,10 @@ _Avoid_ : Historique, source, scrobbles
 La mise à jour des écoutes d'un utilisateur depuis Last.fm : complète la première fois, puis seulement les nouvelles.
 _Avoid_ : Import, fetch, refresh
 
+**Catalogue de tags** :
+Les tags connus par artiste, partagés entre utilisateurs et remplis en tâche de fond. Un artiste absent du catalogue a des tags inconnus, ce qui diffère d'un artiste sans tag.
+_Avoid_ : Cache, enrichissement
+
 ## La chaîne d'une automation
 
 **Fenêtre** :

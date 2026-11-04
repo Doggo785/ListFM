@@ -61,7 +61,7 @@ def _create_body(filter_groups: list) -> dict:
     return {
         "name": "Filtered playlist",
         "description": "test",
-        "source": {"type": "top_tracks", "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "",
         "filter_groups": filter_groups,
         "output": {"maxSize": 50},
@@ -234,7 +234,7 @@ def _frontend_payload(filter_groups: list) -> dict:
         "id": "00000000-0000-0000-0000-000000000000",
         "name": "Filtered playlist",
         "description": "test",
-        "source": {"type": "top_tracks", "period": "3m"},
+        "window": {"length": {"amount": 3, "unit": "month"}}, "sort": "most_played",
         "cron": "",
         "filterGroups": filter_groups,
         "output": {"maxSize": 50},
@@ -286,7 +286,7 @@ async def test_update_automation_accepts_camelCase_filterGroups(client: AsyncCli
                 "conditions": [
                     {
                         "id": "c9",
-                        "field": "listeners",
+                        "field": "playcount",
                         "operator": "gt",
                         "value": 1000,
                         "valueMax": None,
@@ -346,7 +346,7 @@ async def test_update_automation_filter_groups(client: AsyncClient):
                 "conditions": [
                     {
                         "id": "c9",
-                        "field": "listeners",
+                        "field": "playcount",
                         "operator": "gt",
                         "value": 1000,
                         "valueMax": None,

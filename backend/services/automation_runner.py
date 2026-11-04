@@ -1,17 +1,15 @@
 """Shared pipeline for running automations (preview + scheduled sweep).
 
-Pipeline: dispatch source tracks -> deduplicate -> enrich (DB cache first,
-live Last.fm only on misses) -> apply_filters (server-side filter engine)
--> explicit track limit.
+Pipeline (ADR 0002, 0003): the user's stored listens in the window -> sort
+-> filters on stored data -> cut to the playlist size.
 
-``run_automation_pipeline_cached`` is the async cache-first path used by
-the sweep and the preview endpoint. Blocking pylast calls always run in the
-default executor, never on the event loop.
+``run_automation_pipeline_cached`` is used by the sweep and the preview
+endpoint.
 """
 
-import asyncio
-import functools
+import calendar
 import logging
+import random
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -24,25 +22,23 @@ from models.user import User
 from repositories.automation_history import create_automation_history
 from repositories.automations import get_automations_by_ids
 from repositories.generated_playlists import create_generated_playlist
+from repositories.scrobbles import get_known_artist_tags, get_window_tracks
 from schemas import GeneratedPlaylistCreate, Track
-from services.enrich_cache import enrich_tracks_cached
 from services.filter_engine import apply_filters
-from services.lastfm import (
-    deduplicate,
-    get_loved_tracks,
-    get_recent_tracks,
-    get_top_artists_tracks,
-    get_top_tracks,
-    is_rate_limit_error,
-)
+from services.lastfm import is_rate_limit_error
 from services.progress import store as progress_store
+from services.scrobble_sync import (
+    PAGE_ERRORS,
+    SyncSuperseded,
+    is_syncing,
+    start_scrobble_sync,
+    sync_scrobbles,
+)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_TRACK_LIMIT = 50
 
 # Backoff after failed attempt N before retry attempt N+1 runs.
 # Attempt MAX_ATTEMPT is terminal: no further retry, failed stays visible.
@@ -54,23 +50,46 @@ RETRY_DELAYS = {
 MAX_ATTEMPT = 4
 
 
-class UnsupportedSourceTypeError(ValueError):
-    """Raised when an automation source type is not one of the known types."""
+# Tracks returned to the client next to the result, for the builder preview.
+# shortcut: the client refilters these; drop the field with filter-engine.js (phase C).
+SOURCE_TRACKS_SHOWN = 500
 
 
-def dispatch_source_tracks(source_type: str, username: str, period: str, limit: int) -> list[dict]:
-    """Fetch raw source tracks for an automation source type."""
-    match source_type:
-        case "top_tracks":
-            return get_top_tracks(username, period, limit)
-        case "recent_tracks":
-            return get_recent_tracks(username, limit)
-        case "loved_tracks":
-            return get_loved_tracks(username, limit)
-        case "top_artists":
-            return get_top_artists_tracks(username, period, limit)
-        case _:
-            raise UnsupportedSourceTypeError(f"Unsupported source type: {source_type}")
+def _months_back(at: datetime, months: int) -> datetime:
+    year, month = divmod(at.year * 12 + at.month - 1 - months, 12)
+    day = min(at.day, calendar.monthrange(year, month + 1)[1])
+    return at.replace(year=year, month=month + 1, day=day)
+
+
+def _shift_back(at: datetime, span: dict) -> datetime:
+    amount, unit = span["amount"], span["unit"]
+    if unit == "day":
+        return at - timedelta(days=amount)
+    if unit == "week":
+        return at - timedelta(weeks=amount)
+    return _months_back(at, amount * (12 if unit == "year" else 1))
+
+
+def window_bounds(window: dict, at: datetime) -> tuple[datetime | None, datetime]:
+    """[start, end) of a window counted back from ``at`` (start None = every listen)."""
+    end = _shift_back(at, window["ago"]) if window.get("ago") else at
+    start = _shift_back(end, window["length"]) if window.get("length") else None
+    return start, end
+
+
+# Not a security need (shuffling a playlist); it costs nothing and keeps scanners quiet.
+_rng = random.SystemRandom()
+
+
+def sort_tracks(tracks: list[dict], sort: str) -> list[dict]:
+    """Order candidates by the automation's sort (GLOSSARY: Tri)."""
+    if sort == "random":
+        return _rng.sample(tracks, len(tracks))
+    if sort == "random_weighted":
+        # Weighted sampling without replacement: key = u ** (1 / weight).
+        return sorted(tracks, key=lambda t: _rng.random() ** (1 / max(t.get("playcount", 1), 1)), reverse=True)
+    field = {"most_played": "playcount", "last_played": "timestamp", "first_played": "first_played"}[sort]
+    return sorted(tracks, key=lambda t: (t.get(field, 0), t.get("timestamp", 0)), reverse=True)
 
 
 async def run_automation_pipeline_cached(
@@ -78,73 +97,37 @@ async def run_automation_pipeline_cached(
     *,
     user_id: str,
     username: str,
-    source_type: str,
-    period: str,
+    window: dict,
+    sort: str,
     filter_groups: list,
     max_tracks: int,
-    track_limit: int = DEFAULT_TRACK_LIMIT,
+    at: datetime | None = None,
     progress_key: str | None = None,
 ) -> dict:
-    """Cache-first pipeline: dispatch live, enrich from DB cache, filter.
+    """Window of stored listens -> sort -> filter -> cut to size (ADR 0002).
 
-    Returns the sync pipeline's keys plus ``cache_hits``, ``cache_misses``
-    and ``lastfm_calls`` for logs and UI. When ``progress_key`` is set,
-    each stage reports (stage, done, total) to the progress store so the
-    UI can poll a live counter.
+    Reads the database only: no Last.fm call, so a preview can run on every
+    change (ADR 0003). A track whose artist has no stored tags yet matches no
+    tag filter.
     """
-    limit = track_limit if not max_tracks else min(max_tracks, track_limit)
-    loop = asyncio.get_running_loop()
-    source_tracks = await loop.run_in_executor(
-        None,
-        functools.partial(
-            dispatch_source_tracks,
-            source_type=source_type,
-            username=username,
-            period=period,
-            limit=limit,
-        ),
-    )
-    deduped = deduplicate(source_tracks)
+    start, end = window_bounds(window, at or datetime.now(UTC))
+    candidates = sort_tracks(await get_window_tracks(db, user_id, start, end), sort)
+    artist_tags = await get_known_artist_tags(db, user_id)
+    for rank, track in enumerate(candidates, start=1):
+        track["rank"] = rank
+        if track["artist"] in artist_tags:
+            track["artist_tags"] = artist_tags[track["artist"]]
     if progress_key is not None:
-        # done=0 on purpose: the list is fetched but nothing is enriched
-        # yet. Reporting done=len here would pin the bar at 100% (the bug
-        # the user saw); it climbs with each finished track instead.
-        progress_store.report(progress_key, "source", 0, len(deduped))
-    needs = needed_fields(filter_groups)
-    if deduped and all("userloved" in t for t in deduped):
-        # extended=1 dispatch already fetched loved flags: no live call.
-        needs.discard("userloved")
-    if not needs:
-        enriched, stats = deduped, {"hits": 0, "misses": 0, "lastfm_calls": 0}
-    else:
-        enriched, stats = await enrich_tracks_cached(
-            db,
-            user_id=user_id,
-            username=username,
-            tracks=deduped,
-            max_enrich=limit,
-            progress_key=progress_key,
-        )
-    filtered = apply_filters(enriched, filter_groups)
+        progress_store.report(progress_key, "source", 0, len(candidates))
+    tracks = apply_filters(candidates, filter_groups)[:max_tracks]
     if progress_key is not None:
-        progress_store.report(progress_key, "filter", len(filtered), len(deduped))
-    tracks = filtered[:limit]
-    logger.info(
-        "pipeline: %d source -> %d kept (%d cache hits, %d misses, %d Last.fm calls)",
-        len(deduped),
-        len(tracks),
-        stats["hits"],
-        stats["misses"],
-        stats["lastfm_calls"],
-    )
+        progress_store.report(progress_key, "filter", len(tracks), len(candidates))
+    logger.info("pipeline: %d in window -> %d kept", len(candidates), len(tracks))
     return {
         "tracks": tracks,
         "total": len(tracks),
-        "before_filter": len(deduped),
-        "source_tracks": source_tracks,
-        "cache_hits": stats["hits"],
-        "cache_misses": stats["misses"],
-        "lastfm_calls": stats["lastfm_calls"],
+        "before_filter": len(candidates),
+        "source_tracks": candidates[:SOURCE_TRACKS_SHOWN],
     }
 
 
@@ -195,66 +178,10 @@ def _filter_groups_to_json(filter_groups):
     ]
 
 
-# Enrich keys a filter tree can read. playcount/rank/timestamp come from the
-# dispatch list itself, so they need no enrichment. Anything unknown falls
-# back to the full set (safe: fetch more, never filter on missing data).
-# Non-empty needs always run a FULL fetch + write-back (today's behavior):
-# partial fetches skip write-back only once per-group freshness lands
-# (next tranche), so repeated runs keep warming the cache like before.
-FULL_FETCH_KEYS = frozenset(
-    {
-        "listeners",
-        "global_playcount",
-        "userplaycount",
-        "userloved",
-        "artist_tags",
-        "album",
-        "album_tags",
-    }
-)
-_FIELD_TO_ENRICH_KEYS = {
-    "userplaycount": {"userplaycount"},
-    "userloved": {"userloved"},
-    "global_playcount": {"global_playcount"},
-    "listeners": {"listeners"},
-    "tags": {"artist_tags", "album", "album_tags"},
-}
-
-
-def _fg_get(obj, key, default=None):
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
-
-
-def needed_fields(filter_groups) -> set[str]:
-    """Enrich keys the active filters actually read (empty = skip enrich).
-
-    Walks conditions and nested groups (dicts or Pydantic models, like the
-    filter engine). Unknown field -> full set: fetch more rather than risk
-    filtering on defaults.
-    """
-    if not filter_groups:
-        return set()
-    needed: set[str] = set()
-    for group in filter_groups:
-        for condition in _fg_get(group, "conditions") or []:
-            field = _fg_get(condition, "field")
-            if field in _FIELD_TO_ENRICH_KEYS:
-                needed.update(_FIELD_TO_ENRICH_KEYS[field])
-            elif field in ("playcount", "rank", "timestamp", None):
-                continue
-            else:
-                return set(FULL_FETCH_KEYS)
-        needed.update(needed_fields(_fg_get(group, "groups") or []))
-        if needed >= FULL_FETCH_KEYS:
-            return set(FULL_FETCH_KEYS)
-    return needed
-
-
 async def _mark_success(db: AsyncSession, history, result: dict, automation: Automation) -> None:
     """Record a completed run on the history row and bump last_run."""
-    history.status = "completed"
+    # GLOSSARY: Run vide. No playlist, not a failure, never retried.
+    history.status = "completed" if result["total"] else "empty"
     history.tracks_generated = result["total"]
     history.tracks_before_filter = result["before_filter"]
     history.tracks_after_filter = result["total"]
@@ -263,8 +190,33 @@ async def _mark_success(db: AsyncSession, history, result: dict, automation: Aut
     await db.flush()
 
 
+class HistoryLoading(Exception):
+    """The user's first full listening history sync has not finished."""
+
+
+async def _sync_before_run(db: AsyncSession, automation: Automation) -> None:
+    """Bring the listens up to date before a run; wait out the first full load.
+
+    A failed incremental sync is logged and the run uses the stored listens.
+    """
+    user = await db.get(User, automation.user_id)
+    if user is None or user.scrobbles_complete_at is None:
+        # Restarts an interrupted first load; a no-op while one runs.
+        start_scrobble_sync(automation.user_id, automation.lastfm_username)
+        raise HistoryLoading
+    if is_syncing(automation.user_id):
+        return
+    try:
+        await sync_scrobbles(db, automation.user_id, automation.lastfm_username)
+    except (*PAGE_ERRORS, SyncSuperseded):
+        logger.warning("pre-run sync failed for automation %s, using stored listens", automation.id)
+        await db.rollback()
+
+
 def _public_error(exc: Exception) -> str:
     """Message shown in history and progress; the raw error goes to the logs only."""
+    if isinstance(exc, HistoryLoading):
+        return "Your listening history is still loading. The run will retry."
     if is_rate_limit_error(exc):
         return "Last.fm is rate limiting requests. Try again in a few minutes."
     return "The run failed (Last.fm or server error)."
@@ -319,14 +271,16 @@ async def run_automation(
     )
 
     try:
+        await _sync_before_run(db, automation)
         result = await run_automation_pipeline_cached(
             db,
             user_id=automation.user_id,
             username=automation.lastfm_username,
-            source_type=automation.source_type,
-            period=automation.source_period,
+            window=automation.window,
+            sort=automation.sort,
             filter_groups=automation.filter_groups,
             max_tracks=automation.output_max_size,
+            at=scheduled_for,
             progress_key=progress_key,
         )
     except Exception as exc:
@@ -336,8 +290,9 @@ async def run_automation(
             progress_store.finish(progress_key, error=_public_error(exc))
         return history
 
-    playlist = await _persist_result_playlist(db, automation, result)
-    history.generated_playlist_id = playlist.id
+    if result["total"]:
+        playlist = await _persist_result_playlist(db, automation, result)
+        history.generated_playlist_id = playlist.id
     await _mark_success(db, history, result, automation)
     if progress_key is not None:
         progress_store.finish(progress_key)
@@ -359,8 +314,6 @@ async def _persist_result_playlist(
             automation_id=automation.id,
             name=automation.name,
             description=automation.description,
-            source_type=automation.source_type,
-            source_period=automation.source_period,
             tracks=tracks,
             track_count=len(tracks),
             filter_groups=_filter_groups_to_json(automation.filter_groups),

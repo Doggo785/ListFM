@@ -108,7 +108,11 @@ def _no_background_sync():
 
     Tests that check the trigger read the yielded mock.
     """
-    with patch("routers.auth_oauth.start_scrobble_sync") as start:
+    with (
+        patch("routers.auth_oauth.start_scrobble_sync") as start,
+        # Runs sync listens first; tests feed the window directly instead.
+        patch("services.automation_runner._sync_before_run"),
+    ):
         yield start
 
 

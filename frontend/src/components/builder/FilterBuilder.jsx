@@ -6,7 +6,6 @@ import {
   IconBolt,
   IconHeart,
   IconChartBar,
-  IconUsers,
   IconList,
   IconTag,
   IconClock,
@@ -31,8 +30,6 @@ const FIELD_ICONS = {
   userplaycount: IconBolt,
   userloved: IconHeart,
   playcount: IconChartBar,
-  global_playcount: IconChartBar,
-  listeners: IconUsers,
   rank: IconList,
   tags: IconTag,
   timestamp: IconClock,
@@ -82,7 +79,8 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
 
   const [tagSearch, setTagSearch] = useState(condition.field === "tags" ? (condition.value || "") : "");
   const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const [tagSource, setTagSource] = useState(condition.tagSource || "artist");
+  // Artist tags only until albums are stored (ADR 0003).
+  const tagSource = "artist";
   const tagInputRef = useRef(null);
 
   const currentTags = availableTags[tagSource] || [];
@@ -148,24 +146,6 @@ function FilterRow({ condition, onChange, onRemove, availableTags = [], disabled
       const tagSourceLabel = tagSource === "artist" ? "Artist" : "Album";
       return (
         <div className="space-y-2.5">
-          <div className="flex items-center gap-1.5">
-            {[
-              { value: "artist", label: "Artist", Icon: IconBolt, active: "bg-[#ff530b]/15 text-[#ff530b] border border-[#ff530b]/30" },
-              { value: "album", label: "Album", Icon: IconTag, active: "bg-purple-500/15 text-purple-400 border border-purple-500/30" },
-            ].map(({ value, label, Icon, active }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => { setTagSource(value); onChange({ ...condition, tagSource: value }); }}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
-                  tagSource === value ? active : "text-neutral-500 border border-transparent hover:text-neutral-300"
-                }`}
-              >
-                <Icon size={11} />
-                {label}
-              </button>
-            ))}
-          </div>
           <div className="relative" ref={tagInputRef}>
             <div className="flex items-center gap-2 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5">
               <IconSearch size={14} className="text-neutral-500 shrink-0" />

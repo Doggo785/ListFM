@@ -72,6 +72,14 @@ export async function getRecentTracks(limit = 50) {
   return request(`/api/recent-tracks?limit=${limit}`);
 }
 
+export async function startScrobbleSync() {
+  return request("/api/scrobbles/sync", { method: "POST" });
+}
+
+export async function getScrobbleSync() {
+  return request("/api/scrobbles/sync");
+}
+
 export async function previewAutomation(automation, progressToken) {
   return request("/api/automations/preview", {
     method: "POST",

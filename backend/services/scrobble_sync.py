@@ -145,6 +145,10 @@ async def _sync_in_background(user_id: str, username: str) -> None:
             del _running[user_id]
 
 
+def is_syncing(user_id: str) -> bool:
+    return user_id in _running
+
+
 def start_scrobble_sync(user_id: str, username: str) -> bool:
     """Start a background sync unless one already runs for this account.
 

@@ -30,14 +30,15 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
 2. **Synchro des écoutes** (ADR 0001) : table des écoutes, synchro complète puis incrémentale (`user.getRecentTracks` par pages de 1000, repli à 200), progression, liste des loved relue en entier. Toujours avant un run, au plus toutes les 10 min pour l'aperçu. Pendant le premier chargement, l'aperçu est partiel (bandeau) et les runs attendent la fin.
 3. **Moteur de la chaîne** (ADR 0002) : une seule source, les écoutes, puis Fenêtre → Filtres → Tri → Limites.
    - Fenêtre comptée depuis la date prévue du run : glissante, décalée (« le même mois il y a un an »), toutes les écoutes. Pas de dates fixes.
-   - Filtres : l'existant + première écoute, artiste dans ton top N, moment d'écoute (jour, tranche horaire). Groupes ET/OU sur 2 niveaux maximum, même contrôle front et back. Un seul contrat `filterGroups` (camel partout).
+   - Filtres : l'existant (sans auditeurs ni popularité mondiale) + première écoute, artiste dans ton top N, moment d'écoute (jour, tranche horaire). Groupes ET/OU sur 2 niveaux maximum, même contrôle front et back. Un seul contrat `filterGroups` (camel partout).
    - Tris : les plus écoutés, écoutés le plus récemment, découverts le plus récemment, au hasard (pondérable par les écoutes). Le tri choisit les morceaux gardés et fixe leur ordre.
    - Limites : taille, maximum par artiste, maximum par album, pas de répétition sur les N dernières playlists de l'automation.
    - Moins de morceaux que la taille : playlist plus courte, historique « 32/50 ». Zéro : run vide.
    - Table rase des automations, playlists et historique existants (des tests), aucune migration.
-4. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage. Les tags pas encore en cache se cherchent sur clic, avec l'estimation d'appels. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
-5. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
-6. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
+4. **Catalogue de tags** (ADR 0003) : tâche de fond après la synchro, un appel par artiste, les plus écoutés d'abord, partagé entre utilisateurs, valable 90 jours. Tags d'album plus tard (la synchro doit d'abord garder l'album de chaque écoute).
+5. **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage et le taux de tags connus. Aucun appel Last.fm. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
+6. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
+7. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
 
 ### Phase B : identité visuelle avec [Impeccable](https://github.com/pbakaus/impeccable)
 
@@ -67,7 +68,7 @@ Animations, `impeccable polish` et `harden` sur tout le site. Puis v1.0.0 quand 
 
 ## Plus tard (feu vert owner requis)
 
-Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
+Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
 
 ## Leçons Last.fm
 
