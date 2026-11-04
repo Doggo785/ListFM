@@ -37,7 +37,7 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
    - Table rase des automations, playlists et historique existants (des tests), aucune migration.
 4. *(fait)* **Catalogue de tags** (ADR 0003) : tâche de fond après la synchro, un appel par artiste, les plus écoutés d'abord, partagé entre utilisateurs, valable 90 jours. Tags d'album plus tard.
 5. *(fait, côté serveur ; l'écran arrive en phase C)* **Aperçu serveur** : ce que le run produirait maintenant, avec le compte de chaque étage et le taux de tags connus. Aucun appel Last.fm. L'API expose aussi l'avancement des tâches de fond (écoutes, tags) pour le suivi de la phase B. Supprime le besoin de `frontend/src/lib/filter-engine.js`.
-6. **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
+6. *(fait, côté serveur ; le bouton arrive en phase C)* **Retry honnête (T5)** côté serveur : vraie route de retry qui garde le `scheduled_for` d'origine, donc la même fenêtre.
 7. Petites PR indépendantes, glissées quand on veut : **scan sécu planifié** (osv-scanner hebdo via `schedule` dans `ci.yml`), **timeout et abort** dans `frontend/src/lib/api.js`, `isValidCron` strict et identique front/back, **soft-delete en cascade**, **RBAC réel ou suppression du rôle**.
 
 ### Phase B : identité visuelle avec [Impeccable](https://github.com/pbakaus/impeccable)
