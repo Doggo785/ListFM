@@ -77,13 +77,17 @@ def window_bounds(window: dict, at: datetime) -> tuple[datetime | None, datetime
     return start, end
 
 
+# Not a security need (shuffling a playlist); it costs nothing and keeps scanners quiet.
+_rng = random.SystemRandom()
+
+
 def sort_tracks(tracks: list[dict], sort: str) -> list[dict]:
     """Order candidates by the automation's sort (GLOSSARY: Tri)."""
     if sort == "random":
-        return random.sample(tracks, len(tracks))
+        return _rng.sample(tracks, len(tracks))
     if sort == "random_weighted":
         # Weighted sampling without replacement: key = u ** (1 / weight).
-        return sorted(tracks, key=lambda t: random.random() ** (1 / max(t.get("playcount", 1), 1)), reverse=True)
+        return sorted(tracks, key=lambda t: _rng.random() ** (1 / max(t.get("playcount", 1), 1)), reverse=True)
     field = {"most_played": "playcount", "last_played": "timestamp", "first_played": "first_played"}[sort]
     return sorted(tracks, key=lambda t: (t.get(field, 0), t.get("timestamp", 0)), reverse=True)
 
