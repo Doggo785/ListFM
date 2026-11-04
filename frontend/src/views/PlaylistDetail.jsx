@@ -33,6 +33,7 @@ import {
   pollProgress,
 } from "@/lib/api";
 import { useAutomation } from "@/hooks/useAutomation";
+import { useScrobbleSync } from "@/hooks/useScrobbleSync";
 import {
   SORT_OPTIONS,
   WINDOW_OPTIONS,
@@ -135,11 +136,18 @@ function ProgressBar({ progress, onCancel }) {
 const previewSignature = (automation) =>
   JSON.stringify([automation?.window, automation?.sort, automation?.filterGroups, automation?.output]);
 
+// updatedAt changes on every edit, even one undone by hand.
+const savedSignature = (automation) => JSON.stringify({ ...automation, updatedAt: null });
+
 export default function PlaylistDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const username = user?.lastfm_username;
+
+  const listensSync = useScrobbleSync(Boolean(username));
+  // After a failed load the button stays usable: a click starts the load again.
+  const listensLoading = listensSync !== null && !listensSync.complete && listensSync.stage !== "error";
 
   const {
     automation: loadedAutomation,
@@ -149,6 +157,7 @@ export default function PlaylistDetail() {
   const [automation, setAutomation] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -180,6 +189,7 @@ export default function PlaylistDetail() {
   useEffect(() => {
     if (loadedAutomation) {
       setAutomation(loadedAutomation);
+      setLastSaved(savedSignature(loadedAutomation));
       setNotFound(false);
     }
   }, [loadedAutomation]);
@@ -224,19 +234,27 @@ export default function PlaylistDetail() {
     setSaved(false);
   }, []);
 
-  const handleSave = async () => {
-    if (saving) return;
+  const saveChanges = async () => {
     setSaving(true);
     setSaveError(null);
     try {
       await updateAutomation(automation.id, automation);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setLastSaved(savedSignature(automation));
+      return true;
     } catch (err) {
       console.error("Failed to save automation:", err);
       setSaveError(err.message || "Failed to save automation");
+      return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    if (await saveChanges()) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     }
   };
 
@@ -271,11 +289,23 @@ export default function PlaylistDetail() {
     loadHistory();
   }, [loadHistory]);
 
+  const unsavedChanges = automation !== null && savedSignature(automation) !== lastSaved;
+  let runHint = "Trigger this automation immediately. The run is recorded below with its frozen track list.";
+  if (listensLoading) runHint = "Runs can start once your listening history has finished loading.";
+  else if (unsavedChanges) runHint = "Your changes are saved first, then the run starts with them.";
+
   const handleRunNow = async () => {
     if (runningNow) return;
     setRunningNow(true);
     setRunError(null);
     setRunProgress({ stage: "queued", done: 0, total: 0 });
+    // A run reads the saved settings, so unsaved ones would be silently ignored.
+    if (unsavedChanges && !(await saveChanges())) {
+      setRunProgress(null);
+      setRunError("Your changes could not be saved, so the run did not start.");
+      setRunningNow(false);
+      return;
+    }
     const token = newProgressToken();
     let stopped = false;
     // Fire the POST first so the ticket exists ASAP, then poll alongside it.
@@ -289,20 +319,20 @@ export default function PlaylistDetail() {
       if (!stopped) setRunError(err.message || "Failed to track run progress");
     });
     try {
-      await postPromise;
+      const run = await postPromise;
       stopped = true;
       setRunError(null);
-      const entries = await getAutomationHistory(id);
-      setHistory(entries);
-      const latest = entries[0];
-      setRunProgress({
-        stage: "done",
-        done: latest?.tracks_after_filter ?? 0,
-        total: latest?.tracks_before_filter ?? 0,
-      });
+      setHistory(await getAutomationHistory(id));
+      // A failed run's reason is on its history row, right below.
+      setRunProgress(
+        run.status === "failed"
+          ? { stage: "error", done: 0, total: 0 }
+          : { stage: "done", done: run.tracks_after_filter ?? 0, total: run.tracks_before_filter ?? 0 }
+      );
     } catch (err) {
       stopped = true;
-      setRunError(err.message || "Failed to run automation");
+      setRunProgress(null);
+      setRunError((err.message || "Failed to run automation").replace(/^API \d+: /, ""));
     } finally {
       setRunningNow(false);
     }
@@ -599,7 +629,7 @@ export default function PlaylistDetail() {
                 <Button
                   size="default"
                   onClick={handleRunNow}
-                  disabled={runningNow}
+                  disabled={runningNow || listensLoading}
                   className="bg-[#ff530b] text-white hover:bg-[#ff530b]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
                 >
                   {runningNow ? (
@@ -607,10 +637,10 @@ export default function PlaylistDetail() {
                   ) : (
                     <IconPlayerPlay size={16} className="mr-1.5" />
                   )}
-                  {runningNow ? "Running..." : "Run now"}
+                  {runningNow ? "Running..." : unsavedChanges ? "Save & run" : "Run now"}
                 </Button>
                 <p className="text-xs text-neutral-500 leading-relaxed">
-                  Trigger this automation immediately. The run is recorded below with its frozen track list.
+                  {runHint}
                 </p>
               </div>
 
@@ -685,10 +715,10 @@ export default function PlaylistDetail() {
                               e.stopPropagation();
                               handleRunNow();
                             }}
-                            disabled={runningNow}
+                            disabled={runningNow || listensLoading}
                             className="shrink-0 rounded-lg border border-neutral-700 px-3 py-1.5 text-xs text-white hover:border-[#ff530b] hover:text-[#ff530b] transition-colors disabled:opacity-40"
                           >
-                            {runningNow ? "Running..." : "Re-run"}
+                            {runningNow ? "Running..." : unsavedChanges ? "Save & run" : "Re-run"}
                           </button>
                         )}
                       </div>
