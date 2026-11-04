@@ -93,22 +93,18 @@ html, body, #root {
 }
 
 .homepage__brand {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 3.5rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-family: var(--font-display);
+  font-size: 64px;
   color: #ffffff;
   margin: 0;
   line-height: 1;
 }
 
 .homepage__tagline {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 1.05rem;
+  font-size: 20px;
   font-weight: 400;
   color: #a3a3a3;
   margin: 0;
-  letter-spacing: 0.01em;
   text-align: center;
   max-width: 320px;
   line-height: 1.5;
@@ -121,20 +117,18 @@ html, body, #root {
 }
 
 .homepage__hint {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.8rem;
+  font-size: 17px;
   color: #737373;
   margin: 0;
-  letter-spacing: 0.02em;
 }
 
 @media (max-width: 640px) {
   .homepage__brand {
-    font-size: 2.5rem;
+    font-size: 48px;
   }
 
   .homepage__tagline {
-    font-size: 0.9rem;
+    font-size: 20px;
   }
 
   .homepage__content {
@@ -182,22 +176,18 @@ html, body, #root {
 }
 
 .login-page__brand {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 3.5rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-family: var(--font-display);
+  font-size: 64px;
   color: #ffffff;
   margin: 0;
   line-height: 1;
 }
 
 .login-page__tagline {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 1.05rem;
+  font-size: 20px;
   font-weight: 400;
   color: #a3a3a3;
   margin: 0;
-  letter-spacing: 0.01em;
   text-align: center;
 }
 
@@ -215,8 +205,7 @@ html, body, #root {
 }
 
 .login-page__label {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.875rem;
+  font-size: 20px;
   font-weight: 500;
   color: #d4d4d4;
 }
@@ -229,8 +218,7 @@ html, body, #root {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   color: #ffffff;
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 1rem;
+  font-size: 20px;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
   box-sizing: border-box;
 }
@@ -269,8 +257,7 @@ html, body, #root {
   border: none;
   border-radius: 10px;
   color: #ffffff;
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 1rem;
+  font-size: 20px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.1s ease;
@@ -357,8 +344,7 @@ html, body, #root {
 }
 
 .login-page__divider span {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.8125rem;
+  font-size: 17px;
   color: #737373;
   text-transform: lowercase;
 }
@@ -370,8 +356,7 @@ html, body, #root {
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
   color: #fca5a5;
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.875rem;
+  font-size: 20px;
   text-align: center;
 }
 
@@ -381,8 +366,7 @@ html, body, #root {
 }
 
 .login-page__hint {
-  font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 0.875rem;
+  font-size: 20px;
   color: #737373;
   margin: 0;
 }
@@ -400,11 +384,11 @@ html, body, #root {
 
 @media (max-width: 640px) {
   .login-page__brand {
-    font-size: 2.5rem;
+    font-size: 48px;
   }
 
   .login-page__tagline {
-    font-size: 0.9rem;
+    font-size: 20px;
   }
 
   .login-page__content {
@@ -448,12 +432,12 @@ html, body, #root {
 
 .top-nav__account {
   gap: 12px;
-  font-size: 14px;
+  font-size: 17px;
   color: var(--text-muted);
 }
 
 .top-nav__logo {
-  font: 400 34px/1 var(--font-display);
+  font: 400 32px/1 var(--font-display);
 }
 
 .top-nav__links {

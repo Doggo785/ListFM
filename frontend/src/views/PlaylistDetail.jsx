@@ -58,7 +58,7 @@ function SectionCard({ title, icon, children, delay = 0 }) {
           <div className="rounded-lg bg-[var(--ember)]/10 p-2">
             <IconComp size={16} className="text-[var(--ember)]" />
           </div>
-          <h3 className="text-base font-bold text-white">{title}</h3>
+          <h3 className="text-lg font-bold text-white">{title}</h3>
         </div>
         <div className="p-6 space-y-5">{children}</div>
       </div>
@@ -812,7 +812,7 @@ export default function PlaylistDetail() {
                       <div className="rounded-lg bg-[var(--ember)]/10 p-2">
                         <IconEye size={16} className="text-[var(--ember)]" />
                       </div>
-                      <h3 className="text-base font-bold text-white">Preview</h3>
+                      <h3 className="text-lg font-bold text-white">Preview</h3>
                     </div>
                   </div>
 
