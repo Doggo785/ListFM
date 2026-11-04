@@ -70,7 +70,7 @@ function AuthCallback() {
   };
 
   return (
-    <main className="flex-1 flex items-center justify-center bg-[#121212] min-h-screen px-4">
+    <main className="flex-1 flex items-center justify-center bg-[var(--ground)] min-h-screen px-4">
       <div className="absolute inset-0 overflow-hidden">
         <Grainient
           color1="#FF6817"
@@ -106,7 +106,7 @@ function AuthCallback() {
       >
         <Link
           to="/"
-          className="inline-block rounded-full border border-white/10 bg-black/50 px-5 py-2 text-3xl font-black text-[#ff530b] backdrop-blur-md transition-opacity hover:opacity-80"
+          className="inline-block rounded-full border border-white/10 bg-black/50 px-5 py-2 text-3xl font-black text-[var(--ember)] backdrop-blur-md transition-opacity hover:opacity-80"
         >
           ListFM
         </Link>
@@ -148,7 +148,7 @@ function AuthCallback() {
                   }}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
+                  className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[var(--ember)]/50 focus:ring-1 focus:ring-[var(--ember)]/20"
                   disabled={submitting}
                 />
               </div>
@@ -156,7 +156,7 @@ function AuthCallback() {
               <button
                 type="submit"
                 disabled={submitting || !email.trim()}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#ff530b] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#ff530b]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-[var(--ember)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--ember)]/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <span className="flex items-center gap-2">
@@ -184,14 +184,14 @@ function AuthCallback() {
             </p>
             <Link
               to="/login"
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#ff530b] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#ff530b]/90"
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ember)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--ember)]/90"
             >
               Back to Sign In
             </Link>
           </motion.div>
         ) : (
           <div className="flex items-center justify-center gap-3 text-neutral-400 text-sm">
-            <span className="h-4 w-4 rounded-full border-2 border-[#ff530b] border-t-transparent animate-spin" />
+            <span className="h-4 w-4 rounded-full border-2 border-[var(--ember)] border-t-transparent animate-spin" />
             Completing sign in...
           </div>
         )}

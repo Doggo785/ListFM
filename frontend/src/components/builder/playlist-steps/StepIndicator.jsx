@@ -10,16 +10,16 @@ export function StepIndicator({ currentStep, steps }) {
             {idx > 0 && (
               <div
                 className={`w-8 h-px transition-colors ${
-                  isDone ? "bg-[#ff530b]" : "bg-neutral-700"
+                  isDone ? "bg-[var(--ember)]" : "bg-neutral-700"
                 }`}
               />
             )}
             <div
               className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
                 isActive
-                  ? "bg-[#ff530b] text-white"
+                  ? "bg-[var(--ember)] text-white"
                   : isDone
-                    ? "bg-[#ff530b]/20 text-[#ff530b]"
+                    ? "bg-[var(--ember)]/20 text-[var(--ember)]"
                     : "bg-neutral-800 text-neutral-500"
               }`}
             >

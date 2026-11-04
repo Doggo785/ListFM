@@ -25,7 +25,7 @@ import { getKnownTags } from "@/lib/api";
 import CustomSelect from "@/components/ui/CustomSelect";
 
 const INPUT_CLASSES =
-  "rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums";
+  "rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)]/30 transition-all tabular-nums";
 
 const FIELD_ICONS = {
   userplaycount: IconBolt,
@@ -45,7 +45,7 @@ function LogicToggle({ value, onChange }) {
         onClick={() => onChange("AND")}
         className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
           value === "AND"
-            ? "bg-[#ff530b]/20 text-[#ff530b] shadow-[0_0_12px_rgba(255,83,11,0.15)]"
+            ? "bg-[var(--ember)]/20 text-[var(--ember)] shadow-[0_0_12px_rgba(255,83,11,0.15)]"
             : "text-neutral-500 hover:text-neutral-300"
         }`}
       >
@@ -116,7 +116,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
             onClick={() => onChange({ ...condition, value: true })}
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
               condition.value === true
-                ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
+                ? "bg-[var(--ember)]/15 text-[var(--ember)] border-[var(--ember)]/30"
                 : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
             }`}
           >
@@ -127,7 +127,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
             onClick={() => onChange({ ...condition, value: false })}
             className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
               condition.value === false
-                ? "bg-[#ff530b]/15 text-[#ff530b] border-[#ff530b]/30"
+                ? "bg-[var(--ember)]/15 text-[var(--ember)] border-[var(--ember)]/30"
                 : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
             }`}
           >
@@ -179,7 +179,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
                         }}
                         className={`flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors text-left ${
                           condition.value === tag.name
-                            ? "bg-[#ff530b]/15 text-[#ff530b]"
+                            ? "bg-[var(--ember)]/15 text-[var(--ember)]"
                             : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
                         }`}
                       >
@@ -211,7 +211,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
               min="0"
               max="100"
               placeholder="0"
-              className="w-16 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-2.5 py-2 text-sm text-white focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all tabular-nums"
+              className="w-16 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-2.5 py-2 text-sm text-white focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)]/30 transition-all tabular-nums"
             />
             <span className="text-neutral-600 text-xs">/ 100</span>
           </div>
@@ -266,7 +266,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
     <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all">
       <div className="flex items-center gap-3 px-4 py-3.5">
         <div className="rounded-lg bg-neutral-800/60 p-2 shrink-0">
-          <FieldIcon size={14} className="text-neutral-400 group-hover/row:text-[#ff530b] transition-colors" />
+          <FieldIcon size={14} className="text-neutral-400 group-hover/row:text-[var(--ember)] transition-colors" />
         </div>
 
         <CustomSelect
@@ -371,7 +371,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, knownTags }) {
 
         <span className="text-xs text-neutral-500 flex-1">
           Match tracks where{" "}
-          <span className={`font-semibold ${group.logic === "AND" ? "text-[#ff530b]/70" : "text-purple-400/70"}`}>
+          <span className={`font-semibold ${group.logic === "AND" ? "text-[var(--ember)]/70" : "text-purple-400/70"}`}>
             {logicLabel}
           </span>{" "}
           of these conditions are met
@@ -430,7 +430,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, knownTags }) {
             <button
               type="button"
               onClick={addCondition}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-[#ff530b]/30 bg-[#ff530b]/10 px-4 py-3 text-sm font-medium text-[#ff530b] hover:bg-[#ff530b]/15 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-[var(--ember)]/30 bg-[var(--ember)]/10 px-4 py-3 text-sm font-medium text-[var(--ember)] hover:bg-[var(--ember)]/15 transition-all"
             >
               <IconPlus size={14} />
               Add condition
@@ -451,7 +451,7 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, knownTags }) {
           <button
             type="button"
             onClick={() => setShowAddMenu(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700/60 bg-transparent px-4 py-3 text-sm text-neutral-500 hover:border-[#ff530b]/40 hover:text-[#ff530b] hover:bg-[#ff530b]/5 transition-all w-full"
+            className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700/60 bg-transparent px-4 py-3 text-sm text-neutral-500 hover:border-[var(--ember)]/40 hover:text-[var(--ember)] hover:bg-[var(--ember)]/5 transition-all w-full"
           >
             <IconPlus size={14} />
             Add

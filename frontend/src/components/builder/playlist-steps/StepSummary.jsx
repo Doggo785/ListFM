@@ -27,7 +27,7 @@ export function StepSummary({ data }) {
       <div className="max-w-lg mx-auto">
         <div className="rounded-xl border border-neutral-700 bg-[#1c1c1c] overflow-hidden">
           <div className="p-6 border-b border-neutral-700">
-            <div className="text-xs font-medium text-[#ff530b] uppercase tracking-wider mb-1">
+            <div className="text-xs font-medium text-[var(--ember)] uppercase tracking-wider mb-1">
               Playlist
             </div>
             <div className="text-xl font-bold text-white">

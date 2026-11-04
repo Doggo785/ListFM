@@ -26,7 +26,7 @@ export default function CustomSelect({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full rounded-xl border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white hover:border-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b]/30 transition-all"
+        className="flex items-center gap-2 w-full rounded-xl border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white hover:border-neutral-500 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)]/30 transition-all"
       >
         <span className="truncate flex-1 text-left">
           {selected?.label || placeholder}
@@ -49,7 +49,7 @@ export default function CustomSelect({
                 }}
                 className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-lg transition-colors text-left ${
                   opt.value === value
-                    ? "bg-[#ff530b]/15 text-[#ff530b]"
+                    ? "bg-[var(--ember)]/15 text-[var(--ember)]"
                     : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
                 }`}
               >

@@ -22,7 +22,7 @@ export default function SyncBanner() {
           <span className="font-semibold text-white">Loading your listening history… {percent}%</span>{" "}
           Previews only see part of it, and runs wait until it finishes.
           <div className="mt-2 h-1 overflow-hidden rounded bg-neutral-800">
-            <div className="h-full bg-[#ff530b] transition-all" style={{ width: `${percent}%` }} />
+            <div className="h-full bg-[var(--ember)] transition-all" style={{ width: `${percent}%` }} />
           </div>
         </>
       )}

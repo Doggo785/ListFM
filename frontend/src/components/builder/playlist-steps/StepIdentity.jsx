@@ -20,7 +20,7 @@ export function StepIdentity({ data, onChange }) {
             value={data.name}
             onChange={(e) => onChange({ ...data, name: e.target.value })}
             placeholder="e.g. Monthly Discoveries"
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors"
+            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white placeholder:text-neutral-500 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-colors"
             autoFocus
           />
         </div>
@@ -36,7 +36,7 @@ export function StepIdentity({ data, onChange }) {
             }
             placeholder="e.g. Compiles my new musical discoveries every month"
             rows={3}
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white placeholder:text-neutral-500 focus:border-[#ff530b] focus:outline-none focus:ring-1 focus:ring-[#ff530b] transition-colors resize-none"
+            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white placeholder:text-neutral-500 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-colors resize-none"
           />
         </div>
       </div>

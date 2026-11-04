@@ -50,7 +50,7 @@ function LinkLastfm() {
   };
 
   return (
-    <main className="flex-1 flex items-center justify-center bg-[#121212] min-h-screen px-4">
+    <main className="flex-1 flex items-center justify-center bg-[var(--ground)] min-h-screen px-4">
       <div className="absolute inset-0 overflow-hidden opacity-45">
         <Grainient
           color1="#FF6817"
@@ -87,7 +87,7 @@ function LinkLastfm() {
         <div className="text-center">
           <Link
             to="/"
-            className="inline-block mb-4 text-3xl font-black text-[#ff530b] hover:opacity-80 transition-opacity"
+            className="inline-block mb-4 text-3xl font-black text-[var(--ember)] hover:opacity-80 transition-opacity"
           >
             ListFM
           </Link>
@@ -134,7 +134,7 @@ function LinkLastfm() {
               }}
               placeholder="Last.fm username..."
               autoComplete="username"
-              className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[#ff530b]/50 focus:ring-1 focus:ring-[#ff530b]/20"
+              className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[var(--ember)]/50 focus:ring-1 focus:ring-[var(--ember)]/20"
               disabled={loading}
             />
           </div>
@@ -142,7 +142,7 @@ function LinkLastfm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#ff530b] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#ff530b]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-[var(--ember)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--ember)]/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <span className="flex items-center gap-2">
