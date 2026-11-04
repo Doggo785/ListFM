@@ -59,6 +59,7 @@ ListFM works from everything a person has listened to, because Last.fm logs list
 
 ## Brand Commitments
 
+- Type: Tiny5 for titles and numerals, Jersey 20 for reading text, chosen by the owner on 2026-11-04. Both are under the SIL Open Font License.
 - The name is ListFM. There is no logo yet: `frontend/public/favicon.svg` is not a brand asset.
 - The whole site is built around one art direction and is animated throughout, with clean transitions between pages. One precise style carries across every page and evolves from page to page. This is the owner's ultimate goal for the interface, so it is a foundation rather than a finishing touch.
 - That art direction is pixel: a dithered ember ribbon roams every page, guides the eye and changes shape and heat with each page, while always staying secondary to the content. Inspired by the Wave shader by Ali Imam on 21st.dev, whose code is not reused because its licence is unknown.

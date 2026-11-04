@@ -27,7 +27,7 @@ const TOTALS_POLL_MS = 3000;
 function StatBlock({ value, label, color, delay = 0 }) {
   return (
     <motion.div variants={fadeUp} className="text-center">
-      <div className="text-4xl md:text-5xl font-bold tracking-tight" style={{ color }}>
+      <div className="font-heading text-3xl md:text-5xl whitespace-nowrap" style={{ color }}>
         <CountUp to={value} duration={2} delay={delay} separator=" " />
       </div>
       <p className="text-xs text-neutral-500 mt-2 uppercase tracking-wider font-medium">
@@ -245,7 +245,7 @@ function Dashboard() {
 
           <motion.section variants={fadeUp}>
             <div className="mb-6">
-              <h2 className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+              <h2 className="font-sans text-xs font-semibold text-neutral-500 uppercase tracking-wider">
                 Your automations
               </h2>
             </div>

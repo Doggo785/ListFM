@@ -117,7 +117,7 @@ function Register() {
         <motion.header variants={fadeUp} className="text-center">
           <Link
             to="/"
-            className="inline-block mb-4 text-3xl font-black text-[var(--ember)] hover:opacity-80 transition-opacity"
+            className="inline-block mb-4 font-heading text-3xl text-[var(--ember)] hover:opacity-80 transition-opacity"
           >
             ListFM
           </Link>

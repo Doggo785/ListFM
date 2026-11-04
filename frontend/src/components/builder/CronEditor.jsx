@@ -113,7 +113,7 @@ export default function CronEditor({ value, onChange }) {
               <div className="grid grid-cols-5 gap-2">
                 {FIELDS.map((field) => (
                   <div key={field.key} className="space-y-1.5">
-                    <label className="text-[10px] text-neutral-500 uppercase tracking-wider font-medium block text-center">
+                    <label className="text-xs text-neutral-500 uppercase tracking-wider font-medium block text-center">
                       {field.label}
                     </label>
                     <input
@@ -148,7 +148,7 @@ export default function CronEditor({ value, onChange }) {
                     }`}
                   >
                     <span className="text-xs font-semibold">{preset.label}</span>
-                    <span className="text-[10px] text-neutral-500 mt-0.5 font-mono">
+                    <span className="text-xs text-neutral-500 mt-0.5 font-mono">
                       {preset.cron}
                     </span>
                   </button>

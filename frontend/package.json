@@ -13,8 +13,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@fontsource-variable/geist": "^5.3.0",
-    "@fontsource/jersey-25": "^5.3.0",
+    "@fontsource/jersey-20": "^5.3.0",
+    "@fontsource/tiny5": "^5.3.0",
     "@tabler/icons-react": "^3.50.0",
     "@tailwindcss/vite": "^4.3.3",
     "autoprefixer": "^10.6.2",

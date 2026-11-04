@@ -99,8 +99,6 @@
   }
 }
 
-@import "@fontsource-variable/geist";
-
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -123,7 +121,10 @@
   --on-ember: var(--ink);
   --line: #ffba0838;
 
-  --font-display: "Jersey 25", "Geist Variable", sans-serif;
+  /* Pixel fonts are only sharp where a font pixel lands on whole screen pixels:
+     Tiny5 at multiples of 8px, Jersey 20 at 34px (17px on hi-dpi screens). */
+  --font-display: "Tiny5", "Jersey 20", sans-serif;
+  --font-text: "Jersey 20", sans-serif;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-quick: 0.2s;
@@ -140,12 +141,11 @@
   --code-bg: #f4f3ec;
   --accent: oklch(0.97 0 0);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: var(--sans);
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: var(--font-text);
+  --heading: var(--font-display);
+  --mono: var(--font-text);
 
   font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
   color-scheme: dark;
   color: var(--text);
   background: var(--bg);
@@ -235,31 +235,6 @@ body {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
 p {
   margin: 0;
 }
@@ -279,8 +254,29 @@ code {
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-heading: var(--font-display);
+  --font-sans: var(--font-text);
+  --font-mono: var(--font-text);
+  /* Spacing between letters would knock pixel fonts off their grid. */
+  --tracking-*: initial;
+  --text-xs: 17px;
+  --text-xs--line-height: 22px;
+  --text-sm: 20px;
+  --text-sm--line-height: 24px;
+  --text-base: 20px;
+  --text-base--line-height: 24px;
+  --text-lg: 24px;
+  --text-lg--line-height: 32px;
+  --text-xl: 24px;
+  --text-xl--line-height: 32px;
+  --text-2xl: 32px;
+  --text-2xl--line-height: 40px;
+  --text-3xl: 40px;
+  --text-3xl--line-height: 48px;
+  --text-4xl: 48px;
+  --text-4xl--line-height: 56px;
+  --text-5xl: 64px;
+  --text-5xl--line-height: 72px;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -359,9 +355,14 @@ code {
   * {
     @apply border-border outline-ring/50;}
   body {
-    @apply bg-background text-foreground;}
+    @apply bg-background text-foreground text-sm;}
   html {
-    @apply font-sans;}}
+    @apply font-sans;}
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;}}
 
 ::selection {
   background: var(--ember);
