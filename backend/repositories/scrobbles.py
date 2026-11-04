@@ -1,5 +1,7 @@
-from datetime import datetime
+import uuid
+from datetime import UTC, datetime
 
+from models.album import Album
 from models.artist import Artist
 from models.artist_tag import ArtistTag
 from models.scrobble import Scrobble
@@ -7,7 +9,7 @@ from models.tag import Tag
 from models.track import Track
 from models.user_track import UserTrack
 from repositories.user_tracks import bulk_store_recent_plays, ensure_tracks
-from sqlalchemy import and_, delete, func, select, update
+from sqlalchemy import and_, bindparam, delete, func, select, tuple_, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +39,55 @@ async def store_scrobbles(
             ]
         )
         .on_conflict_do_nothing()
+    )
+
+
+async def store_track_albums(db: AsyncSession, listens: list[tuple[str, str, str | None]]) -> None:
+    """Set each track's album from (title, artist, album), newest first. Caller commits.
+
+    A track keeps one album, the one of its latest listen seen, even when it
+    was also played from a single: a limit per album needs no more than that.
+    """
+    # Longer than the column: treat as no album rather than fail the page.
+    albums: dict[tuple[str, str], str] = {}
+    for title, artist, album in listens:
+        if album and len(album) <= Album.title.type.length:
+            albums.setdefault((artist, title), album)
+    if not albums:
+        return
+    album_keys = {(album, artist) for (artist, _), album in albums.items()}
+    now = datetime.now(UTC)
+    await db.execute(
+        insert(Album)
+        .values(
+            [
+                {"id": str(uuid.uuid4()), "title": album, "artist": artist, "created_at": now}
+                for album, artist in sorted(album_keys)
+            ]
+        )
+        .on_conflict_do_nothing(index_elements=["title", "artist"])
+    )
+    album_rows = await db.execute(
+        select(Album.id, Album.title, Album.artist).where(tuple_(Album.title, Album.artist).in_(album_keys))
+    )
+    album_ids = {(row.title, row.artist): row.id for row in album_rows}
+    by_key = await ensure_tracks(db, list(albums))
+    table = Track.__table__
+    await db.execute(
+        update(table)
+        .where(
+            table.c.id == bindparam("track_id"),
+            table.c.album_id.is_distinct_from(bindparam("new_album_id")),
+        )
+        .values(album_id=bindparam("new_album_id")),
+        # Sorted: two syncs updating shared tracks in the same order cannot deadlock.
+        sorted(
+            (
+                {"track_id": by_key[key].id, "new_album_id": album_ids[(album, key[0])]}
+                for key, album in albums.items()
+            ),
+            key=lambda row: row["track_id"],
+        ),
     )
 
 
@@ -79,6 +130,7 @@ async def get_window_tracks(
         select(
             Track.title,
             Track.artist,
+            Album.title.label("album"),
             plays.label("plays"),
             func.count().label("all_plays"),
             func.min(Scrobble.played_at).label("first_played"),
@@ -86,18 +138,20 @@ async def get_window_tracks(
             func.coalesce(UserTrack.userloved, False).label("loved"),
         )
         .join(Track, Track.id == Scrobble.track_id)
+        .outerjoin(Album, Album.id == Track.album_id)
         .outerjoin(
             UserTrack,
             and_(UserTrack.user_id == Scrobble.user_id, UserTrack.track_id == Scrobble.track_id),
         )
         .where(Scrobble.user_id == user_id)
-        .group_by(Track.id, Track.title, Track.artist, UserTrack.userloved)
+        .group_by(Track.id, Track.title, Track.artist, Album.title, UserTrack.userloved)
         .having(plays > 0)
     )
     return [
         {
             "title": row.title,
             "artist": row.artist,
+            "album": row.album,
             "playcount": row.plays,
             "userplaycount": row.all_plays,
             "userloved": row.loved,

@@ -101,11 +101,17 @@ def sort_tracks(tracks: list[dict], sort: str) -> list[dict]:
 
 
 def apply_limits(
-    tracks: list[dict], max_tracks: int, max_per_artist: int | None, already_used: set[tuple[str, str]]
+    tracks: list[dict],
+    max_tracks: int,
+    max_per_artist: int | None = None,
+    max_per_album: int | None = None,
+    already_used: frozenset[tuple[str, str]] | set[tuple[str, str]] = frozenset(),
 ) -> list[dict]:
     """Take tracks in sort order until the size is reached (GLOSSARY: Limite)."""
     kept: list[dict] = []
     per_artist: Counter[str] = Counter()
+    # By artist too: two artists' "Greatest Hits" are two albums. No known album, no limit.
+    per_album: Counter[tuple[str, str]] = Counter()
     for track in tracks:
         if len(kept) == max_tracks:
             break
@@ -113,7 +119,13 @@ def apply_limits(
             continue
         if max_per_artist is not None and per_artist[track["artist"]] >= max_per_artist:
             continue
+        album = track.get("album")
+        album_key = (track["artist"], album) if album else None
+        if album_key and max_per_album is not None and per_album[album_key] >= max_per_album:
+            continue
         per_artist[track["artist"]] += 1
+        if album_key:
+            per_album[album_key] += 1
         kept.append(track)
     return kept
 
@@ -156,6 +168,7 @@ async def run_automation_pipeline_cached(
     filter_groups: list,
     max_tracks: int,
     max_per_artist: int | None = None,
+    max_per_album: int | None = None,
     no_repeat_playlists: int | None = None,
     automation_id: str | None = None,
     at: datetime | None = None,
@@ -191,7 +204,7 @@ async def run_automation_pipeline_cached(
         if no_repeat_playlists and automation_id
         else set()
     )
-    tracks = apply_limits(apply_filters(candidates, filter_groups), max_tracks, max_per_artist, already_used)
+    tracks = apply_limits(apply_filters(candidates, filter_groups), max_tracks, max_per_artist, max_per_album, already_used)
     if progress_key is not None:
         progress_store.report(progress_key, "filter", len(tracks), len(candidates))
     logger.info("pipeline: %d in window -> %d kept", len(candidates), len(tracks))
@@ -353,6 +366,7 @@ async def run_automation(
             filter_groups=automation.filter_groups,
             max_tracks=automation.output_max_size,
             max_per_artist=automation.output_max_per_artist,
+            max_per_album=automation.output_max_per_album,
             no_repeat_playlists=automation.output_no_repeat_playlists,
             automation_id=automation.id,
             at=scheduled_for,

@@ -9,10 +9,12 @@ from unittest.mock import patch
 import pylast
 import pytest
 from httpx import AsyncClient
+from models.album import Album
 from models.scrobble import Scrobble
 from models.track import Track
 from models.user import User
 from models.user_track import UserTrack
+from repositories.scrobbles import get_window_tracks
 from services import scrobble_sync
 from sqlalchemy import func, select
 
@@ -42,8 +44,8 @@ class FakeLastfm:
         return self.loved[(page - 1) * limit : page * limit], max(1, math.ceil(len(self.loved) / limit))
 
 
-def _listen(n, title=None):
-    return (title or f"Song {n}", "Artist", 1_700_000_000 + n * 60)
+def _listen(n, title=None, album=None):
+    return (title or f"Song {n}", "Artist", 1_700_000_000 + n * 60, album)
 
 
 async def _new_user():
@@ -189,7 +191,8 @@ def test_scrobble_page_parsing_skips_now_playing():
             "@attr": {"totalPages": "4"},
             "track": [
                 {"name": "Live", "artist": {"#text": "A"}, "@attr": {"nowplaying": "true"}},
-                {"name": "Done", "artist": {"#text": "A"}, "date": {"uts": "1700000000"}},
+                {"name": "Done", "artist": {"#text": "A"}, "date": {"uts": "1700000000"}, "album": {"#text": "LP"}},
+                {"name": "Bare", "artist": {"#text": "A"}, "date": {"uts": "1700000001"}, "album": {"#text": ""}},
             ],
         }
     }
@@ -198,7 +201,7 @@ def test_scrobble_page_parsing_skips_now_playing():
         patch.object(lastfm, "_lastfm_json", return_value=payload) as call,
     ):
         listens, pages = lastfm.get_scrobble_page("me", 2, 1000, 5, 10)
-    assert listens == [("Done", "A", 1700000000)]
+    assert listens == [("Done", "A", 1700000000, "LP"), ("Bare", "A", 1700000001, None)]
     assert pages == 4
     assert call.call_args.kwargs == {"user": "me", "page": "2", "limit": "1000", "to": "10", "from": "5"}
 
@@ -274,3 +277,43 @@ async def test_rate_limited_page_is_retried():
         await _sync(user_id, fake)
     assert backoff.call_count == 1
     assert await _count(user_id) == 1
+
+
+async def _album_of(title):
+    async with _TestSessionLocal() as db:
+        return await db.scalar(
+            select(Album.title).join(Track, Track.album_id == Album.id).where(Track.title == title)
+        )
+
+
+@pytest.mark.asyncio
+async def test_sync_keeps_the_album_of_the_latest_listen():
+    user_id = await _new_user()
+    track = f"Song {uuid.uuid4()}"
+    no_album = f"Bare {uuid.uuid4()}"
+    too_long = f"Long {uuid.uuid4()}"
+    fake = FakeLastfm(
+        [
+            _listen(1, track, "Single"),
+            _listen(2, track, "Album"),
+            _listen(3, no_album),
+            _listen(4, too_long, "x" * 501),
+        ]
+    )
+    await _sync(user_id, fake)
+    assert await _album_of(track) == "Album"
+    assert await _album_of(no_album) is None
+    assert await _album_of(too_long) is None
+
+    # A later listen without album leaves the known one alone.
+    fake.listens = [_listen(5, track), *fake.listens]
+    await _sync(user_id, fake)
+    assert await _album_of(track) == "Album"
+
+    fake.listens = [_listen(6, track, "Reissue"), *fake.listens]
+    await _sync(user_id, fake)
+    assert await _album_of(track) == "Reissue"
+
+    async with _TestSessionLocal() as db:
+        rows = await get_window_tracks(db, user_id, None, datetime.now(UTC))
+    assert {row["title"]: row["album"] for row in rows}[track] == "Reissue"
