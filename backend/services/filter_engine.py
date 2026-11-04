@@ -143,9 +143,11 @@ def evaluate_condition(track, condition):
     count_min = _get(condition, "countMin") or 0
     tag_source = _get(condition, "tagSource")
 
+    # Each of these conditions has its own period or moment: the pipeline computes per id.
     if field == "artist_rank":
-        # Each condition has its own period: the pipeline ranks per condition id.
         field_value = (track.get("artist_ranks") or {}).get(_get(condition, "id"))
+    elif field == "listening_moment":
+        field_value = (track.get("moment_plays") or {}).get(_get(condition, "id"), 0)
     else:
         field_value = get_field_value(track, field, tag_source)
 
@@ -173,13 +175,13 @@ def evaluate_group(track, group):
     return all(results) if logic == "AND" else any(results)
 
 
-def artist_rank_conditions(filter_groups):
-    """(condition id, period) of every artist_rank condition in the tree."""
+def conditions_on(filter_groups, field, setting):
+    """(condition id, its setting) of every condition on this field in the tree."""
     for group in filter_groups or []:
         for condition in _get(group, "conditions") or []:
-            if _get(condition, "field") == "artist_rank":
-                yield _get(condition, "id"), _get(condition, "period")
-        yield from artist_rank_conditions(_get(group, "groups"))
+            if _get(condition, "field") == field:
+                yield _get(condition, "id"), _get(condition, setting)
+        yield from conditions_on(_get(group, "groups"), field, setting)
 
 
 def apply_filters(tracks, filter_groups):

@@ -12,6 +12,13 @@ describe("listening filters", () => {
     expect(applyFilters([recent, old], condition("first_played", "within_days", 30))).toEqual([recent]);
   });
 
+  it("read the listens at their own moment, none when absent", () => {
+    const often = { moment_plays: { c: 5 } };
+    const once = { moment_plays: { c: 1 } };
+    const never = { moment_plays: {} };
+    expect(applyFilters([often, once, never], condition("listening_moment", "gte", 2))).toEqual([often]);
+  });
+
   it("read the artist rank of their own condition and drop unranked artists", () => {
     const top = { artist_ranks: { c: 2 } };
     const low = { artist_ranks: { c: 9 } };

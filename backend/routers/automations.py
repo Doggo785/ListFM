@@ -75,6 +75,7 @@ async def preview_automation(
         username=username,
         window=automation.window.model_dump(),
         sort=automation.sort,
+        sort_counts=automation.sort_counts,
         filter_groups=automation.filter_groups,
         max_tracks=automation.output.maxSize,
         max_per_artist=automation.output.maxPerArtist,

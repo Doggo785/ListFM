@@ -84,6 +84,7 @@ def _mixed_tree() -> list:
                     "countMin": 0,
                     "tagSource": "artist",
                     "period": None,
+                    "moment": None,
                 },
                 {
                     "id": "c2",
@@ -94,6 +95,7 @@ def _mixed_tree() -> list:
                     "countMin": 50,
                     "tagSource": "artist",
                     "period": None,
+                    "moment": None,
                 },
             ],
             "groups": [
@@ -110,6 +112,7 @@ def _mixed_tree() -> list:
                             "countMin": 0,
                             "tagSource": "artist",
                             "period": None,
+                            "moment": None,
                         },
                         {
                             "id": "c4",
@@ -120,6 +123,7 @@ def _mixed_tree() -> list:
                             "countMin": 0,
                             "tagSource": "artist",
                             "period": None,
+                            "moment": None,
                         },
                     ],
                     "groups": [],
@@ -139,6 +143,7 @@ def _mixed_tree() -> list:
                     "countMin": 0,
                     "tagSource": "artist",
                     "period": None,
+                    "moment": None,
                 }
             ],
             "groups": [],
@@ -186,6 +191,7 @@ async def test_invalid_filter_tree_rejected_422(client: AsyncClient):
                         "countMin": 0,
                         "tagSource": "artist",
                         "period": None,
+                        "moment": None,
                     }
                 ],
                 "groups": [],
@@ -217,6 +223,7 @@ async def test_invalid_condition_value_type_rejected_422(client: AsyncClient):
                         "countMin": 0,
                         "tagSource": "artist",
                         "period": None,
+                        "moment": None,
                     }
                 ],
                 "groups": [],
@@ -298,6 +305,7 @@ async def test_update_automation_accepts_camelCase_filterGroups(client: AsyncCli
                         "countMin": 0,
                         "tagSource": "artist",
                         "period": None,
+                        "moment": None,
                     }
                 ],
                 "groups": [],
@@ -340,6 +348,7 @@ async def test_update_automation_filter_groups(client: AsyncClient):
                         "countMin": 0,
                         "tagSource": "artist",
                         "period": None,
+                        "moment": None,
                     }
                 ],
                 "groups": [],

@@ -1,6 +1,7 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
+from filter_types import ListeningMoment
 from models.album import Album
 from models.artist import Artist
 from models.artist_tag import ArtistTag
@@ -9,7 +10,18 @@ from models.tag import Tag
 from models.track import Track
 from models.user_track import UserTrack
 from repositories.user_tracks import bulk_store_recent_plays, ensure_tracks
-from sqlalchemy import and_, bindparam, delete, func, select, tuple_, update
+from sqlalchemy import (
+    and_,
+    between,
+    bindparam,
+    delete,
+    extract,
+    func,
+    or_,
+    select,
+    tuple_,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -203,3 +215,53 @@ async def get_artist_ranks(
         .order_by(func.count().desc(), Track.artist)
     )
     return {artist: rank for rank, artist in enumerate(rows.scalars(), start=1)}
+
+
+def _in_moment(local_time, moment: ListeningMoment):
+    """SQL test of a listen's local time against a moment."""
+    clauses = []
+    overnight = False
+    if moment.fromHour is not None and moment.toHour is not None:
+        hour = extract("hour", local_time)
+        overnight = moment.fromHour > moment.toHour
+        clauses.append(
+            or_(hour >= moment.fromHour, hour < moment.toHour)
+            if overnight
+            else and_(hour >= moment.fromHour, hour < moment.toHour)
+        )
+    if moment.fromDay is not None and moment.toDay is not None:
+        # Moved back by toHour, a listen after midnight falls on the day the night began.
+        day_time = local_time - timedelta(hours=moment.toHour or 0) if overnight else local_time
+        day = extract("isodow", day_time)
+        clauses.append(
+            between(day, moment.fromDay, moment.toDay)
+            if moment.fromDay <= moment.toDay
+            else or_(day >= moment.fromDay, day <= moment.toDay)
+        )
+    return and_(*clauses)
+
+
+async def get_moment_plays(
+    db: AsyncSession,
+    user_id: str,
+    start: datetime | None,
+    end: datetime,
+    timezone: str,
+    moments: list[ListeningMoment],
+) -> dict[tuple[str, str], int]:
+    """Listens in [start, end) at any of these moments, per (title, artist)."""
+    local_time = func.timezone(timezone, Scrobble.played_at)
+    in_period = and_(
+        Scrobble.user_id == user_id,
+        Scrobble.played_at < end,
+        or_(*[_in_moment(local_time, moment) for moment in moments]),
+    )
+    if start is not None:
+        in_period = and_(in_period, Scrobble.played_at >= start)
+    rows = await db.execute(
+        select(Track.title, Track.artist, func.count().label("plays"))
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .where(in_period)
+        .group_by(Track.title, Track.artist)
+    )
+    return {(row.title, row.artist): row.plays for row in rows}

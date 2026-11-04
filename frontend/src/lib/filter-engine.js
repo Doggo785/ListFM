@@ -12,9 +12,11 @@ function getFieldValue(track, field, tagSource) {
 
 function evaluateCondition(track, condition) {
   const { field, operator, value, valueMax, countMin, tagSource } = condition;
-  // Each condition has its own period: the server ranks per condition id.
-  const fieldValue =
-    field === "artist_rank" ? track.artist_ranks?.[condition.id] : getFieldValue(track, field, tagSource);
+  // Each of these conditions has its own period or moment: the server computes per id.
+  let fieldValue;
+  if (field === "artist_rank") fieldValue = track.artist_ranks?.[condition.id];
+  else if (field === "listening_moment") fieldValue = track.moment_plays?.[condition.id] ?? 0;
+  else fieldValue = getFieldValue(track, field, tagSource);
 
   if (field === "tags") {
     // Tags never looked up match nothing, not even not_contains: unknown is not "no tag".
