@@ -13,9 +13,11 @@ import {
   getAutomationHistory,
   getPreviewProgress,
   getRunProgress,
+  getScrobbleSync,
   pollProgress,
   previewAutomation,
   runAutomationNow,
+  updateAutomation,
 } from "@/lib/api";
 import PlaylistDetail from "@/views/PlaylistDetail";
 
@@ -34,6 +36,7 @@ vi.mock("@/lib/api", () => ({
   getPreviewProgress: vi.fn(),
   cancelPreview: vi.fn(),
   getRunProgress: vi.fn(),
+  getScrobbleSync: vi.fn(async () => ({ complete: true })),
   pollProgress: vi.fn(),
 }));
 
@@ -142,7 +145,12 @@ describe("PlaylistDetail progress", () => {
           error_message: null,
         },
       ]);
-    runAutomationNow.mockResolvedValue({ id: "h1", status: "completed" });
+    runAutomationNow.mockResolvedValue({
+      id: "h1",
+      status: "completed",
+      tracks_before_filter: 10,
+      tracks_after_filter: 3,
+    });
     getRunProgress.mockResolvedValue({ stage: "source", done: 3, total: 10 });
     pollProgress.mockImplementation(async (getSnapshot, opts) => {
       const snapshot = await getSnapshot();
@@ -303,7 +311,72 @@ describe("PlaylistDetail progress", () => {
     try {
       await waitForText(container, "Run now");
       await clickButton(container, "Run now");
-      await waitForText(container, "API 409: Automation already running");
+      await waitForText(container, "Automation already running");
+      expect(container.textContent).not.toContain("API 409");
+      expect(container.textContent).not.toContain("Starting...");
+    } finally {
+      await teardown(container, root);
+    }
+  });
+
+  it("shows Failed, not Done, when the run comes back failed", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    runAutomationNow.mockResolvedValue({ id: "h1", status: "failed" });
+    pollProgress.mockResolvedValue({});
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Run now");
+      await clickButton(container, "Run now");
+      await waitForText(container, "Failed");
+      expect(container.textContent).not.toContain("Done");
+    } finally {
+      await teardown(container, root);
+    }
+  });
+
+  it("greys Run while the history loads and frees it when it finishes", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    getScrobbleSync.mockResolvedValueOnce({ stage: "sync", complete: false });
+    const { container, root } = await renderDetail();
+    const runButton = () => [...container.querySelectorAll("button")].find((b) => b.textContent.includes("Run now"));
+    try {
+      await waitForText(container, "Runs can start once");
+      expect(runButton().disabled).toBe(true);
+      getScrobbleSync.mockResolvedValueOnce({ stage: "done", complete: true });
+      for (let i = 0; i < 400 && runButton().disabled; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
+      }
+      expect(runButton().disabled).toBe(false);
+    } finally {
+      await teardown(container, root);
+    }
+  }, 10000);
+
+  it("saves unsaved changes before the run, and does not run if the save fails", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    runAutomationNow.mockResolvedValue({ id: "h1", status: "completed" });
+    pollProgress.mockResolvedValue({});
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Run now");
+      await clickButton(container, "Most played");
+      await waitForText(container, "Save & run");
+
+      updateAutomation.mockRejectedValueOnce(new Error("API 500: nope"));
+      await clickButton(container, "Save & run");
+      await waitForText(container, "the run did not start");
+      expect(runAutomationNow).not.toHaveBeenCalled();
+
+      updateAutomation.mockResolvedValueOnce({});
+      await clickButton(container, "Save & run");
+      await waitForText(container, "Run now");
+      expect(updateAutomation.mock.calls[1][1].sort).toBe("most_played");
+      expect(updateAutomation.mock.invocationCallOrder[1]).toBeLessThan(runAutomationNow.mock.invocationCallOrder[0]);
     } finally {
       await teardown(container, root);
     }

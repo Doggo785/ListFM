@@ -1,36 +1,12 @@
-import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getScrobbleSync, startScrobbleSync } from "@/lib/api";
-
-const POLL_MS = 3000;
+import { useScrobbleSync } from "@/hooks/useScrobbleSync";
+import { startScrobbleSync } from "@/lib/api";
 
 /** Shows the first listening history load, the only time runs must wait (ADR 0001). */
 export default function SyncBanner() {
   const { user } = useAuth();
-  const linked = Boolean(user?.lastfm_username);
-  const [status, setStatus] = useState(null);
-
-  useEffect(() => {
-    if (!linked) return undefined;
-    let timer;
-    let stopped = false;
-    const poll = async (load) => {
-      try {
-        const next = await load();
-        if (stopped) return;
-        setStatus(next);
-        if (!next.complete && next.stage !== "error") timer = setTimeout(() => poll(getScrobbleSync), POLL_MS);
-      } catch {
-        // No banner when the status cannot be read; the app works without it.
-      }
-    };
-    // Also keeps a finished history fresh: the server skips it if synced in the last 10 minutes.
-    poll(startScrobbleSync);
-    return () => {
-      stopped = true;
-      clearTimeout(timer);
-    };
-  }, [linked]);
+  // Also keeps a finished history fresh: the server skips it if synced in the last 10 minutes.
+  const status = useScrobbleSync(Boolean(user?.lastfm_username), startScrobbleSync);
 
   if (!status || status.complete) return null;
   const percent = status.total ? Math.round((status.done / status.total) * 100) : 0;
