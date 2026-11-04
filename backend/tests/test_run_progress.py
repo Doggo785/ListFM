@@ -6,7 +6,6 @@ Previews carry a client-made ticket, runs reuse f"run:{automation_id}"
 (single-flight guarantees one run per automation at a time).
 """
 
-import time
 import uuid
 from unittest.mock import patch
 
@@ -55,8 +54,8 @@ def _automation_body(filter_groups: list) -> dict:
     }
 
 
-def _listeners_groups() -> list:
-    return [{"conditions": [{"field": "listeners", "operator": "gt", "value": 0}]}]
+def _played_groups() -> list:
+    return [{"conditions": [{"field": "playcount", "operator": "gt", "value": 0}]}]
 
 
 @pytest.mark.asyncio
@@ -73,7 +72,7 @@ async def test_pipeline_reports_progress_to_store():
         with (
             patch(
                 "services.automation_runner.get_window_tracks",
-                return_value=[{**base, "listeners": 10}],
+                return_value=[{**base, "playcount": 10}],
             ),
         ):
             await run_automation_pipeline_cached(
@@ -82,7 +81,7 @@ async def test_pipeline_reports_progress_to_store():
                 username="u",
                 window={"length": None},
                 sort="most_played",
-                filter_groups=_listeners_groups(),
+                filter_groups=_played_groups(),
                 max_tracks=50,
                 progress_key=key,
             )
@@ -321,20 +320,3 @@ async def _cleanup_user_with_automations(client: AsyncClient, email: str) -> Non
             await db.execute(delete(Automation).where(Automation.user_id == user_id))
         await db.commit()
     await _cleanup_user(client, email)
-
-
-def _slow_info(*args, **kwargs):
-    time.sleep(0.2)
-    return {
-        "listeners": 1,
-        "global_playcount": 2,
-        "userplaycount": 3,
-        "userloved": False,
-        "artist_tags": [],
-        "album": None,
-        "album_tags": [],
-    }
-
-
-
-

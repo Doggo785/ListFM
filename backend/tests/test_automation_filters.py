@@ -286,7 +286,7 @@ async def test_update_automation_accepts_camelCase_filterGroups(client: AsyncCli
                 "conditions": [
                     {
                         "id": "c9",
-                        "field": "listeners",
+                        "field": "playcount",
                         "operator": "gt",
                         "value": 1000,
                         "valueMax": None,
@@ -346,7 +346,7 @@ async def test_update_automation_filter_groups(client: AsyncClient):
                 "conditions": [
                     {
                         "id": "c9",
-                        "field": "listeners",
+                        "field": "playcount",
                         "operator": "gt",
                         "value": 1000,
                         "valueMax": None,

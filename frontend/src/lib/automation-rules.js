@@ -108,8 +108,6 @@ export const FILTER_FIELDS = {
   userplaycount: { label: "Your plays (all time)", type: "number", description: "Total times you played this track across all time" },
   userloved: { label: "Loved", type: "boolean", description: "Whether you've loved this track on Last.fm" },
   playcount: { label: "Your plays (window)", type: "number", description: "Times you played this track within the time window" },
-  global_playcount: { label: "Global plays", type: "number", description: "Total plays across all Last.fm users" },
-  listeners: { label: "Listeners", type: "number", description: "Number of unique Last.fm users who played this track" },
   rank: { label: "Rank", type: "number", description: "Position after sorting (1 = first)" },
   tags: { label: "Tag", type: "text", description: "Genre or mood tag associated with the track" },
   timestamp: { label: "Last listened", type: "date", description: "When you last played this track (in days ago)" },

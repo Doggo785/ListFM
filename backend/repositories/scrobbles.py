@@ -69,9 +69,7 @@ async def get_window_tracks(
     """One row per track played in [start, end), with the user's local stats.
 
     ``playcount`` and ``timestamp`` (last play) are read inside the window;
-    ``userplaycount`` and ``first_played`` cover every stored listen. Global
-    counts are left out until Last.fm gave them: a filter must not read the
-    column default as a real zero.
+    ``userplaycount`` and ``first_played`` cover every stored listen.
     """
     in_window = Scrobble.played_at < end
     if start is not None:
@@ -81,9 +79,6 @@ async def get_window_tracks(
         select(
             Track.title,
             Track.artist,
-            Track.listeners,
-            Track.global_playcount,
-            Track.last_fetched_at,
             plays.label("plays"),
             func.count().label("all_plays"),
             func.min(Scrobble.played_at).label("first_played"),
@@ -108,11 +103,6 @@ async def get_window_tracks(
             "userloved": row.loved,
             "timestamp": int(row.last_played.timestamp()),
             "first_played": int(row.first_played.timestamp()),
-            **(
-                {"listeners": row.listeners, "global_playcount": row.global_playcount}
-                if row.last_fetched_at
-                else {}
-            ),
         }
         for row in rows
     ]

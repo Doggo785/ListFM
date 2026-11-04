@@ -8,7 +8,6 @@ import pylast
 import pytest
 from models.automation import Automation
 from models.automation_history import AutomationHistory
-from models.track import Track
 from models.user import User
 from repositories.scrobbles import get_window_tracks, replace_loved, store_scrobbles
 from repositories.tags import mark_artist_tags_fetched, upsert_artist_tag
@@ -21,7 +20,7 @@ from services.automation_runner import (
     sort_tracks,
     window_bounds,
 )
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from .conftest import _TestSessionLocal, _unique_email
 
@@ -104,9 +103,6 @@ async def test_filters_read_stored_data_only():
             await store_scrobbles(db, user_id, [(title, artist, NOW - timedelta(days=2))])
         await upsert_artist_tag(db, "Rockers", "rock", 80)
         await mark_artist_tags_fetched(db, {"Rockers", "Tagless"})
-        await db.execute(
-            update(Track).where(Track.artist == "Rockers").values(listeners=7, last_fetched_at=NOW)
-        )
         await db.commit()
 
     async def titles(condition):
@@ -121,8 +117,6 @@ async def test_filters_read_stored_data_only():
         assert await titles({"field": "tags", "operator": "contains", "value": "rock"}) == {"Rockers"}
         # Tagless is known to have no tag; Stranger and Artist were never looked up.
         assert await titles({"field": "tags", "operator": "not_contains", "value": "rock"}) == {"Tagless"}
-        # A column default of 0 is not a real count.
-        assert await titles({"field": "listeners", "operator": "lt", "value": 100}) == {"Rockers"}
 
 
 async def _automation(user_id):

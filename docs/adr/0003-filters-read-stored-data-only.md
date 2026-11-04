@@ -12,3 +12,4 @@ Filtrer sur un tag appelait Last.fm morceau par morceau pendant le run ou l'aper
 - Une donnée jamais cherchée ne passe aucun filtre, pas même « ne contient pas » : inconnu n'est pas « sans tag ». Tant que le catalogue n'est pas plein, une playlist filtrée sur un tag peut sortir incomplète, et seul le taux de tags connus l'indique.
 - Les tags sont valables 90 jours : relire tous les artistes chaque semaine ferait tourner la tâche en continu.
 - Seuls les tags d'artiste sont proposés : un artiste qui change de style entre deux albums est mal classé jusqu'à ce que les albums soient stockés (la synchro ne garde pas l'album de chaque écoute).
+- Les filtres auditeurs et popularité mondiale sont retirés : ils demandent un appel par morceau, soit environ 2 h pour un compte de 150 000 écoutes, sans partage entre artistes.

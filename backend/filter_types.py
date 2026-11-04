@@ -17,8 +17,6 @@ FilterField = Literal[
     "userplaycount",
     "userloved",
     "playcount",
-    "global_playcount",
-    "listeners",
     "rank",
     "tags",
     "timestamp",
