@@ -174,3 +174,20 @@ async def test_api_round_trips_limits_and_periods_and_bounds_the_depth(client: A
     assert (await client.post("/api/automations", json=_frontend_payload(too_deep))).status_code == 422
     patched = await client.patch(f"/api/automations/{read['id']}", json={"filterGroups": too_deep})
     assert patched.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_fixed_dates_are_read_in_the_users_timezone():
+    # December 31 at 23:30 UTC is already January 1 in Paris.
+    played = datetime(2025, 12, 31, 23, 30, tzinfo=UTC)
+    user_id = str(uuid.uuid4())
+    async with _TestSessionLocal() as db:
+        db.add(User(id=user_id, email=_unique_email(), timezone="Europe/Paris", scrobbles_complete_at=NOW))
+        await db.flush()
+        await store_scrobbles(db, user_id, [("Late", "A", played)])
+        await db.commit()
+    rank = {"field": "artist_rank", "operator": "lte", "value": 1}
+    in_2025 = {**rank, "period": {"since": "2025-01-01", "until": "2025-12-31"}}
+    in_2026 = {**rank, "period": {"since": "2026-01-01", "until": "2026-12-31"}}
+    assert await _titles(user_id, in_2025) == []
+    assert await _titles(user_id, in_2026) == ["Late"]

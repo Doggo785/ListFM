@@ -17,6 +17,7 @@ class Automation(Base):
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     window: Mapped[dict] = mapped_column(JSONB)  # schemas.AutomationWindow (ADR 0002)
     sort: Mapped[str] = mapped_column(String(30))  # schemas.SortKey
+    sort_counts: Mapped[str] = mapped_column(String(10), default="window", server_default="window")  # schemas.SortCounts
     cron: Mapped[str | None] = mapped_column(String(100), nullable=True)
     filter_groups: Mapped[list[FilterGroup]] = mapped_column(FilterGroupListJSONB, default=list)  # Recursive filter tree as JSONB
     output_max_size: Mapped[int] = mapped_column(Integer, default=50)

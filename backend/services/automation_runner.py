@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
 from database import async_session
-from filter_types import ArtistRankPeriod
+from filter_types import ArtistRankPeriod, ListeningMoment
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
@@ -30,10 +30,11 @@ from repositories.generated_playlists import (
 from repositories.scrobbles import (
     get_artist_ranks,
     get_known_artist_tags,
+    get_moment_plays,
     get_window_tracks,
 )
 from schemas import GeneratedPlaylistCreate, Track
-from services.filter_engine import apply_filters, artist_rank_conditions
+from services.filter_engine import apply_filters, conditions_on
 from services.lastfm import PAGE_ERRORS, is_rate_limit_error
 from services.progress import store as progress_store
 from services.scrobble_sync import (
@@ -89,14 +90,14 @@ def window_bounds(window: dict, at: datetime) -> tuple[datetime | None, datetime
 _rng = random.SystemRandom()
 
 
-def sort_tracks(tracks: list[dict], sort: str) -> list[dict]:
+def sort_tracks(tracks: list[dict], sort: str, plays_field: str = "playcount") -> list[dict]:
     """Order candidates by the automation's sort (GLOSSARY: Tri)."""
     if sort == "random":
         return _rng.sample(tracks, len(tracks))
     if sort == "random_weighted":
         # Weighted sampling without replacement: key = u ** (1 / weight).
-        return sorted(tracks, key=lambda t: _rng.random() ** (1 / max(t.get("playcount", 1), 1)), reverse=True)
-    field = {"most_played": "playcount", "last_played": "timestamp", "first_played": "first_played"}[sort]
+        return sorted(tracks, key=lambda t: _rng.random() ** (1 / max(t.get(plays_field, 1), 1)), reverse=True)
+    field = {"most_played": plays_field, "last_played": "timestamp", "first_played": "first_played"}[sort]
     return sorted(tracks, key=lambda t: (t.get(field, 0), t.get("timestamp", 0)), reverse=True)
 
 
@@ -130,12 +131,12 @@ def apply_limits(
     return kept
 
 
-def _period_bounds(period: ArtistRankPeriod, at: datetime) -> tuple[datetime | None, datetime]:
+def _period_bounds(period: ArtistRankPeriod, at: datetime, timezone: str) -> tuple[datetime | None, datetime]:
     if period.since is not None and period.until is not None:
-        # shortcut: fixed dates are read in UTC, use the user's timezone when the moment filter brings it.
+        zone = ZoneInfo(timezone)
         return (
-            datetime.combine(period.since, time.min, tzinfo=UTC),
-            datetime.combine(period.until + timedelta(days=1), time.min, tzinfo=UTC),
+            datetime.combine(period.since, time.min, tzinfo=zone),
+            datetime.combine(period.until + timedelta(days=1), time.min, tzinfo=zone),
         )
     return window_bounds(period.model_dump(), at)
 
@@ -146,15 +147,34 @@ async def _artist_ranks_by_condition(
     filter_groups: list,
     window_range: tuple[datetime | None, datetime],
     at: datetime,
+    timezone: str,
 ) -> dict[str, dict[str, int]]:
     """Artist ranks for each artist_rank condition; one query per distinct period."""
     by_range: dict[tuple[datetime | None, datetime], dict[str, int]] = {}
     by_condition: dict[str, dict[str, int]] = {}
-    for condition_id, period in artist_rank_conditions(filter_groups):
-        bounds = window_range if period is None else _period_bounds(ArtistRankPeriod.model_validate(period), at)
+    for condition_id, period in conditions_on(filter_groups, "artist_rank", "period"):
+        bounds = window_range if period is None else _period_bounds(ArtistRankPeriod.model_validate(period), at, timezone)
         if bounds not in by_range:
             by_range[bounds] = await get_artist_ranks(db, user_id, *bounds)
         by_condition[condition_id] = by_range[bounds]
+    return by_condition
+
+
+async def _moment_plays_by_condition(
+    db: AsyncSession,
+    user_id: str,
+    moments: dict[str, ListeningMoment],
+    window_range: tuple[datetime | None, datetime],
+    timezone: str,
+) -> dict[str, dict[tuple[str, str], int]]:
+    """Listens at the moment of each condition; one query per distinct moment."""
+    by_moment: dict[str, dict[tuple[str, str], int]] = {}
+    by_condition: dict[str, dict[tuple[str, str], int]] = {}
+    for condition_id, moment in moments.items():
+        key = moment.model_dump_json()
+        if key not in by_moment:
+            by_moment[key] = await get_moment_plays(db, user_id, *window_range, timezone, [moment])
+        by_condition[condition_id] = by_moment[key]
     return by_condition
 
 
@@ -165,6 +185,7 @@ async def run_automation_pipeline_cached(
     username: str,
     window: dict,
     sort: str,
+    sort_counts: str = "window",
     filter_groups: list,
     max_tracks: int,
     max_per_artist: int | None = None,
@@ -182,9 +203,22 @@ async def run_automation_pipeline_cached(
     """
     at = at or datetime.now(UTC)
     start, end = window_bounds(window, at)
-    candidates = sort_tracks(await get_window_tracks(db, user_id, start, end), sort)
+    timezone = await db.scalar(select(User.timezone).where(User.id == user_id)) or "UTC"
+    moments = {
+        condition_id: ListeningMoment.model_validate(moment)
+        for condition_id, moment in conditions_on(filter_groups, "listening_moment", "moment")
+    }
+    window_tracks = await get_window_tracks(db, user_id, start, end)
+    plays_field = "playcount"
+    if sort_counts == "moment" and moments:
+        at_moments = await get_moment_plays(db, user_id, start, end, timezone, list(moments.values()))
+        for track in window_tracks:
+            track["moment_playcount"] = at_moments.get((track["title"], track["artist"]), 0)
+        plays_field = "moment_playcount"
+    candidates = sort_tracks(window_tracks, sort, plays_field)
     artist_tags = await get_known_artist_tags(db, user_id)
-    ranks_by_condition = await _artist_ranks_by_condition(db, user_id, filter_groups, (start, end), at)
+    ranks_by_condition = await _artist_ranks_by_condition(db, user_id, filter_groups, (start, end), at, timezone)
+    plays_by_condition = await _moment_plays_by_condition(db, user_id, moments, (start, end), timezone)
     at_epoch = int(at.timestamp())
     for rank, track in enumerate(candidates, start=1):
         track["rank"] = rank
@@ -194,6 +228,12 @@ async def run_automation_pipeline_cached(
             condition_id: ranks[track["artist"]]
             for condition_id, ranks in ranks_by_condition.items()
             if track["artist"] in ranks
+        }
+        track_key = (track["title"], track["artist"])
+        track["moment_plays"] = {
+            condition_id: plays[track_key]
+            for condition_id, plays in plays_by_condition.items()
+            if track_key in plays
         }
         if track["artist"] in artist_tags:
             track["artist_tags"] = artist_tags[track["artist"]]
@@ -363,6 +403,7 @@ async def run_automation(
             username=automation.lastfm_username,
             window=automation.window,
             sort=automation.sort,
+            sort_counts=automation.sort_counts,
             filter_groups=automation.filter_groups,
             max_tracks=automation.output_max_size,
             max_per_artist=automation.output_max_per_artist,

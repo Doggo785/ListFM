@@ -28,7 +28,7 @@ Règle : identité d'abord, écrans ensuite. Aucun travail visuel sur un écran 
 
 1. *(fait, #106)* **Docs** : `GLOSSARY.md`, ADR 0001 et 0002, cette ROADMAP.
 2. *(fait, #107)* **Synchro des écoutes** (ADR 0001) : table des écoutes, synchro complète puis incrémentale (`user.getRecentTracks` par pages de 1000, repli à 200), progression, liste des loved relue en entier. Toujours avant un run, au plus toutes les 10 min pour l'aperçu. Pendant le premier chargement, l'aperçu est partiel (bandeau) et les runs attendent la fin.
-3. *(fenêtre et tris faits, #109 ; restent les nouveaux filtres et limites)* **Moteur de la chaîne** (ADR 0002) : une seule source, les écoutes, puis Fenêtre → Filtres → Tri → Limites.
+3. *(fait, #109, #111, #112, #113)* **Moteur de la chaîne** (ADR 0002) : une seule source, les écoutes, puis Fenêtre → Filtres → Tri → Limites.
    - Fenêtre comptée depuis la date prévue du run : glissante, décalée (« le même mois il y a un an »), toutes les écoutes. Pas de dates fixes.
    - Filtres : l'existant (sans auditeurs ni popularité mondiale) + première écoute, artiste dans ton top N (calculé sur la fenêtre par défaut, ou sur tout l'historique, une période relative, des dates fixes), moment d'écoute (de tel jour à tel jour, de telle heure à telle heure, passage de minuit accepté, au moins X écoutes, fuseau de l'utilisateur ; le tri compte au choix toutes les écoutes de la fenêtre ou seulement celles de ce moment). Groupes ET/OU sur 2 niveaux maximum, même contrôle front et back. Un seul contrat `filterGroups` (camel partout).
    - Tris : les plus écoutés, écoutés le plus récemment, découverts le plus récemment, au hasard (pondérable par les écoutes). Le tri choisit les morceaux gardés et fixe leur ordre.

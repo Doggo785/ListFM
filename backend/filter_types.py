@@ -23,6 +23,7 @@ FilterField = Literal[
     "timestamp",
     "first_played",
     "artist_rank",
+    "listening_moment",
 ]
 
 # Permissive union of every operator the frontend can emit (FILTER_OPERATORS).
@@ -81,6 +82,32 @@ class ArtistRankPeriod(AutomationWindow):
         return self
 
 
+class ListeningMoment(BaseModel):
+    """When listens count for a listening_moment condition, in the user's timezone.
+
+    Days run from 1 (Monday) to 7, both included, and may wrap ("Saturday to
+    Monday"). Hours run from fromHour up to toHour excluded and may cross
+    midnight: then the hours after midnight belong to the day the night began.
+    """
+
+    fromDay: int | None = Field(default=None, ge=1, le=7)
+    toDay: int | None = Field(default=None, ge=1, le=7)
+    fromHour: int | None = Field(default=None, ge=0, le=23)
+    toHour: int | None = Field(default=None, ge=0, le=23)
+
+    @model_validator(mode="after")
+    def complete_ranges(self):
+        if (self.fromDay is None) != (self.toDay is None):
+            raise ValueError("fromDay and toDay go together")
+        if (self.fromHour is None) != (self.toHour is None):
+            raise ValueError("fromHour and toHour go together")
+        if self.fromDay is None and self.fromHour is None:
+            raise ValueError("A moment needs days or hours")
+        if self.fromHour is not None and self.fromHour == self.toHour:
+            raise ValueError("fromHour and toHour must differ")
+        return self
+
+
 class FilterCondition(BaseModel):
     """A single leaf condition, mirroring ``createCondition()``."""
 
@@ -93,6 +120,14 @@ class FilterCondition(BaseModel):
     tagSource: Literal["artist", "album"] = "artist"
     # artist_rank only. None ranks artists on the automation's own window.
     period: ArtistRankPeriod | None = None
+    # listening_moment only: value is then the minimum listens at that moment.
+    moment: ListeningMoment | None = None
+
+    @model_validator(mode="after")
+    def moment_field_has_a_moment(self):
+        if self.field == "listening_moment" and self.moment is None:
+            raise ValueError("A listening_moment condition needs a moment")
+        return self
 
 
 class FilterGroup(BaseModel):

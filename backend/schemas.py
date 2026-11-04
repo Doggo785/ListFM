@@ -204,6 +204,11 @@ def _default_window() -> AutomationWindow:
 SortKey = Literal["most_played", "last_played", "first_played", "random", "random_weighted"]
 
 
+# What most_played and random_weighted count: every listen of the window, or
+# only those of the automation's listening_moment filters.
+SortCounts = Literal["window", "moment"]
+
+
 class AutomationOutput(BaseModel):
     # Wire key stays camelCase to match the frontend contract (#12).
     maxSize: int = Field(default=50, ge=0, le=200)
@@ -224,6 +229,7 @@ class AutomationCreate(BaseModel):
     description: str = ""
     window: AutomationWindow = Field(default_factory=_default_window)
     sort: SortKey = "most_played"
+    sort_counts: SortCounts = Field(default="window", alias="sortCounts")
     cron: str = Field(default="", max_length=100)
     filter_groups: FilterGroups = Field(default_factory=list, alias="filterGroups")
     output: AutomationOutput = Field(default_factory=AutomationOutput)
@@ -285,6 +291,7 @@ class AutomationUpdate(BaseModel):
     description: str | None = None
     window: AutomationWindow | None = None
     sort: SortKey | None = None
+    sort_counts: SortCounts | None = Field(default=None, alias="sortCounts")
     cron: str | None = Field(default=None, max_length=100)
     filter_groups: FilterGroups | None = Field(default=None, alias="filterGroups")
     output: AutomationOutput | None = None
@@ -309,6 +316,7 @@ class AutomationRead(BaseModel):
     description: str | None = None
     window: AutomationWindow
     sort: SortKey
+    sort_counts: SortCounts = Field(alias="sortCounts")
     cron: str | None = None
     filter_groups: FilterGroups = Field(alias="filterGroups")
     output: dict
@@ -332,6 +340,7 @@ class AutomationRead(BaseModel):
                 "description": values.description,
                 "window": values.window,
                 "sort": values.sort,
+                "sort_counts": values.sort_counts,
                 "cron": values.cron,
                 "filter_groups": values.filter_groups or [],
                 "output": {
