@@ -57,11 +57,12 @@ Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGE
 Chaque PR passe `impeccable critique` et `audit` avant le merge, branche le ruban sur les vraies données de l'écran et supprime l'ancien code qu'elle remplace. Le Créateur vient en premier : `DESIGN.md` s'écrit à sa fin, depuis le résultat construit (pas `document`, qui décrirait l'ancien style).
 
 1. **Créateur** : le but est une liberté quasi infinie dans une UI soignée, intuitive et jamais chargée (réglages avancés repliés par défaut). Une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Filtres : remplacer les blocs par une liste qui se lit comme une phrase, groupes repliés dans « Avancé », et ajouter à l'écran première écoute, top artistes et moment d'écoute. Le ruban dessine les compteurs de la chaîne.
-2. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran, son titre glissant de la liste à la page.
+2. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran, son titre glissant de la liste à la page. Les cartes qui présentent les automations sont refaites en style pixel.
 3. **Historique** : états « nouvel essai prévu », « échec définitif », run vide, « 32/50 ». Le bouton Re-run passe par la route de retry de T5.
 4. **Dashboard**.
-5. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` et `styled-components` s'ils ne servent plus.
-6. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
+5. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` s'il ne sert plus.
+6. **Page d'accueil** : refaite à 100 % avant le login, avec une présentation propre de ListFM.
+7. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
 
 ### Phase D : finition
 

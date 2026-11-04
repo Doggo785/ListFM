@@ -509,3 +509,15 @@ html, body, #root {
     transition: none;
   }
 }
+
+.loader {
+  color: var(--text-muted);
+  opacity: 0;
+  animation: loader-show 0s 0.4s forwards;
+}
+
+@keyframes loader-show {
+  to {
+    opacity: 1;
+  }
+}

@@ -53,7 +53,7 @@ function Playlists() {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[var(--ground)]">
+      <div className="flex h-screen w-full items-center justify-center">
         <Loader />
       </div>
     );
