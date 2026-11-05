@@ -31,6 +31,8 @@ Lire avant d'agir :
 - Les modèles ne déclarent aucun `relationship()` ; les jointures sont des `select().join()` explicites.
 - `Automation.output` est stocké à plat (`output_max_size`) et reconstruit par un `model_validator`.
 - Tokens de provider : aucune colonne en clair. Les rajouter seulement chiffrées au repos.
+- Last.fm se lie par son autorisation web : le jeton de retour ne sert qu'une fois, la clé de session n'est pas gardée. Un test lie un compte avec `link_lastfm` de `tests/conftest.py`.
+- `users.timezone` vide veut dire « pas encore connu », lu comme UTC : le navigateur ne le remplit que dans ce cas, pour ne jamais écraser un choix fait dans les réglages.
 - `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.
 - Un cron se lit toujours via `schemas.cron_trigger`, jamais `CronTrigger.from_crontab` : APScheduler compte les jours depuis lundi, donc `1` tomberait un mardi.
 - Le scheduler du sweep ne démarre qu'avec `ENABLE_SCHEDULER` ; le rate limiter vit en mémoire du process. L'app suppose un seul worker.
