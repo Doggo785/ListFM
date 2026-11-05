@@ -11,9 +11,9 @@ export function AuthProvider({ children }) {
     try {
       const data = await request("/api/auth/me");
       setUser(data);
-      // Cron schedules run in the user's zone: keep it in sync with this browser.
+      // The first browser sets the zone. After that only Settings does: a trip must not shift the schedules.
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (timezone && data.timezone !== timezone) {
+      if (timezone && !data.timezone) {
         request("/api/auth/me/timezone", {
           method: "PUT",
           body: JSON.stringify({ timezone }),
@@ -47,10 +47,10 @@ export function AuthProvider({ children }) {
     await checkSession();
   }, [checkSession]);
 
-  const register = useCallback(async (email, password, displayName) => {
+  const register = useCallback(async (email, password) => {
     await request("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, display_name: displayName || undefined }),
+      body: JSON.stringify({ email, password }),
     });
     await checkSession();
   }, [checkSession]);
@@ -60,28 +60,20 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const linkLastfm = useCallback(async (username) => {
-    await request("/api/auth/link-lastfm", {
-      method: "POST",
-      body: JSON.stringify({ username }),
-    });
-    // Optimistically update state so isLastfmLinked is true immediately
-    // This prevents the linking page from staying visible or the dashboard
-    // from showing "No Last.fm account linked" if the refresh call fails.
-    setUser((prev) =>
-      prev ? { ...prev, lastfm_username: username, is_lastfm_linked: true } : prev
-    );
-    // Refresh session with actual server data — failure is non-fatal
-    // because we already optimistically applied the linking above
-    try {
-      const data = await request("/api/auth/me");
-      setUser(data);
-    } catch {
-      // Session fetch failed, but the linking itself succeeded on the backend.
-      // Optimistic state keeps the user correctly identified as linked.
-      // Real data will be fetched on next app load.
-    }
+  const refreshUser = useCallback(async () => {
+    setUser(await request("/api/auth/me"));
   }, []);
+
+  const forgetUser = useCallback(() => setUser(null), []);
+
+  const finishLastfmLink = useCallback(async (token, state) => {
+    const linked = await request("/api/auth/lastfm/link", {
+      method: "POST",
+      body: JSON.stringify({ token, state }),
+    });
+    await refreshUser();
+    return linked;
+  }, [refreshUser]);
 
   const isLastfmLinked = !!user?.lastfm_username;
   const lastfmUsername = user?.lastfm_username;
@@ -110,9 +102,11 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
-    linkLastfm,
+    finishLastfmLink,
+    refreshUser,
+    forgetUser,
     loading,
-  }), [user, avatar, loading, isLastfmLinked, login, register, logout, linkLastfm]);
+  }), [user, avatar, loading, isLastfmLinked, login, register, logout, finishLastfmLink, refreshUser, forgetUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

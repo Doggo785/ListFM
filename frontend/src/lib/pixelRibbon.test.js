@@ -21,8 +21,12 @@ function fakeGl(overrides = {}) {
 
 describe("sceneFor", () => {
   it("gives each page its own scene", () => {
-    const scenes = ["/dashboard", "/automations/new", "/automations", "/automations/abc", "/playlists", "/playlists/abc", "/login"].map(sceneFor);
-    expect(new Set(scenes).size).toBe(7);
+    const scenes = ["/dashboard", "/automations/new", "/automations", "/automations/abc", "/playlists", "/playlists/abc", "/login", "/settings", "/"].map(sceneFor);
+    expect(new Set(scenes).size).toBe(9);
+  });
+
+  it("keeps one scene on every screen before the site, so moving between them is still", () => {
+    for (const path of ["/register", "/link-lastfm", "/auth/lastfm", "/auth/callback"]) expect(sceneFor(path)).toBe(sceneFor("/login"));
   });
 
   it("shows the Creator's scene while editing an automation", () => {

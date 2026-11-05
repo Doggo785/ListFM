@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { CELL, ribbonStage } from "@/lib/pixelRibbon";
 import { createForge, forgeRamps, letterMask } from "@/lib/forge";
-import { SWEEP_SECONDS } from "@/lib/ribbonTrack";
+import { SWEEP_SECONDS, sweepAt } from "@/lib/ribbonTrack";
 
 // Tiny5's pixels land on the 4px grid at these sizes only.
 const SIZES = [320, 288, 256, 224, 192, 160, 128, 96, 64, 32];
@@ -27,7 +27,7 @@ function fitSize(name, family, width, viewportHeight) {
 }
 
 /** The artist's name as large as it fits. It catches fire from the ribbon's playhead, and flames still cross it now and then. */
-export default function ForgedName({ name, reducedMotion }) {
+export default function ForgedName({ name, reducedMotion, relights = true }) {
   const box = useRef(null);
   const canvas = useRef(null);
   const [size, setSize] = useState(SIZES.at(-1));
@@ -47,7 +47,7 @@ export default function ForgedName({ name, reducedMotion }) {
   }, [name]);
 
   useEffect(() => {
-    if (reducedMotion || cut) return undefined;
+    if (reducedMotion || cut || (!relights && forgedName === name)) return undefined;
     let frameId = 0;
     let lickTimer = 0;
     let stopped = false;
@@ -84,8 +84,12 @@ export default function ForgedName({ name, reducedMotion }) {
         ramps: forgeRamps(ember, root.getPropertyValue("--text")),
         sweepSeconds: SWEEP_SECONDS,
         soaked: forgedName === name,
-        // The ribbon's own playhead, so the letter catches as the flame passes under it.
-        headX: () => ((ribbonStage.track?.head ?? 0) - box.current.getBoundingClientRect().left) / CELL,
+        // The ribbon's own playhead, so the letter catches as the flame passes under it. Without one, it just crosses.
+        headX: (seconds) => {
+          // The page may already be gone: this frame runs before the effect's cleanup.
+          const here = box.current?.getBoundingClientRect() ?? rect;
+          return ribbonStage.track ? (ribbonStage.track.head - here.left) / CELL : (sweepAt(seconds) * here.width) / CELL;
+        },
         onSpark: (x, y) => {
           const here = element.getBoundingClientRect();
           ribbonStage.burst(here.left + x * CELL, here.top + y * CELL);
@@ -128,7 +132,7 @@ export default function ForgedName({ name, reducedMotion }) {
           scheduleLick();
         }, low + Math.random() * (high - low));
       };
-      scheduleLick();
+      if (relights) scheduleLick();
     };
     if (document.fonts?.load) document.fonts.load(`${size}px Tiny5`).then(() => !stopped && start(), () => !stopped && start());
     else start();
@@ -137,7 +141,7 @@ export default function ForgedName({ name, reducedMotion }) {
       window.cancelAnimationFrame(frameId);
       clearTimeout(lickTimer);
     };
-  }, [name, size, cut, reducedMotion]);
+  }, [name, size, cut, reducedMotion, relights]);
 
   return (
     <h1

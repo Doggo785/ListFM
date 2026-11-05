@@ -23,6 +23,8 @@ const QUIET_FADE = 130;
 const MAX_HOLES = 4;
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
+const PHONE_WIDTH = 860; // Where the auth screens stack, and the free space moves under the form.
+
 const SCENES = {
   // Near where its wave will lie, so the wave grows in place when the listens arrive.
   dashboard: { shape: [0.11, 0.1, 0.09, 0.11, 0.13, 0.1, 0.09, 0.11, 0.14, 0.12, 0.1, 0.09], angle: -0.04, offset: 0.08, heat: 0 },
@@ -31,6 +33,9 @@ const SCENES = {
   detail: { shape: [0.2, 0.19, 0.17, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0.1, 0.09, 0.09], angle: 1.2, offset: 0.42, heat: 2 },
   playlists: { shape: [0.1, 0.11, 0.12, 0.14, 0.16, 0.18, 0.18, 0.16, 0.14, 0.12, 0.11, 0.1], angle: -0.06, offset: -0.3, heat: 2 },
   playlist: { shape: [0.08, 0.09, 0.1, 0.12, 0.14, 0.17, 0.2, 0.22, 0.2, 0.17, 0.14, 0.12], angle: 1.45, offset: 0.46, heat: 3 },
+  // Under the name, where the Dashboard's wave will lie, so logging in barely moves it.
+  auth: { shape: [0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.14, 0.13, 0.12], angle: 0.05, offset: -0.24, phoneOffset: -0.36, heat: 2 },
+  settings: { shape: [0.08, 0.09, 0.1, 0.11, 0.12, 0.12, 0.12, 0.13, 0.14, 0.15, 0.16, 0.18], angle: 1.45, offset: -0.42, heat: 0 },
   other: { shape: [0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14], angle: -0.3, offset: -0.28, heat: 0 },
 };
 
@@ -47,6 +52,8 @@ export function sceneFor(pathname) {
   if (pathname.startsWith("/automations/")) return SCENES.detail;
   if (pathname === "/playlists") return SCENES.playlists;
   if (pathname.startsWith("/playlists/")) return SCENES.playlist;
+  if (["/login", "/register", "/link-lastfm"].includes(pathname) || pathname.startsWith("/auth/")) return SCENES.auth;
+  if (pathname === "/settings") return SCENES.settings;
   return SCENES.other;
 }
 
@@ -462,7 +469,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
 
   return {
     setScene(next) {
-      scene = { cols: next.shape, angle: next.angle, off: next.offset };
+      scene = { cols: next.shape, angle: next.angle, off: (window.innerWidth <= PHONE_WIDTH && next.phoneOffset) || next.offset };
       sceneHeat = heat = next.heat;
       Object.assign(target, scene, { ramp: rampFor(next.heat, palette) });
       // The first scene appears in place; only later ones travel.
