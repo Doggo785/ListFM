@@ -3,7 +3,6 @@ import "./App.css";
 import TopNav from "./components/ui/TopNav";
 import PixelRibbon from "./components/ui/PixelRibbon";
 import ScrollToTop from "./components/elements/ScrollToTop";
-import SyncBanner from "./components/elements/SyncBanner";
 import Landing from "./views/Landing";
 import Login from "./views/Login";
 import Register from "./views/Register";
@@ -28,7 +27,6 @@ function App() {
       {showNav && <TopNav />}
       <div className="app-main">
         <div className="min-w-0 flex-1">
-          {showNav && <SyncBanner />}
           {/* The new page is there at once: nothing waits for the old one to leave. */}
           <div key={location.pathname} className="page-enter h-full">
             <Routes location={location}>

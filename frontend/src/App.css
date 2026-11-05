@@ -513,3 +513,32 @@ html, body, #root {
     opacity: 1;
   }
 }
+
+.background-task {
+  flex: 0 1 auto;
+  text-align: left;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.background-task__track,
+.background-task__fill {
+  height: 8px;
+  background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px);
+}
+
+.background-task__track {
+  margin-top: 4px;
+}
+
+.background-task__fill {
+  background-image: repeating-linear-gradient(90deg, var(--ember) 0 4px, transparent 4px 8px);
+}
+
+/* Below this the row no longer fits it: it takes its own line under the links. */
+@media (max-width: 1100px) {
+  .background-task {
+    order: 3;
+    flex-basis: 100%;
+  }
+}

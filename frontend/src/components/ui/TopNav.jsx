@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import BackgroundTasks from "@/components/elements/BackgroundTasks";
 
 const LINKS = [
   { label: "Dashboard", to: "/dashboard" },
@@ -35,6 +36,7 @@ export default function TopNav() {
           <span ref={marker} className="top-nav__marker" aria-hidden="true" />
         </nav>
       </div>
+      <BackgroundTasks />
       <div className="top-nav__account" data-quiet>
         {avatar && <img src={avatar} alt="" className="top-nav__avatar" />}
         {username && <span>{username}</span>}
