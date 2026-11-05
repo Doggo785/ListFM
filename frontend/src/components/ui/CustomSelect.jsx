@@ -9,7 +9,7 @@ export default function CustomSelect({ value, onChange, options, placeholder, la
       <Select.Trigger
         aria-label={label}
         className={cn(
-          "flex h-10 w-full items-center gap-2 border-2 border-(--control) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) hover:border-(--ember) focus-visible:border-(--ember)",
+          "flex h-10 pointer-coarse:h-11 w-full items-center gap-2 border-2 border-(--control) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) hover:border-(--ember) focus-visible:border-(--ember)",
           className,
         )}
       >

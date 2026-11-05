@@ -17,6 +17,7 @@ import {
   describeAutomationWithSchedule,
   describeCron,
   describePeriod,
+  isValidCron,
   usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
@@ -152,5 +153,16 @@ describe("describePeriod", () => {
     expect(describePeriod({ start: "2025-12-01", end: "2026-02-28" })).toBe("Dec 1, 2025 to Feb 28, 2026");
     expect(describePeriod({ start: null, end: "2026-08-31" })).toBe("all your listens up to Aug 31, 2026");
     expect(describePeriod(undefined)).toBeNull();
+  });
+});
+
+describe("isValidCron", () => {
+  it("catches what the server would refuse, and leaves names to it", () => {
+    for (const cron of ["0 0 1 3,6,9,12 *", "*/5 * * * *", "0 8 * * 1-5", "0 8 * * 7", "0 0 last * *", "0 8 * * mon-fri", "0-30/5 8 1,15 * *"]) {
+      expect(isValidCron(cron), cron).toBe(true);
+    }
+    for (const cron of ["0 0", "99 0 * * *", "0 24 * * *", "0 0 0 * *", "0 0 * 13 *", "0 0 * * 8", "*/0 * * * *", "0 0 * * 1-9", "@ * * * *", "", null]) {
+      expect(isValidCron(cron), String(cron)).toBe(false);
+    }
   });
 });

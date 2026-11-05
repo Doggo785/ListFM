@@ -83,7 +83,7 @@ in vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
 
 const FRAGMENT = `#version 300 es
 precision highp float;
-uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull,uCalm,uEdge;uniform vec2 uPoint,uBand;
+uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull,uCalm,uEdge,uClip;uniform vec2 uPoint,uBand;
 uniform float uCols[${COLUMNS}];uniform vec3 uRamp[4];uniform vec4 uQuiet[${MAX_QUIET}];uniform int uN;
 out vec4 o;
 float b2(vec2 a){a=floor(a);return fract(a.x/2.+a.y*a.y*.75);}
@@ -91,6 +91,7 @@ float b4(vec2 a){return b2(.5*a)*.25+b2(a);}
 float b8(vec2 a){return b4(.5*a)*.25+b2(a);}
 void main(){
   vec2 cell=floor(gl_FragCoord.xy);
+  if(cell.y>uClip){o=vec4(0.);return;}
   vec2 uv=(cell+.5)/uRes;float asp=uRes.x/uRes.y;
   float loose=1.-uCalm;float th=uAngle+loose*.22*sin(uWander*.09);
   float cs=cos(th),sn=sin(th);mat2 R=mat2(cs,-sn,sn,cs);
@@ -112,7 +113,7 @@ void main(){
   o=vec4(uRamp[int(min(idx,4.))-1],1.);
 }`;
 
-const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN"];
+const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN"];
 
 function compile(gl) {
   const shader = (type, source) => {
@@ -254,6 +255,9 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     gl.uniform1f(uniforms.uOff, now.off);
     gl.uniform1f(uniforms.uCalm, now.calm);
     gl.uniform1f(uniforms.uEdge, now.edge);
+    // A band scrolled out of its page leaves with the page, instead of crossing what sits above it.
+    const page = chain?.closest("main")?.getBoundingClientRect();
+    gl.uniform1f(uniforms.uClip, page ? (window.innerHeight - page.top) / CELL : window.innerHeight);
     gl.uniform1f(uniforms.uPull, now.pull * (1 - now.calm));
     gl.uniform2f(
       uniforms.uBand,

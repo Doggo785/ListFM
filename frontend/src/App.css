@@ -400,6 +400,19 @@ html, body, #root {
   animation: page-enter var(--duration-enter) step-end backwards;
 }
 
+/* A scrolling page dissolves under the bar above it instead of being cut in half. The mask stays with the box, not the scroll. */
+.scroll-edge {
+  mask:
+    linear-gradient(#000, #000) 0 16px / 100% 100% no-repeat,
+    var(--dither-2) 0 0 / 16px 16px repeat-x;
+}
+
+.preview-stale {
+  opacity: 0.6;
+  /* Only a slow answer dims it: a quick one must not blink at each change. */
+  transition: opacity 0s linear 600ms;
+}
+
 .preview-row {
   animation: page-enter var(--duration-enter) step-end backwards;
   animation-delay: calc(var(--row) * 16ms);

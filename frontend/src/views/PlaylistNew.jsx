@@ -25,6 +25,7 @@ import {
   matchingPreset,
   suggestName,
   toPayload,
+  usesMomentFilter,
   usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
@@ -32,6 +33,9 @@ import { useAuth } from "../contexts/AuthContext";
 
 const CUSTOM = "custom";
 const WINDOW_CHOICES = [...WINDOW_OPTIONS, { value: CUSTOM, label: "Custom" }];
+const WINDOW_ENDS = [{ value: "now", label: "now" }, { value: "earlier", label: "earlier" }];
+const PLAYS_FROM = [{ value: "window", label: "Count plays in the whole window" }, { value: "moment", label: "Count plays at the listening moment" }];
+const COUNTS_PLAYS = ["most_played", "random_weighted"];
 const UNITS = ["day", "week", "month", "year"].map((value) => ({ value, label: `${value}s` }));
 const Muted = ({ children }) => <span className="text-sm text-(--text-muted)">{children}</span>;
 // A kept track slides to its new rank; a new one dithers in from the top, and a dropped one steps out.
@@ -91,9 +95,14 @@ function CustomWindow({ window, onChange }) {
       <NumberInput aria-label="Window length" min={1} max={1000} value={length?.amount} onChange={(amount) => onChange({ ...window, length: { ...length, amount } })} />
       <CustomSelect label="Window length unit" value={length?.unit ?? "month"} onChange={(unit) => onChange({ ...window, length: { ...length, unit } })} options={UNITS} className="w-28" />
       <Muted>ending</Muted>
-      <NumberInput aria-label="Window end" min={0} max={1000} value={ago?.amount ?? 0} onChange={(amount) => onChange({ ...window, ago: { unit: ago?.unit ?? "year", amount: amount || null } })} />
-      <CustomSelect label="Window end unit" value={ago?.unit ?? "year"} onChange={(unit) => onChange({ ...window, ago: { amount: ago?.amount ?? null, unit } })} options={UNITS} className="w-28" />
-      <Muted>ago</Muted>
+      <CustomSelect label="Window end" value={ago ? "earlier" : "now"} onChange={(end) => onChange({ ...window, ago: end === "now" ? null : { amount: 1, unit: "year" } })} options={WINDOW_ENDS} className="w-28" />
+      {ago && (
+        <>
+          <NumberInput aria-label="Window end, how long ago" min={1} max={1000} value={ago.amount} onChange={(amount) => onChange({ ...window, ago: { ...ago, amount } })} />
+          <CustomSelect label="Window end unit" value={ago.unit} onChange={(unit) => onChange({ ...window, ago: { ...ago, unit } })} options={UNITS} className="w-28" />
+          <Muted>ago</Muted>
+        </>
+      )}
     </div>
   );
 }
@@ -128,6 +137,12 @@ function Preview({ preview, draft, linked }) {
         </p>
       </div>
       {result?.period && <p className="pb-2 text-sm text-(--text-muted)">Covers {describePeriod(result.period)}.</p>}
+      {result && result.total > 0 && (
+        <p className="flex justify-between pr-2 pb-1 pl-11 text-sm text-(--text-muted)">
+          <span>Track</span>
+          <span>Plays</span>
+        </p>
+      )}
       {failed && !loading && <p className="pb-2 text-sm text-(--ember)" role="alert">The preview could not update. Change a setting to try again.</p>}
       {result && result.total > 0 && result.total < wanted && (
         <p className="pb-2 text-sm text-(--text-muted)">Only {result.total} of the {wanted} tracks you asked for fit these settings.</p>
@@ -142,7 +157,7 @@ function Preview({ preview, draft, linked }) {
       )}
       {result?.total === 0 && <p className="py-3 text-sm text-(--text-muted)">No track fits. Try a wider window or fewer rules.</p>}
       {result && result.total > 0 && (
-        <motion.ol layoutScroll className={`relative min-h-0 flex-1 divide-y divide-(--line) overflow-y-auto ${showAll ? "" : "max-lg:[&>li:nth-child(n+9)]:hidden"}`}>
+        <motion.ol layoutScroll aria-busy={loading} className={`${loading ? "preview-stale" : ""} relative min-h-0 flex-1 divide-y divide-(--line) overflow-y-auto ${showAll ? "" : "max-lg:[&>li:nth-child(n+9)]:hidden"}`}>
           <AnimatePresence mode="popLayout" initial={false}>
             {result.tracks.map((track, i) => (
               <motion.li
@@ -187,6 +202,7 @@ export default function PlaylistNew() {
   const [draft, setDraft] = useState(createDefaultAutomation);
   const [typedName, setTypedName] = useState(null);
   const [customWindow, setCustomWindow] = useState(false);
+  const [replaced, setReplaced] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
 
@@ -214,7 +230,17 @@ export default function PlaylistNew() {
   const limitCount = ["maxPerArtist", "maxPerAlbum", "noRepeatPlaylists"].filter((k) => draft.output[k]).length;
   const incompleteCount = countIncompleteConditions(draft.filterGroups);
   const ruleState = [ruleCount ? plural(ruleCount, "rule") : "No rules", incompleteCount > 0 && `${incompleteCount} not applied yet`].filter(Boolean).join(", ");
-  const selected = matchingPreset(draft)?.id;
+  const selectedPreset = matchingPreset(draft);
+  const selected = selectedPreset?.id;
+  // Offered only until the next change: past that, going back would lose that change too.
+  const canUndo = replaced?.after === draft;
+  const pickPreset = (preset) => {
+    const after = applyPreset(draft, preset);
+    // A draft matching no preset is the user's own work, and a preset rewrites every setting.
+    setReplaced(selected ? null : { before: draft, customWindow, after, label: preset.label });
+    setCustomWindow(false);
+    setDraft(after);
+  };
   const badSchedule = Boolean(draft.cron) && !isValidCron(draft.cron);
   const outcome = badSchedule ? "Fix the schedule to create this automation." : describeOutcome(draft.cron, result ?? undefined);
 
@@ -236,10 +262,11 @@ export default function PlaylistNew() {
   };
 
   return (
-    <main className="h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-40 text-left md:px-8 lg:pb-8">
+    <main className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-40 text-left md:px-8 lg:pb-8">
       <div className="mx-auto max-w-6xl">
         <header data-quiet className="pt-4">
           <h1 className="text-4xl">New automation</h1>
+          <p className="pt-1 text-base text-(--text-muted)">Choose what goes in a playlist, and when it gets made. Start from a recipe or set everything yourself.</p>
           <div className="flex flex-wrap gap-2 pt-3">
             {PRESETS.map((preset) => (
               <Button
@@ -247,15 +274,31 @@ export default function PlaylistNew() {
                 size="sm"
                 variant={selected === preset.id ? "default" : "outline"}
                 aria-pressed={selected === preset.id}
-                onClick={() => {
-                  setCustomWindow(false);
-                  setDraft((d) => applyPreset(d, preset));
-                }}
+                onClick={() => pickPreset(preset)}
               >
                 {preset.label}
               </Button>
             ))}
           </div>
+          <p className="min-h-8 pt-2 text-sm text-(--text-muted)" role="status">
+            {canUndo ? (
+              <>
+                {replaced.label} replaced your settings.{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(replaced.before);
+                    setCustomWindow(replaced.customWindow);
+                  }}
+                  className="text-(--ember) underline underline-offset-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9) pointer-coarse:py-2.5"
+                >
+                  Undo
+                </button>
+              </>
+            ) : (
+              selectedPreset?.description
+            )}
+          </p>
         </header>
 
         {/* The ribbon runs through this gap and narrows with the chain's counts. */}
@@ -274,7 +317,12 @@ export default function PlaylistNew() {
             </FoldedStage>
 
             <Stage label="Sort">
-              <CustomSelect label="Sort" value={draft.sort} onChange={(sort) => update({ sort })} options={SORT_OPTIONS.map(({ value, label }) => ({ value, label }))} />
+              <div className="space-y-2">
+                <CustomSelect label="Sort" value={draft.sort} onChange={(sort) => update({ sort })} options={SORT_OPTIONS.map(({ value, label }) => ({ value, label }))} />
+                {COUNTS_PLAYS.includes(draft.sort) && usesMomentFilter(draft.filterGroups) && (
+                  <CustomSelect label="Count plays" value={draft.sortCounts ?? "window"} onChange={(sortCounts) => update({ sortCounts })} options={PLAYS_FROM} />
+                )}
+              </div>
             </Stage>
 
             <Stage label="Size" count={<Count value={result?.total} unit="in playlist" />}>
@@ -285,7 +333,7 @@ export default function PlaylistNew() {
             </Stage>
 
             <FoldedStage label="More limits" state={limitCount ? plural(limitCount, "limit") : "None"}>
-              <div className="max-w-sm space-y-2">
+              <div className="max-w-sm space-y-2 sm:ml-[calc(8rem+0.75rem)]">
                 <LimitField label="Tracks per artist" max={200} value={draft.output.maxPerArtist} onChange={(maxPerArtist) => setOutput({ maxPerArtist })} />
                 <LimitField label="Tracks per album" max={200} value={draft.output.maxPerAlbum} onChange={(maxPerAlbum) => setOutput({ maxPerAlbum })} />
                 <LimitField label="No repeats from the last playlists" max={50} value={draft.output.noRepeatPlaylists} onChange={(noRepeatPlaylists) => setOutput({ noRepeatPlaylists })} />
@@ -298,6 +346,10 @@ export default function PlaylistNew() {
 
             <Stage label="Name">
               <Input aria-label="Name" value={typedName ?? suggestion} placeholder={suggestion} onChange={(e) => setTypedName(e.target.value)} className="w-full" />
+            </Stage>
+
+            <Stage label="Description">
+              <Input aria-label="Description" value={draft.description} placeholder="Optional" onChange={(e) => update({ description: e.target.value })} className="w-full" />
             </Stage>
           </div>
 

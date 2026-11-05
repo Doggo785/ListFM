@@ -91,6 +91,85 @@ describe("creator", () => {
     expect(link.rel).toBe("noopener noreferrer");
   });
 
+  it("says what a preset does, and undoes it over the user's own settings", async () => {
+    const container = await render();
+    await wait(400);
+    expect(container.textContent).toContain("What you played most over the last 3 months.");
+    await click(button(container, "Recent"));
+    expect(container.textContent).not.toContain("replaced your settings");
+
+    await type(container.querySelector('[aria-label="Playlist size"]'), "12");
+    await click(button(container, "Seasonal"));
+    expect(container.textContent).toContain("Seasonal replaced your settings.");
+    await click(button(container, "Undo"));
+    expect(container.querySelector('[aria-label="Playlist size"]').value).toBe("12");
+    expect(button(container, "Undo")).toBeUndefined();
+
+    await click(button(container, "Seasonal"));
+    await type(container.querySelector('[aria-label="Playlist size"]'), "13");
+    expect(button(container, "Undo")).toBeUndefined();
+  });
+
+  it("marks a slow preview as busy, and names the plays column", async () => {
+    const container = await render();
+    await wait(400);
+    expect(container.textContent).toContain("Plays");
+    expect(container.querySelector("ol").getAttribute("aria-busy")).toBe("false");
+    await click(button(container, "Recent"));
+    expect(container.querySelector("ol").getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector("ol").className).toContain("preview-stale");
+    await wait(400);
+    expect(container.querySelector("ol").className).not.toContain("preview-stale");
+  });
+
+  it("offers counting plays at the moment only with a moment rule and a sort on plays", async () => {
+    Element.prototype.scrollIntoView = () => {};
+    const container = await render();
+    expect(container.querySelector('[aria-label="Count plays"]')).toBeNull();
+    await click(button(container, "Add rule"));
+    await click(container.querySelector('[aria-label="Filter field"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "Listening moment"));
+    await click(container.querySelector('[aria-label="Count plays"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "Count plays at the listening moment"));
+    await wait(400);
+    expect(previewAutomation.mock.lastCall[0].sortCounts).toBe("moment");
+    await click(button(container, "Recent"));
+    await wait(400);
+    expect(previewAutomation.mock.lastCall[0].sortCounts).toBe("window");
+  });
+
+  it("closes a custom schedule when a preset replaces it", async () => {
+    Element.prototype.scrollIntoView = () => {};
+    const container = await render();
+    await click(container.querySelector('[aria-label="How often"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "Custom"));
+    expect(container.querySelector('[aria-label="Cron expression"]')).not.toBeNull();
+    await click(button(container, "Seasonal"));
+    expect(container.querySelector('[aria-label="Cron expression"]')).toBeNull();
+    expect(container.querySelector('[aria-label="How often"]').textContent).toContain("Every season");
+  });
+
+  it("sends the description", async () => {
+    const container = await render();
+    await type(container.querySelector('[aria-label="Description"]'), "For the road");
+    await click(button(container, "Create only"));
+    expect(createAutomation.mock.lastCall[0].description).toBe("For the road");
+  });
+
+  it("asks when a custom window ends only if it isn't now", async () => {
+    Element.prototype.scrollIntoView = () => {};
+    const container = await render();
+    await wait(400);
+    await click(container.querySelector('[aria-label="Window"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "Custom"));
+    expect(container.querySelector('[aria-label="Window end, how long ago"]')).toBeNull();
+    expect(container.textContent).not.toContain("ago");
+    await click(container.querySelector('[aria-label="Window end"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "earlier"));
+    await wait(400);
+    expect(previewAutomation.mock.lastCall[0].window.ago).toEqual({ amount: 1, unit: "year" });
+  });
+
   it("waits for a pause: a burst of changes makes one request", async () => {
     const container = await render();
     await wait(400);

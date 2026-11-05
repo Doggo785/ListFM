@@ -54,10 +54,21 @@ export function describeAutomation(auto) {
 
 export const DEFAULT_CRON = "0 0 1 * *";
 
+const CRON_RANGES = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+
+// Same reading as the server for numbers. Named values (`mon`, `last`) stay the server's to judge.
+function isValidCronField(field, [min, max]) {
+  const inRange = (n) => n === undefined || (Number(n) >= min && Number(n) <= max);
+  return field.split(",").every((piece) => {
+    const match = /^(?:\*|[a-z]+(?:-[a-z]+)?|(\d+)(?:-(\d+))?)(?:\/([1-9]\d*))?$/i.exec(piece);
+    return match !== null && inRange(match[1]) && inRange(match[2]);
+  });
+}
+
 export function isValidCron(expr) {
   if (!expr || typeof expr !== "string") return false;
   const parts = expr.trim().split(/\s+/);
-  return parts.length === 5;
+  return parts.length === 5 && parts.every((part, i) => isValidCronField(part, CRON_RANGES[i]));
 }
 
 export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -219,6 +230,15 @@ export function createCondition(overrides = {}) {
   };
 }
 
+/** A copy with its own ids: the server keys per-rule results on them. */
+export const cloneCondition = (condition) => ({ ...condition, id: crypto.randomUUID() });
+export const cloneGroup = (group) => ({
+  ...group,
+  id: crypto.randomUUID(),
+  conditions: group.conditions.map(cloneCondition),
+  groups: (group.groups ?? []).map(cloneGroup),
+});
+
 /** The same condition on another field: the old value means nothing there. */
 export function conditionForField(condition, field) {
   const type = FILTER_FIELDS[field]?.type ?? "number";
@@ -252,6 +272,12 @@ function countConditions(filterGroups, test) {
 export const countActiveConditions = (filterGroups) => countConditions(filterGroups, isCompleteCondition);
 export const countIncompleteConditions = (filterGroups) => countConditions(filterGroups, (c) => !isCompleteCondition(c));
 
+export function usesMomentFilter(filterGroups) {
+  return (filterGroups ?? []).some(
+    (group) => (group.conditions ?? []).some((c) => c.field === "listening_moment") || usesMomentFilter(group.groups),
+  );
+}
+
 export function usesTagFilter(filterGroups) {
   return (filterGroups ?? []).some(
     (group) =>
@@ -264,13 +290,13 @@ const rule = (field, operator, value) => ({ field, operator, value });
 
 // GLOSSARY: Preset. A filled-in recipe to start from, everything stays editable.
 export const PRESETS = [
-  { id: "top", label: "Top tracks", window: month(3), sort: "most_played", cron: "", maxSize: 50, rules: [] },
-  { id: "recent", label: "Recent", window: month(1), sort: "last_played", cron: "", maxSize: 50, rules: [] },
-  { id: "loved", label: "Loved", window: { length: null, ago: null }, sort: "last_played", cron: "", maxSize: 50, rules: [rule("userloved", "is", true)] },
-  { id: "artists", label: "Top artists", window: month(3), sort: "most_played", cron: "", maxSize: 50, maxPerArtist: 5, rules: [rule("artist_rank", "lte", 10)] },
-  { id: "discoveries", label: "Monthly discoveries", window: month(1), sort: "most_played", cron: DEFAULT_CRON, maxSize: 50, rules: [rule("first_played", "within_days", 31)] },
-  { id: "rediscoveries", label: "Rediscoveries", window: { length: null, ago: null }, sort: "most_played", cron: "", maxSize: 50, rules: [rule("timestamp", "before", 180), rule("userplaycount", "gte", 5)] },
-  { id: "seasonal", label: "Seasonal", window: month(3), sort: "most_played", cron: `0 0 1 ${SEASON_MONTHS} *`, maxSize: 30, rules: [] },
+  { id: "top", description: "What you played most over the last 3 months.", label: "Top tracks", window: month(3), sort: "most_played", cron: "", maxSize: 50, rules: [] },
+  { id: "recent", description: "What you listened to last, over the last month.", label: "Recent", window: month(1), sort: "last_played", cron: "", maxSize: 50, rules: [] },
+  { id: "loved", description: "The tracks you loved on Last.fm, latest listens first.", label: "Loved", window: { length: null, ago: null }, sort: "last_played", cron: "", maxSize: 50, rules: [rule("userloved", "is", true)] },
+  { id: "artists", description: "Your 10 most played artists of the last 3 months, 5 tracks each at most.", label: "Top artists", window: month(3), sort: "most_played", cron: "", maxSize: 50, maxPerArtist: 5, rules: [rule("artist_rank", "lte", 10)] },
+  { id: "discoveries", description: "On the 1st of each month, the tracks you first heard in the month before.", label: "Monthly discoveries", window: month(1), sort: "most_played", cron: DEFAULT_CRON, maxSize: 50, rules: [rule("first_played", "within_days", 31)] },
+  { id: "rediscoveries", description: "Tracks you played 5 times or more, but not in the last 6 months.", label: "Rediscoveries", window: { length: null, ago: null }, sort: "most_played", cron: "", maxSize: 50, rules: [rule("timestamp", "before", 180), rule("userplaycount", "gte", 5)] },
+  { id: "seasonal", description: "At each change of season, what you played most during the one that ended.", label: "Seasonal", window: month(3), sort: "most_played", cron: `0 0 1 ${SEASON_MONTHS} *`, maxSize: 30, rules: [] },
 ];
 
 /** The preset's recipe over a draft: name and identity stay the draft's. */
@@ -279,6 +305,7 @@ export function applyPreset(draft, preset) {
     ...draft,
     window: preset.window,
     sort: preset.sort,
+    sortCounts: "window",
     cron: preset.cron,
     filterGroups: [createGroup({ conditions: preset.rules.map((r) => createCondition(r)) })],
     output: { maxSize: preset.maxSize, ...(preset.maxPerArtist && { maxPerArtist: preset.maxPerArtist }) },
@@ -297,6 +324,7 @@ const recipe = (a) =>
   JSON.stringify([
     a.window,
     a.sort,
+    a.sortCounts ?? "window",
     a.cron,
     stripIds(a.filterGroups),
     a.output?.maxSize,
