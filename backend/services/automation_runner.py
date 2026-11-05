@@ -16,7 +16,6 @@ from datetime import UTC, datetime, time, timedelta
 from time import monotonic
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from apscheduler.triggers.cron import CronTrigger
 from database import async_session
 from filter_types import ArtistRankPeriod, ListeningMoment
 from models.automation import Automation
@@ -35,7 +34,7 @@ from repositories.scrobbles import (
     get_moment_plays,
     get_window_tracks,
 )
-from schemas import GeneratedPlaylistCreate, Track
+from schemas import GeneratedPlaylistCreate, Track, cron_trigger
 from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.filter_engine import apply_filters, conditions_on
 from services.lastfm import PAGE_ERRORS, is_rate_limit_error
@@ -305,7 +304,7 @@ def is_due(
     if not cron:
         return False
     try:
-        trigger = CronTrigger.from_crontab(cron, timezone=ZoneInfo(timezone))
+        trigger = cron_trigger(cron, ZoneInfo(timezone))
     except (ValueError, ZoneInfoNotFoundError):
         return False
     last_run = getattr(automation, "last_run", None)

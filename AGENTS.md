@@ -32,6 +32,7 @@ Lire avant d'agir :
 - `Automation.output` est stocké à plat (`output_max_size`) et reconstruit par un `model_validator`.
 - Tokens de provider : aucune colonne en clair. Les rajouter seulement chiffrées au repos.
 - `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.
+- Un cron se lit toujours via `schemas.cron_trigger`, jamais `CronTrigger.from_crontab` : APScheduler compte les jours depuis lundi, donc `1` tomberait un mardi.
 - Le scheduler du sweep ne démarre qu'avec `ENABLE_SCHEDULER` ; le rate limiter vit en mémoire du process. L'app suppose un seul worker.
 
 ## Pièges frontend
