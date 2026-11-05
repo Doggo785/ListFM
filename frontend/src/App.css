@@ -46,6 +46,15 @@ html, body, #root {
   image-rendering: pixelated;
 }
 
+.under-ribbon {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .app-main {
   position: relative;
   z-index: 1;
@@ -428,6 +437,230 @@ html, body, #root {
   mask:
     linear-gradient(#000, #000) 0 16px / 100% 100% no-repeat,
     var(--dither-2) 0 0 / 16px 16px repeat-x;
+}
+
+/* The Dashboard: the poster, then the pinned flight. Sizes of the name are set by ForgedName, on the 4px grid. */
+.poster {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  max-width: 1376px;
+  margin-inline: auto;
+  padding: 32px 16px 24px;
+}
+.poster__name {
+  width: 100%;
+  min-width: 0;
+}
+.forged-name {
+  position: relative;
+  display: table;
+  white-space: nowrap;
+  color: var(--text);
+}
+.forged-name--cold {
+  color: var(--ember-2);
+}
+.forged-name--cut {
+  display: block;
+  overflow: hidden;
+  font-size: 32px;
+  line-height: 32px;
+  text-overflow: ellipsis;
+}
+.forged-name__fire {
+  position: absolute;
+  left: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+  transform-origin: top left;
+  transform: scale(4);
+}
+.poster__line {
+  height: clamp(96px, 14vh, 152px);
+  flex: none;
+}
+.poster__lead {
+  padding-bottom: 12px;
+  font-size: var(--text-xl);
+  line-height: var(--text-xl--line-height);
+}
+.poster__body {
+  display: grid;
+  gap: 24px 64px;
+}
+.poster__shelf {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.poster__album {
+  flex: none;
+  width: 152px;
+}
+/* Holds the place until its image arrives: the first look has no hole under the name. */
+.poster__cover {
+  width: 128px;
+  background: var(--ember-1);
+}
+.poster__totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  gap: 16px 48px;
+  margin-top: auto;
+  padding-top: 24px;
+}
+@media (min-width: 768px) {
+  .poster {
+    padding-inline: 32px;
+  }
+  .poster__totals {
+    grid-template-columns: repeat(4, minmax(0, max-content));
+  }
+}
+@media (max-height: 760px) {
+  .poster {
+    padding-top: 16px;
+  }
+  .poster__line {
+    height: 96px;
+  }
+}
+/* A laptop's window once the browser has taken its share: the totals stay on the first screen. */
+@media (max-height: 680px) {
+  .poster__line {
+    height: 72px;
+  }
+  .poster__cover {
+    width: 96px;
+  }
+}
+@media (min-width: 768px) and (min-height: 820px) {
+  .poster__album {
+    width: 192px;
+  }
+  .poster__cover {
+    width: 100%;
+  }
+}
+@media (min-width: 1024px) {
+  .poster__body {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+}
+
+.deck {
+  position: relative;
+}
+.deck__pin {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 1376px;
+  margin-inline: auto;
+  padding: 12px 16px 16px;
+}
+.deck__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px 24px;
+  align-self: stretch;
+}
+.deck__anchor {
+  flex: none;
+  align-self: center;
+  width: var(--deck-card);
+  height: var(--deck-card);
+  margin-top: 12px;
+}
+.deck__caption {
+  align-self: center;
+  width: var(--deck-card);
+  min-width: 0;
+  max-width: 100%;
+}
+.deck__ticks {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.deck__tick {
+  display: block;
+  max-width: 120px;
+  overflow: hidden;
+  padding-block: 4px;
+  border-bottom: 3px dotted transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deck__tick:hover {
+  color: var(--text);
+}
+.deck__tick[aria-current] {
+  border-bottom-color: var(--ember);
+  color: var(--text);
+}
+@media (min-width: 768px) {
+  .deck__pin {
+    padding-inline: 32px;
+  }
+}
+.deck-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+.deck-card__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ember-1);
+}
+/* No cover: a card in its own right, or the flame around it would read as a hole. */
+.deck-card__frame--bare {
+  border: 2px solid var(--control);
+  background: var(--ground);
+}
+.deck-card__art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.deck-card--still {
+  width: 192px;
+  height: 192px;
+  overflow: hidden;
+}
+/* A dealt card and a changing caption break into the ribbon's pixels instead of fading. */
+.deck-card[data-far="1"],
+.deck__caption[data-far="1"] {
+  mask-image: var(--dither-1);
+}
+.deck-card[data-far="2"],
+.deck__caption[data-far="2"] {
+  mask-image: var(--dither-2);
+}
+.deck__caption[data-far="3"] {
+  mask-image: var(--dither-3);
 }
 
 .preview-stale {

@@ -55,14 +55,14 @@ Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGE
 
 ### Phase C : écrans réécrits
 
-Chaque PR passe `impeccable critique` et `audit` avant le merge, branche le ruban sur les vraies données de l'écran et supprime l'ancien code qu'elle remplace. Le Créateur vient en premier : `DESIGN.md` s'écrit à sa fin, depuis le résultat construit (pas `document`, qui décrirait l'ancien style).
+Chaque PR branche le ruban sur les vraies données de l'écran et supprime l'ancien code qu'elle remplace. Le Créateur vient en premier : `DESIGN.md` s'écrit à sa fin, depuis le résultat construit (pas `document`, qui décrirait l'ancien style).
 
 1. *(fait, sauf le choix du fuseau)* **Créateur** : le but est une liberté quasi infinie dans une UI soignée, intuitive et jamais chargée (réglages avancés repliés par défaut). Une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Filtres : remplacer les blocs par une liste qui se lit comme une phrase, groupes repliés dans « Avancé », et ajouter à l'écran première écoute, top artistes et moment d'écoute. Le ruban dessine les compteurs de la chaîne.
 2. *(fait)* **Finition du Créateur**. L'owner garde Tiny5 pour les chiffres, comparaison faite avec Jersey 20. Écartés : le « or » modifiable entre groupes (le moteur fait un OU entre groupes par construction, un ET s'écrit dans un même groupe) et l'effilement du ruban aligné sur les étapes (le ruban est horizontal, les étapes verticales).
 3. *(fait)* **Playlists** : menu Dashboard, Automations, Playlists. L'onglet Playlists range les playlists sur une étagère par automation, chacune avec une pochette (deux albums séparés par le ruban) et la période qu'elle couvre. Elle s'ouvre en plein écran, sa pochette, son nom et sa période glissant de l'étagère à la page, avec copie de la liste, lien vers l'automation et suppression. Les automations passent à `/automations`, en cartes pixel. À revoir au Dashboard : l'onglet Automations reste seulement s'il apporte plus que le Dashboard refait (vue d'ensemble, derniers résultats).
 4. *(fait)* **Historique** : intégré à l'automation plutôt qu'en onglet, choix de l'owner. Chaque carte d'Automations dit l'état de sa dernière génération ; la page d'une automation montre son historique par jour, une ligne par génération, essais repliés, avec « Retrying at 14:32 », échec définitif, run vide et « 32/50 » (taille demandée enregistrée à chaque run). Re-run passe par la route de retry de T5, sur la dernière génération en échec seulement. Les réglages se modifient dans le Créateur : l'ancienne page `PlaylistDetail` a disparu. Le ruban chauffe tant qu'une dernière génération est en échec.
-5. **Dashboard**.
-6. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` s'il ne sert plus.
+5. *(fait)* **Dashboard** : une affiche, puis l'année en vol. Le nom de l'artiste du moment en géant prend feu depuis la tête de lecture du ruban (la forge), au-dessus de la largeur du ruban qui suit les écoutes jour par jour, des braises qui en montent, des albums du moment, des derniers runs et des totaux. Plus bas, le scroll rembobine l'année : les pochettes sortent de la gauche sur un arc 3D, chacune celle de l'artiste du mois, à travers la flamme. Le même arc montre les automations. Les images d'artistes de Last.fm étant mortes, seules les pochettes d'albums servent.
+6. **Connexion et réglages**, y compris le fond `Grainient`, à retirer avec `ogl` s'il ne sert plus.
 7. **Page d'accueil** : refaite à 100 % avant le login, avec une présentation propre de ListFM.
 8. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
 
@@ -74,7 +74,7 @@ Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impecca
 
 ## Plus tard (feu vert owner requis)
 
-Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
+Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
 
 **Noms qui se mettent à jour** (idée de l'owner, utile surtout une fois les playlists envoyées sur les apps de streaming) : un nom d'automation peut contenir des variables résolues à chaque run, par exemple `Seasonal {season} {year}` donne « Seasonal Winter 2026 ». À trancher : la liste des variables, l'hémisphère pour les saisons, et l'année d'un hiver à cheval sur deux ans.
 
