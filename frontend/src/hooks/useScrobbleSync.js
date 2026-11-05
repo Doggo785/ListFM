@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { getScrobbleSync } from "@/lib/api";
 
 const POLL_MS = 3000;
+// A scheduled sync can start a tag pass at any moment, so an idle status is still re-read now and then.
+const IDLE_POLL_MS = 60000;
 
-/** The listening history load status, polled until it finishes or fails. Null until known. */
+const isWorking = (status) =>
+  status.stage !== "error" && (!status.complete || status.stage === "sync" || status.tags_total > 0);
+
+/** The listening history and tag pass status, polled while the page is open. Null until known. */
 export function useScrobbleSync(enabled, firstCall = getScrobbleSync) {
   const [status, setStatus] = useState(null);
 
@@ -16,7 +21,7 @@ export function useScrobbleSync(enabled, firstCall = getScrobbleSync) {
         const next = await load();
         if (stopped) return;
         setStatus(next);
-        if (!next.complete && next.stage !== "error") timer = setTimeout(() => poll(getScrobbleSync), POLL_MS);
+        timer = setTimeout(() => poll(getScrobbleSync), isWorking(next) ? POLL_MS : IDLE_POLL_MS);
       } catch {
         // An unreadable status stays as it was: the app works without it.
       }
