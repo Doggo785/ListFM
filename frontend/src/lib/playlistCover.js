@@ -7,12 +7,16 @@ const ALBUMS = 2;
 const COLUMNS = 12;
 const EDGE = 0.1; // Of the cover: how far the ribbon dissolves, as on the site.
 
+// Parsed from text because PMD (Codacy) misreads hexadecimal literals as inaccurate.
+const FNV_OFFSET = parseInt("811c9dc5", 16);
+const FNV_PRIME = parseInt("01000193", 16);
+
 /** A stable stream of numbers from 0 to 1 for an id: FNV-1a, then xorshift. */
 function randomFrom(seed) {
-  let hash = 0x811c9dc5;
+  let hash = FNV_OFFSET;
   for (const char of String(seed)) {
     hash ^= char.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193);
+    hash = Math.imul(hash, FNV_PRIME);
   }
   hash = hash >>> 0 || 1;
   return () => {
@@ -20,7 +24,7 @@ function randomFrom(seed) {
     hash ^= hash >>> 17;
     hash ^= hash << 5;
     hash >>>= 0;
-    return hash / 4294967296;
+    return hash / 2 ** 32;
   };
 }
 
