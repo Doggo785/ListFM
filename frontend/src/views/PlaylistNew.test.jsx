@@ -4,15 +4,17 @@ import React, { act } from "react";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PlaylistNew from "@/views/PlaylistNew";
-import { createAutomation, previewAutomation } from "@/lib/api";
+import { createAutomation, getAutomation, previewAutomation, updateAutomation } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   previewAutomation: vi.fn(),
   createAutomation: vi.fn(async () => ({ id: "a1" })),
   getKnownTags: vi.fn(async () => []),
+  getAutomation: vi.fn(),
+  updateAutomation: vi.fn(async () => ({ id: "a1" })),
 }));
 const auth = vi.hoisted(() => ({ user: { lastfm_username: "u" } }));
 vi.mock("../contexts/AuthContext", () => ({ useAuth: () => auth }));
@@ -230,7 +232,7 @@ describe("creator", () => {
     const container = await render();
     await click(button(container, "Create only"));
     expect(createAutomation.mock.calls[0][0]).toMatchObject({ name: "Top tracks", cron: "", sort: "most_played" });
-    expect(navigate).toHaveBeenCalledWith("/automations/a1", { state: { created: "Created. Nothing runs until you start it.", runNow: false } });
+    expect(navigate).toHaveBeenCalledWith("/automations/a1", { state: { notice: "Created. Nothing runs until you start it.", runNow: false } });
 
     await type(container.querySelector('[aria-label="Name"]'), "Mine");
     await click(button(container, "Seasonal"));
@@ -245,7 +247,7 @@ describe("creator", () => {
     expect(container.textContent).toContain("Nothing runs until you start it.");
     expect(container.textContent).not.toContain("Covers");
     await click(button(container, "Create and run"));
-    expect(navigate).toHaveBeenCalledWith("/automations/a1", { state: { created: "Created.", runNow: true } });
+    expect(navigate).toHaveBeenCalledWith("/automations/a1", { state: { notice: "Created.", runNow: true } });
 
     await click(button(container, "Seasonal"));
     expect(container.textContent).toContain("Create and run makes the last full period now. Create only starts on the next date.");
@@ -253,7 +255,7 @@ describe("creator", () => {
     expect(container.textContent).toContain("Covers Jun 1 to Aug 31, 2026.");
     expect(container.textContent).toContain("Create and run makes Jun 1 to Aug 31, 2026 now. Create only starts on Dec 1, 2026.");
     await click(button(container, "Create only"));
-    expect(navigate).toHaveBeenLastCalledWith("/automations/a1", { state: { created: "Created. First playlist on Dec 1, 2026.", runNow: false } });
+    expect(navigate).toHaveBeenLastCalledWith("/automations/a1", { state: { notice: "Created. First playlist on Dec 1, 2026.", runNow: false } });
   });
 
   it("blocks creating on a malformed schedule and says where to look", async () => {
@@ -332,3 +334,86 @@ describe("creator", () => {
     expect(button(container, "Create and run").disabled).toBe(true);
   });
 });
+
+describe("editing an automation", () => {
+  const SAVED = {
+    id: "a1",
+    user_id: "u1",
+    name: "My mix",
+    description: null,
+    window: { length: { amount: 3, unit: "month" }, ago: null },
+    sort: "most_played",
+    cron: null,
+    filterGroups: [],
+    output: { maxSize: 25, noRepeatPlaylists: 2 },
+    enabled: true,
+  };
+
+  async function renderEdit() {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mounted = { container, root };
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={["/automations/a1/edit"]}>
+          <Routes>
+            <Route path="/automations/:id/edit" element={<PlaylistNew />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    return container;
+  }
+
+  it("starts from the stored settings and previews as that automation", async () => {
+    getAutomation.mockResolvedValue(SAVED);
+    const container = await renderEdit();
+    expect(container.querySelector("h1").textContent).toBe("Edit automation");
+    expect(container.querySelector('input[aria-label="Name"]').value).toBe("My mix");
+    expect(container.querySelector('input[aria-label="Playlist size"]').value).toBe("25");
+    await wait(500);
+    expect(previewAutomation.mock.calls.at(-1)[2]).toBe("a1");
+    expect(container.textContent).not.toContain("Repeats can only be skipped");
+    expect(container.textContent).toContain("Nothing runs until you start it.");
+  });
+
+  it("saves in place instead of creating, then goes back to the automation", async () => {
+    getAutomation.mockResolvedValue(SAVED);
+    const container = await renderEdit();
+    await type(container.querySelector('input[aria-label="Name"]'), "Renamed");
+    await click(button(container, "Save"));
+    expect(createAutomation).not.toHaveBeenCalled();
+    expect(updateAutomation.mock.calls[0][0]).toBe("a1");
+    expect(updateAutomation.mock.calls[0][1].name).toBe("Renamed");
+    expect(updateAutomation.mock.calls[0][1].output.maxSize).toBe(25);
+    expect(navigate).toHaveBeenLastCalledWith("/automations/a1", { state: { notice: "Saved.", runNow: false } });
+  });
+
+  it("can save and run, and says why a save failed", async () => {
+    getAutomation.mockResolvedValue(SAVED);
+    const container = await renderEdit();
+    await click(button(container, "Save and run"));
+    expect(navigate).toHaveBeenLastCalledWith("/automations/a1", { state: { notice: "Saved.", runNow: true } });
+
+    updateAutomation.mockRejectedValueOnce(new Error("API 500: nope"));
+    await click(button(container, "Save"));
+    expect(container.querySelector('[role="alert"]').textContent).toBe("nope");
+  });
+
+  it("says when the automation is gone, and retries a failed load", async () => {
+    getAutomation.mockRejectedValueOnce(new Error("API 404: gone"));
+    let container = await renderEdit();
+    expect(container.textContent).toContain("This automation no longer exists");
+    await act(async () => mounted.root.unmount());
+    container.remove();
+
+    getAutomation.mockRejectedValueOnce(new Error("API 500: boom"));
+    getAutomation.mockResolvedValue(SAVED);
+    container = await renderEdit();
+    expect(container.textContent).toContain("This automation could not load.");
+    await click(button(container, "Try again"));
+    expect(container.querySelector("h1").textContent).toBe("Edit automation");
+  });
+});
+

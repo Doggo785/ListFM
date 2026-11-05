@@ -1,6 +1,7 @@
 import { cva } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-export const buttonVariants = cva(
+const variants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 border-2 border-transparent text-sm whitespace-nowrap transition-colors duration-(--duration-quick) outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9) disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
@@ -18,3 +19,6 @@ export const buttonVariants = cva(
     defaultVariants: { variant: "default", size: "default" },
   },
 );
+
+// Merged: a link using these classes directly keeps the border its variant asks for.
+export const buttonVariants = (options) => cn(variants(options));

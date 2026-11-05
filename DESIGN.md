@@ -99,7 +99,8 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - `PlaylistCover`: the playlist's first two albums in their original quality, cut apart by the site's ribbon (same formula and dither, 64 cells across). Height, slope, width and heat come from the playlist's id, always in Braise, with no text and no animation. One album fills the cover; with none, the ribbon alone on the ground. Size it in multiples of 64px so its cells stay whole: 192, 128 or 384.
 - Shelf: one per automation, covers in a row that scrolls sideways, each with the period it covers under it. The period is what tells apart the playlists of one automation.
 - Playlist glide: opening a playlist and going back slides its cover, name and period with a view transition, and the rest of the page swaps at once. Without browser support or under reduced motion, it all swaps at once.
-- Automation card: the only bordered card, a whole link holding a cover and a few lines. Its border turns amber on hover.
+- Automation card: the only bordered card, a whole link holding a cover and a few lines, the last one saying how its latest run went. Its border turns amber on hover.
+- Run line: time, then what the run came to, one line per run under its day. Only a failure or a pending retry takes the ember colour: a short or empty run is a result, so it stays neutral. Attempts fold under the line.
 - Ribbon band: an empty `data-chain` element pulls the ribbon straight into it, with the widths set by its counts. Text never sits in it.
 
 ## Do's and Don'ts

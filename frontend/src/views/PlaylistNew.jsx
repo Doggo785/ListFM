@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { IconChevronDown } from "@tabler/icons-react";
 import { AnimatePresence, motion } from "motion/react";
 import CronEditor from "@/components/builder/CronEditor";
 import FilterBuilder from "@/components/builder/FilterBuilder";
+import Loader from "@/components/elements/Loader";
 import PixelNumber from "@/components/elements/PixelNumber";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/buttonVariants";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { Input, NumberInput } from "@/components/ui/input";
+import { useAutomation } from "@/hooks/useAutomation";
 import { useLivePreview } from "@/hooks/useLivePreview";
-import { createAutomation } from "@/lib/api";
+import { createAutomation, updateAutomation } from "@/lib/api";
 import { plural } from "@/lib/playlists";
 import {
   PRESETS,
@@ -19,6 +22,8 @@ import {
   countActiveConditions,
   countIncompleteConditions,
   createDefaultAutomation,
+  createGroup,
+  describeNextRun,
   describeOutcome,
   describePeriod,
   describeWaiting,
@@ -116,7 +121,7 @@ function LimitField({ label, value, onChange, max }) {
   );
 }
 
-function Preview({ preview, draft, linked }) {
+function Preview({ preview, draft, linked, saved }) {
   const { result, loading, failed } = preview;
   const [showAll, setShowAll] = useState(false);
   const wanted = draft.output.maxSize ?? 50;
@@ -152,7 +157,7 @@ function Preview({ preview, draft, linked }) {
           Tags known for {result.known_tag_artists} of {result.window_artists} artists so far. The others match no tag filter yet.
         </p>
       )}
-      {draft.output.noRepeatPlaylists && (
+      {!saved && draft.output.noRepeatPlaylists && (
         <p className="pb-2 text-sm text-(--text-muted)">Repeats can only be skipped once this automation has playlists, so this preview still shows them.</p>
       )}
       {result?.total === 0 && <p className="py-3 text-sm text-(--text-muted)">No track fits. Try a wider window or fewer rules.</p>}
@@ -195,20 +200,28 @@ function Preview({ preview, draft, linked }) {
   );
 }
 
-export default function PlaylistNew() {
+/** A stored automation as the Creator's draft: the server leaves the optional fields empty. */
+const draftFrom = (saved) => ({
+  ...saved,
+  cron: saved.cron ?? "",
+  description: saved.description ?? "",
+  filterGroups: saved.filterGroups?.length ? saved.filterGroups : [createGroup()],
+});
+
+function Creator({ saved }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const linked = Boolean(user?.lastfm_username);
-  const [draft, setDraft] = useState(createDefaultAutomation);
-  const [typedName, setTypedName] = useState(null);
+  const [draft, setDraft] = useState(() => (saved ? draftFrom(saved) : createDefaultAutomation()));
+  const [typedName, setTypedName] = useState(saved?.name ?? null);
   const [customWindow, setCustomWindow] = useState(false);
   const [replaced, setReplaced] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
 
   useEffect(() => {
-    document.title = "New automation - ListFM";
-  }, []);
+    document.title = `${saved ? "Edit automation" : "New automation"} - ListFM`;
+  }, [saved]);
 
   const suggestion = suggestName(draft);
   const name = typedName?.trim() || suggestion;
@@ -217,7 +230,7 @@ export default function PlaylistNew() {
 
   const payload = toPayload(draft);
   // The schedule sets the period a run covers; a half-typed cron must not fail the preview.
-  const preview = useLivePreview(linked ? { ...payload, name, cron: isValidCron(draft.cron) ? draft.cron : "", id: undefined, createdAt: undefined, updatedAt: undefined } : null);
+  const preview = useLivePreview(linked ? { ...payload, name, cron: isValidCron(draft.cron) ? draft.cron : "", id: undefined, createdAt: undefined, updatedAt: undefined } : null, saved?.id);
   const { result } = preview;
 
   const windowIsCustom = customWindow || !windowOption(draft.window);
@@ -242,19 +255,21 @@ export default function PlaylistNew() {
     setDraft(after);
   };
   const badSchedule = Boolean(draft.cron) && !isValidCron(draft.cron);
-  const outcome = badSchedule ? "Fix the schedule to create this automation." : describeOutcome(draft.cron, result ?? undefined);
+  const describeAhead = () => (saved ? describeNextRun(draft.enabled === false ? "" : draft.cron, result ?? undefined) : describeOutcome(draft.cron, result ?? undefined));
+  const outcome = badSchedule ? `Fix the schedule to ${saved ? "save" : "create"} this automation.` : describeAhead();
 
   const create = async ({ run = false } = {}) => {
     if (creating) return;
     setCreating(true);
     setCreateError(null);
     try {
-      const created = await createAutomation({ ...payload, name });
-      // The detail page runs it: its progress and its "history still loading" answer already live there.
-      navigate(`/automations/${created.id}`, { state: { created: run ? "Created." : `Created. ${describeWaiting(draft.cron, result ?? undefined)}`, runNow: run } });
+      const stored = saved ? await updateAutomation(saved.id, { ...payload, name }) : await createAutomation({ ...payload, name });
+      const done = saved ? "Saved." : "Created.";
+      // The automation's page runs it: its progress and its "history still loading" answer already live there.
+      navigate(`/automations/${stored.id}`, { state: { notice: run || saved ? done : `${done} ${describeWaiting(draft.cron, result ?? undefined)}`, runNow: run } });
     } catch (err) {
-      console.error("Failed to create automation:", err);
-      const reason = (err.message || "The automation could not be created. Try again.").replace(/^API \d+: /, "");
+      console.error("Failed to save automation:", err);
+      const reason = (err.message || `The automation could not be ${saved ? "saved" : "created"}. Try again.`).replace(/^API \d+: /, "");
       setCreateError(reason.startsWith("Invalid cron") ? "That schedule isn't valid. Check each part: minute hour day month weekday." : reason);
     } finally {
       setCreating(false);
@@ -265,8 +280,10 @@ export default function PlaylistNew() {
     <main className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-40 text-left md:px-8 lg:pb-8">
       <div className="mx-auto max-w-6xl">
         <header data-quiet className="pt-4">
-          <h1 className="text-4xl">New automation</h1>
-          <p className="pt-1 text-base text-(--text-muted)">Choose what goes in a playlist, and when it gets made. Start from a recipe or set everything yourself.</p>
+          <h1 className="text-4xl">{saved ? "Edit automation" : "New automation"}</h1>
+          <p className="pt-1 text-base text-(--text-muted)">
+            {saved ? "Change what goes in its next playlists, and when they get made. The ones already made stay as they are." : "Choose what goes in a playlist, and when it gets made. Start from a recipe or set everything yourself."}
+          </p>
           <div className="flex flex-wrap gap-2 pt-3">
             {PRESETS.map((preset) => (
               <Button
@@ -362,12 +379,12 @@ export default function PlaylistNew() {
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button size="lg" onClick={() => create({ run: true })} disabled={creating || !linked || badSchedule}>
-                {creating ? "Creating" : "Create and run"}
+                {saved ? (creating ? "Saving" : "Save and run") : creating ? "Creating" : "Create and run"}
               </Button>
               <Button size="lg" variant="outline" onClick={() => create()} disabled={creating || !linked || badSchedule}>
-                Create only
+                {saved ? "Save" : "Create only"}
               </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate("/automations")} className="max-lg:hidden">
+              <Button size="lg" variant="outline" onClick={() => navigate(saved ? `/automations/${saved.id}` : "/automations")} className="max-lg:hidden">
                 Cancel
               </Button>
             </div>
@@ -376,10 +393,39 @@ export default function PlaylistNew() {
           </div>
 
           <aside data-quiet className="flex min-h-0 min-w-0 flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:self-start">
-            <Preview preview={preview} draft={draft} linked={linked} />
+            <Preview preview={preview} draft={draft} linked={linked} saved={Boolean(saved)} />
           </aside>
         </div>
       </div>
     </main>
   );
+}
+
+/** Waits for the stored automation, so the Creator starts from its settings and never from the defaults. */
+function EditAutomation({ id }) {
+  const { user } = useAuth();
+  const { automation, error, refetch } = useAutomation(user?.lastfm_username ? id : null);
+  if (automation) return <Creator saved={automation} />;
+  return (
+    <main className="h-full w-full px-4 pt-4 text-left md:px-8">
+      {!error && <Loader />}
+      {error && /API 404/.test(error) && (
+        <div data-quiet className="mx-auto max-w-6xl">
+          <p className="pb-4 text-2xl">This automation no longer exists</p>
+          <Link to="/automations" className={buttonVariants({ variant: "outline" })}>Back to automations</Link>
+        </div>
+      )}
+      {error && !/API 404/.test(error) && (
+        <div data-quiet role="alert" className="mx-auto max-w-6xl">
+          <p className="pb-3 text-base">This automation could not load.</p>
+          <Button variant="outline" onClick={() => refetch()}>Try again</Button>
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default function PlaylistNew() {
+  const { id } = useParams();
+  return id ? <EditAutomation id={id} /> : <Creator />;
 }

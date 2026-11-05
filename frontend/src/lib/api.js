@@ -141,6 +141,17 @@ export async function runAutomationNow(id, progressToken) {
   });
 }
 
+export async function retryRun(id, historyId, progressToken) {
+  return request(`/api/automations/${id}/history/${historyId}/retry`, {
+    method: "POST",
+    body: JSON.stringify({ progress_token: progressToken }),
+  });
+}
+
+export async function getLatestRuns() {
+  return request("/api/automations/latest-runs");
+}
+
 export async function getGeneratedPlaylistTracks(playlistId) {
   return request(`/api/generated-playlists/${playlistId}/tracks`);
 }

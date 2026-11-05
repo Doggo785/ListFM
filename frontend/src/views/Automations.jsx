@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAutomations } from "@/hooks/useAutomations";
@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
+import { getLatestRuns } from "@/lib/api";
 import { describeAutomation, describeSchedule } from "@/lib/automation-rules";
 import { plural } from "@/lib/playlists";
+import { describeRun } from "@/lib/runs";
 
+const TONES = { plain: "text-(--text)", muted: "text-(--text-muted)", alert: "text-(--ember)" };
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9)";
 
 export default function Automations() {
@@ -16,12 +19,28 @@ export default function Automations() {
   const username = user?.lastfm_username;
   const { automations, generatedPlaylists, counts, isLoading, error, playlistsFailed, refetch } = useAutomations(username);
 
+  // Null until known, or if it fails: the cards then say nothing rather than "No runs yet".
+  const [latestRuns, setLatestRuns] = useState(null);
+
   useEffect(() => {
     document.title = "Automations - ListFM";
   }, []);
 
+  useEffect(() => {
+    if (!username) return undefined;
+    let current = true;
+    getLatestRuns()
+      .then((runs) => current && setLatestRuns(runs))
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [username]);
+
+  const failing = latestRuns?.some((run) => run.status === "failed");
+
   return (
-    <main className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-8 text-left md:px-8">
+    <main data-ribbon-hot={failing ? "" : undefined} className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-8 text-left md:px-8">
       <div className="mx-auto max-w-6xl">
         <header data-quiet className="flex flex-wrap items-end justify-between gap-4 pt-4 pb-8">
           <div>
@@ -53,6 +72,8 @@ export default function Automations() {
           <ul data-quiet className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {automations.map((automation) => {
               const latest = generatedPlaylists.find((playlist) => playlist.automation_id === automation.id);
+              const lastRun = latestRuns?.find((run) => run.automation_id === automation.id);
+              const outcome = lastRun && describeRun(lastRun);
               return (
               <li key={automation.id} className="min-w-0">
                 <Link
@@ -67,6 +88,8 @@ export default function Automations() {
                       {automation.enabled === false ? "Paused" : describeSchedule(automation.cron)}
                     </span>
                     {!playlistsFailed && <span className="block text-sm text-(--text-muted)">{plural(counts.get(automation.id) || 0, "playlist")}</span>}
+                    {outcome && <span className={`block pt-1 text-sm ${TONES[outcome.tone]}`}>{outcome.label}</span>}
+                    {latestRuns && !lastRun && <span className="block pt-1 text-sm text-(--text-muted)">No runs yet</span>}
                   </span>
                 </Link>
               </li>

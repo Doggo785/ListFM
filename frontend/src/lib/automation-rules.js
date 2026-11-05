@@ -141,6 +141,12 @@ export function describeWaiting(cron, { next_run: nextRun } = {}) {
   return `First playlist on ${nextRun ? formatDay(nextRun) : "the next date"}.`;
 }
 
+/** Said while editing: the automation already exists, so only the next date matters. */
+export function describeNextRun(cron, { next_run: nextRun } = {}) {
+  if (!cron) return "Nothing runs until you start it.";
+  return `Next playlist on ${nextRun ? formatDay(nextRun) : "the next date"}.`;
+}
+
 const ordinal = (n) => {
   const v = n % 100;
   return `${n}${SUFFIXES[(v - 20) % 10] || SUFFIXES[v] || SUFFIXES[0]}`;

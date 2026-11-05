@@ -7,7 +7,7 @@ const DELAY_MS = 400;
  * Reruns the server preview after each change, one request at a time: a slow query never piles up,
  * and whatever changed meanwhile runs right after it. A null draft means there is nothing to run.
  */
-export function useLivePreview(draft) {
+export function useLivePreview(draft, automationId) {
   const [state, setState] = useState({ result: null, loading: draft !== null, failed: false });
   const wanted = useRef(null);
   const done = useRef(null);
@@ -24,7 +24,7 @@ export function useLivePreview(draft) {
       while (wanted.current !== done.current) {
         const sent = wanted.current;
         try {
-          const result = await previewAutomation(JSON.parse(sent));
+          const result = await previewAutomation(JSON.parse(sent), undefined, automationId);
           setState({ result, loading: wanted.current !== sent, failed: false });
         } catch (err) {
           console.error("Preview failed:", err);
@@ -35,7 +35,7 @@ export function useLivePreview(draft) {
       busy.current = false;
     }, DELAY_MS);
     return () => clearTimeout(timer);
-  }, [signature]);
+  }, [signature, automationId]);
 
   return state;
 }

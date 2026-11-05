@@ -25,6 +25,10 @@ describe("sceneFor", () => {
     expect(new Set(scenes).size).toBe(7);
   });
 
+  it("shows the Creator's scene while editing an automation", () => {
+    expect(sceneFor("/automations/abc/edit")).toBe(sceneFor("/automations/new"));
+  });
+
   it("gets hotter from the dashboard to the automations", () => {
     expect(sceneFor("/automations").heat).toBeGreaterThan(sceneFor("/dashboard").heat);
   });
@@ -195,6 +199,21 @@ describe("createRibbon", () => {
     expect(halfWidth()).toBeCloseTo(400 / CELL);
     expect(lastPull(gl)).toBeLessThan(leaning);
     page.remove();
+  });
+
+  it("burns hotter while a page asks for it, and cools back down", () => {
+    const gl = fakeGl();
+    const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE, reducedMotion: true });
+    ribbon.setScene(sceneFor("/automations"));
+    tick(16);
+    const calm = lastCall(gl, "uniform3fv")[1].at(-1);
+    const page = document.body.appendChild(document.createElement("main"));
+    page.setAttribute("data-ribbon-hot", "");
+    tick(32);
+    expect(lastCall(gl, "uniform3fv")[1].at(-1)).toBeGreaterThan(calm);
+    page.remove();
+    tick(48);
+    expect(lastCall(gl, "uniform3fv")[1].at(-1)).toBe(calm);
   });
 
   it("does not diverge when a frame's timestamp goes backwards", () => {
