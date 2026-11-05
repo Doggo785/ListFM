@@ -7,7 +7,7 @@ from models.playlist_track import PlaylistTrack
 from models.track import Track
 from repositories.tracks import get_or_create_track
 from schemas import GeneratedPlaylistCreate
-from sqlalchemy import func, select
+from sqlalchemy import Row, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 COVERS_PER_PLAYLIST = 4
@@ -48,22 +48,20 @@ async def get_playlist_covers(db: AsyncSession, user_id: str) -> dict[str, list[
     return covers
 
 
-async def get_albums_missing_cover(db: AsyncSession, user_id: str) -> list[tuple[str, str, str]]:
-    """(id, title, artist) of the albums in this user's playlists never looked up, newest playlists first."""
+async def get_cover_candidates(db: AsyncSession, user_id: str) -> list[list[Row]]:
+    """Each playlist's different albums in track order, newest playlists first."""
     rows = await db.execute(
-        select(Album.id, Album.title, Album.artist)
-        .join(Track, Track.album_id == Album.id)
-        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        select(PlaylistTrack.playlist_id, Album.id, Album.title, Album.artist, Album.image_url, Album.image_fetched_at)
         .join(GeneratedPlaylist, GeneratedPlaylist.id == PlaylistTrack.playlist_id)
-        .where(
-            GeneratedPlaylist.user_id == user_id,
-            GeneratedPlaylist.deleted_at.is_(None),
-            Album.image_fetched_at.is_(None),
-        )
-        .group_by(Album.id, Album.title, Album.artist)
-        .order_by(func.max(GeneratedPlaylist.generated_at).desc(), Album.id)
+        .join(Track, Track.id == PlaylistTrack.track_id)
+        .join(Album, Album.id == Track.album_id)
+        .where(GeneratedPlaylist.user_id == user_id, GeneratedPlaylist.deleted_at.is_(None))
+        .order_by(GeneratedPlaylist.generated_at.desc(), PlaylistTrack.playlist_id, PlaylistTrack.position)
     )
-    return [(row.id, row.title, row.artist) for row in rows]
+    playlists: dict[str, dict[str, Row]] = {}
+    for row in rows:
+        playlists.setdefault(row.playlist_id, {}).setdefault(row.id, row)
+    return [list(albums.values()) for albums in playlists.values()]
 
 
 async def get_generated_playlist(db: AsyncSession, playlist_id: str, user_id: str) -> GeneratedPlaylist | None:

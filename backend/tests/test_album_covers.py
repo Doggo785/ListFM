@@ -14,7 +14,11 @@ from models.track import Track
 from models.user import User
 from repositories.generated_playlists import get_playlist_covers
 from services import album_covers, lastfm
-from services.album_covers import MAX_CONSECUTIVE_FAILURES, fill_album_covers
+from services.album_covers import (
+    MAX_ALBUMS_TRIED,
+    MAX_CONSECUTIVE_FAILURES,
+    fill_album_covers,
+)
 from sqlalchemy import delete, select
 
 from .conftest import _cleanup_user, _TestSessionLocal, _unique_email
@@ -65,6 +69,57 @@ async def test_a_pass_stores_the_cover_and_remembers_an_album_without_one():
         async with _TestSessionLocal() as db:
             await fill_album_covers(db, user_id, "u")
         assert get.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_a_cover_asks_only_for_the_two_albums_it_shows():
+    user_id, _, album_ids = await _playlist_with_albums(6)
+    with patch.object(album_covers, "get_album_image", return_value="https://img/x.png") as get:
+        async with _TestSessionLocal() as db:
+            await fill_album_covers(db, user_id, "u")
+    assert get.call_count == 2
+    assert [(await _album(album_id)).image_fetched_at is not None for album_id in album_ids] == [True, True, *[False] * 4]
+
+
+@pytest.mark.asyncio
+async def test_albums_without_art_are_passed_until_two_covers_are_found():
+    user_id, _, album_ids = await _playlist_with_albums(6)
+    with_art = {f"album-{album_ids[1]}", f"album-{album_ids[3]}"}
+
+    with patch.object(
+        album_covers, "get_album_image", side_effect=lambda artist, title: "https://img/x.png" if title in with_art else None
+    ) as get:
+        async with _TestSessionLocal() as db:
+            await fill_album_covers(db, user_id, "u")
+    assert get.call_count == 4
+
+
+@pytest.mark.asyncio
+async def test_a_playlist_without_art_stops_at_the_limit_for_good():
+    user_id, _, _ = await _playlist_with_albums(MAX_ALBUMS_TRIED + 3)
+    with patch.object(album_covers, "get_album_image", return_value=None) as get:
+        for _ in range(2):
+            async with _TestSessionLocal() as db:
+                await fill_album_covers(db, user_id, "u")
+    assert get.call_count == MAX_ALBUMS_TRIED
+
+
+@pytest.mark.asyncio
+async def test_a_failed_album_is_passed_and_stays_due_for_the_next_visit():
+    user_id, _, album_ids = await _playlist_with_albums(3)
+    answers = iter([ValueError("no key here"), "https://img/a.png", "https://img/b.png"])
+
+    def answer(artist, title):
+        value = next(answers)
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    with patch.object(album_covers, "get_album_image", side_effect=answer):
+        async with _TestSessionLocal() as db:
+            await fill_album_covers(db, user_id, "u")
+    assert (await _album(album_ids[0])).image_fetched_at is None
+    assert (await _album(album_ids[2])).image_url == "https://img/b.png"
 
 
 @pytest.mark.asyncio
