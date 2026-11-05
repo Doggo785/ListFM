@@ -37,3 +37,14 @@ describe("session expiry", () => {
     expect(onExpired).not.toHaveBeenCalled();
   });
 });
+
+describe("error messages", () => {
+  it("reads a validation error's list instead of printing [object Object]", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: false,
+      status: 422,
+      text: async () => JSON.stringify({ detail: [{ msg: "Value error, Invalid cron expression: x" }, { msg: "Too long" }] }),
+    }));
+    await expect(request("/x")).rejects.toThrow("API 422: Invalid cron expression: x Too long");
+  });
+});

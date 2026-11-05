@@ -58,6 +58,8 @@ export async function request(path, options = {}) {
       const parsed = JSON.parse(body);
       if (parsed && typeof parsed === "object") {
         message = parsed.detail ?? parsed.error ?? body;
+        // A validation error details each field in a list.
+        if (Array.isArray(message)) message = message.map((e) => String(e.msg ?? e).replace(/^Value error, /, "")).join(" ");
       }
     } catch {
       // body is not JSON — fall back to raw text
