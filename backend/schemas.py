@@ -1,5 +1,5 @@
 import re
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, date, datetime, tzinfo
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -412,6 +412,8 @@ class GeneratedPlaylistCreate(BaseModel):
     tracks: list[Track]
     track_count: int
     filter_groups: list[dict] | None = None
+    period_start: date | None = None
+    period_end: date | None = None
 
 
 class GeneratedPlaylistRead(BaseModel):
@@ -423,6 +425,8 @@ class GeneratedPlaylistRead(BaseModel):
     description: str | None = None
     track_count: int
     filter_groups: list[dict] | None = None
+    period_start: date | None = None
+    period_end: date | None = None
     generated_at: datetime
     created_at: datetime
 

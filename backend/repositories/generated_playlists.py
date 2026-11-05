@@ -60,6 +60,8 @@ async def create_generated_playlist(
         description=data.description,
         track_count=data.track_count,
         filter_groups=data.filter_groups,
+        period_start=data.period_start,
+        period_end=data.period_end,
         generated_at=now,
     )
     db.add(playlist)

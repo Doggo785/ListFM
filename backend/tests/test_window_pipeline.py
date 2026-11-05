@@ -1,13 +1,14 @@
 """Window -> sort -> filter -> size, read from the stored listens (ADR 0002)."""
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pylast
 import pytest
 from models.automation import Automation
 from models.automation_history import AutomationHistory
+from models.generated_playlist import GeneratedPlaylist
 from models.user import User
 from repositories.scrobbles import get_window_tracks, replace_loved, store_scrobbles
 from repositories.tags import mark_artist_tags_fetched, upsert_artist_tag
@@ -140,6 +141,17 @@ async def test_run_with_no_listens_in_window_is_empty_not_failed():
         await db.commit()
         row = (await db.execute(select(AutomationHistory).where(AutomationHistory.id == history.id))).scalar_one()
     assert (row.status, row.generated_playlist_id, row.tracks_generated) == ("empty", None, 0)
+
+
+@pytest.mark.asyncio
+async def test_run_records_the_period_its_playlist_covers():
+    user_id = await _user_with_listens([("A", 1)])
+    automation = await _automation(user_id)
+    async with _TestSessionLocal() as db:
+        history = await run_automation(db, automation, scheduled_for=NOW)
+        await db.commit()
+        playlist = await db.get(GeneratedPlaylist, history.generated_playlist_id)
+    assert (playlist.period_start, playlist.period_end) == (date(2026, 3, 24), date(2026, 3, 31))
 
 
 @pytest.mark.asyncio

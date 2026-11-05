@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from database import Base
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +17,9 @@ class GeneratedPlaylist(Base):
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     track_count: Mapped[int] = mapped_column(Integer)  # cached count
     filter_groups: Mapped[list | None] = mapped_column(JSONB, nullable=True)  # snapshot of filters used
+    # On the owner's clock, end included. Both empty on playlists older than these columns; start empty = every listen.
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # soft delete
