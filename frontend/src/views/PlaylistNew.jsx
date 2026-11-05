@@ -150,15 +150,22 @@ function Preview({ preview, draft, linked }) {
                 layout="position"
                 transition={ROW_MOVE}
                 exit={ROW_EXIT}
-                className="preview-row flex items-center gap-3 py-2 pr-2"
+                className="preview-row"
                 style={{ "--row": Math.min(i, ROW_STAGGER_LIMIT) }}
               >
+                <a
+                  href={`https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 py-2 pr-2 outline-none transition-colors duration-(--duration-quick) hover:bg-(--ember-1) focus-visible:bg-(--ember-1) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ember-9)"
+                >
                 <span className="w-8 shrink-0 text-right text-sm text-(--text-muted) tabular-nums">{i + 1}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-base">{track.title}</span>
                   <span className="block truncate text-sm text-(--text-muted)">{track.artist}</span>
                 </span>
                 {track.playcount != null && <span className="shrink-0 text-sm text-(--text-muted) tabular-nums" title="Plays" aria-label={plural(track.playcount, "play")}>{track.playcount}</span>}
+                </a>
               </motion.li>
             ))}
           </AnimatePresence>

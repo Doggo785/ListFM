@@ -81,6 +81,16 @@ describe("creator", () => {
     expect(container.querySelector("[data-chain]").dataset.chain).toBe("800,60,1");
   });
 
+  it("opens a previewed track on its Last.fm page, in a new tab", async () => {
+    previewAutomation.mockImplementation(async () => result({ tracks: [{ title: "AC/DC? Song", artist: "Sigur Rós", playcount: 9 }] }));
+    const container = await render();
+    await wait(400);
+    const link = container.querySelector("ol li a");
+    expect(link.getAttribute("href")).toBe("https://www.last.fm/music/Sigur%20R%C3%B3s/_/AC%2FDC%3F%20Song");
+    expect(link.target).toBe("_blank");
+    expect(link.rel).toBe("noopener noreferrer");
+  });
+
   it("waits for a pause: a burst of changes makes one request", async () => {
     const container = await render();
     await wait(400);
