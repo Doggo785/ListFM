@@ -28,7 +28,7 @@ function Shelf({ shelf, opening, cameFrom, returnTo, onOpen }) {
         {shelf.playlists.map((playlist) => {
           const active = playlist.id === opening;
           return (
-            <li key={playlist.id} className="w-[144px] shrink-0 snap-start md:w-[192px]">
+            <li key={playlist.id} className="w-[128px] shrink-0 snap-start md:w-[192px]">
               <Link
                 to={`/playlists/${playlist.id}`}
                 ref={playlist.id === cameFrom ? returnTo : undefined}
@@ -36,8 +36,9 @@ function Shelf({ shelf, opening, cameFrom, returnTo, onOpen }) {
                 className={`group block ${FOCUS}`}
               >
                 <PlaylistCover
+                  seed={playlist.id}
                   images={playlist.cover_images}
-                  className="aspect-square w-full outline-2 outline-transparent transition-[outline-color] duration-(--duration-quick) group-hover:outline-(--ember)"
+                  className="w-full outline-2 outline-transparent transition-[outline-color] duration-(--duration-quick) group-hover:outline-(--ember)"
                   style={active ? { viewTransitionName: "playlist-cover" } : undefined}
                 />
                 <span className="block w-fit pt-2 text-sm group-hover:text-(--ember)" style={active ? { viewTransitionName: "playlist-period" } : undefined}>

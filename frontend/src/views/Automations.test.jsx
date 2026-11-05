@@ -37,7 +37,7 @@ describe("Automations", () => {
     expect(card.textContent).toContain("Seasonal");
     expect(card.textContent).toContain("Every season");
     expect(card.textContent).toContain("2 playlists");
-    expect(card.querySelector("img").getAttribute("src")).toBe("https://img/a.png");
+    expect(card.querySelector("canvas")).toBeTruthy();
   });
 
   it("says when an automation is paused", async () => {

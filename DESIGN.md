@@ -96,7 +96,7 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - Folded sections are native `details`, and the closed row still states what it holds ("4 rules").
 - `PixelNumber`: every Tiny5 number. Random ember pixels gather on the digits, never in a box, with a few loose ones around. It swaps under them and they leave one by one, in under half a second. It swaps at once under reduced motion.
 - Live lists: a kept row slides to its new place, a new one dithers in, and a dropped one steps out. The list never empties while it updates.
-- `PlaylistCover`: real album art of the playlist, a mosaic of four when it has four albums with art, or the first one alone, enlarged so its pixels show. An empty ember square until the art arrives.
+- `PlaylistCover`: the playlist's first two albums in their original quality, cut apart by the site's ribbon (same formula and dither, 64 cells across). Height, slope, width and heat come from the playlist's id, always in Braise, with no text and no animation. One album fills the cover; with none, the ribbon alone on the ground. Size it in multiples of 64px so its cells stay whole: 192, 128 or 384.
 - Shelf: one per automation, covers in a row that scrolls sideways, each with the period it covers under it. The period is what tells apart the playlists of one automation.
 - Playlist glide: opening a playlist and going back slides its cover, name and period with a view transition, and the rest of the page swaps at once. Without browser support or under reduced motion, it all swaps at once.
 - Automation card: the only bordered card, a whole link holding a cover and a few lines. Its border turns amber on hover.

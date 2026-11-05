@@ -146,13 +146,13 @@ async def test_the_list_returns_the_covers_and_starts_a_pass(client):
 
 
 def _image(url):
-    return [{"size": "large", "#text": "https://img/174s/big.png"}, {"size": "small", "#text": url}]
+    return [{"size": "small", "#text": "https://img/34s/tiny.png"}, {"size": "extralarge", "#text": url}]
 
 
-def test_get_album_image_reads_the_small_cover_and_refuses_the_placeholder():
-    with patch.object(lastfm, "_lastfm_json", return_value={"album": {"image": _image("https://img/34s/real.png")}}):
-        assert lastfm.get_album_image("a", "b") == "https://img/34s/real.png"
-    placeholder = f"https://img/34s/{lastfm.NO_IMAGE_HASH}.png"
+def test_get_album_image_reads_the_best_cover_and_refuses_the_placeholder():
+    with patch.object(lastfm, "_lastfm_json", return_value={"album": {"image": _image("https://img/300x300/real.png")}}):
+        assert lastfm.get_album_image("a", "b") == "https://img/300x300/real.png"
+    placeholder = f"https://img/300x300/{lastfm.NO_IMAGE_HASH}.png"
     with patch.object(lastfm, "_lastfm_json", return_value={"album": {"image": _image(placeholder)}}):
         assert lastfm.get_album_image("a", "b") is None
     with patch.object(lastfm, "_lastfm_json", return_value={"album": {}}):

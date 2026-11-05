@@ -284,7 +284,7 @@ def get_artist_tags(artist: str) -> list[dict]:
 
 
 def get_album_image(artist: str, album: str) -> str | None:
-    """An album's small cover: the screen enlarges it into visible pixels. An unknown album or a placeholder has none."""
+    """An album's cover in its best size for the screen. An unknown album or a placeholder has none."""
     _throttled_call()
     try:
         data = _lastfm_json("album.getInfo", artist=artist, album=album)["album"]
@@ -292,7 +292,7 @@ def get_album_image(artist: str, album: str) -> str | None:
         if str(exc.status) == "6":
             return None
         raise
-    image = _pick_image(data.get("image"), ("small", "medium", "large", "extralarge"))
+    image = _pick_image(data.get("image"), ("extralarge", "large", "medium", "small"))
     return None if image is None or NO_IMAGE_HASH in image else image
 
 
