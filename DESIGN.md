@@ -90,7 +90,7 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - `Button`: `default` for the one primary action and the selected choice, `outline` for the rest, `danger` for destruction.
 - `Input`, `NumberInput`, `CustomSelect`: same height and border, and the focus or hover state turns the border amber.
 - Folded sections are native `details`, and the closed row still states what it holds ("4 rules").
-- `PixelNumber`: every Tiny5 number. Random ember pixels cover it, it swaps under them, and they leave one by one, in under half a second. It swaps at once under reduced motion.
+- `PixelNumber`: every Tiny5 number. Random ember pixels gather on the digits, never in a box, with a few loose ones around. It swaps under them and they leave one by one, in under half a second. It swaps at once under reduced motion.
 - Live lists: a kept row slides to its new place, a new one dithers in, and a dropped one steps out. The list never empties while it updates.
 - Ribbon band: an empty `data-chain` element pulls the ribbon straight into it, with the widths set by its counts. Text never sits in it.
 

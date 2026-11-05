@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PixelNumber from "@/components/elements/PixelNumber";
+import { coverCells } from "@/lib/pixelCover";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -16,7 +17,15 @@ let root;
 let drawn;
 beforeEach(() => {
   drawn = 0;
-  HTMLCanvasElement.prototype.getContext = () => ({ clearRect() {}, fillRect: () => { drawn += 1; } });
+  HTMLCanvasElement.prototype.getContext = () => ({
+    clearRect() {},
+    fillRect: () => {
+      drawn += 1;
+    },
+    fillText() {},
+    measureText: () => ({}),
+    getImageData: (x, y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
+  });
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ width: 80, height: 40 });
 });
 afterEach(async () => {
@@ -62,6 +71,20 @@ describe("PixelNumber", () => {
     expect(container.textContent).toBe("3");
   });
 
+  it("reads the digits' ink in their own size, even with tabular numerals set", async () => {
+    const fonts = [];
+    const real = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function getContext() {
+      return new Proxy(real.call(this), { set: (target, key, value) => {
+        if (key === "font") fonts.push(value);
+        target[key] = value;
+        return true;
+      } });
+    };
+    await show(<PixelNumber value={1} />);
+    expect(fonts.some((font) => font.startsWith("32px"))).toBe(true);
+  });
+
   it("stops drawing once revealed", async () => {
     await show(<PixelNumber value={1} />);
     await wait(500);
@@ -83,5 +106,33 @@ describe("PixelNumber", () => {
     const container = await show(<PixelNumber value={7} />);
     await act(async () => root.render(<PixelNumber value={8} />));
     expect(container.textContent).toBe("8");
+  });
+});
+
+describe("coverCells", () => {
+  const key = ([x, y]) => `${x},${y}`;
+  const inked = [[2, 2], [3, 2]];
+
+  it("always covers the digits and their edge, so nothing shows through", () => {
+    const cells = coverCells(inked, 20, 8, () => 0.99).map(key);
+    for (const [x, y] of inked) expect(cells).toContain(`${x},${y}`);
+    expect(cells).toContain("1,1");
+    expect(cells).toContain("4,3");
+  });
+
+  it("follows the digits' shape and not the box", () => {
+    const cells = coverCells(inked, 20, 8, () => 0.99).map(key);
+    expect(cells).not.toContain("15,6");
+    expect(cells).not.toContain("0,0");
+  });
+
+  it("scatters loose pixels further out, past the box if need be", () => {
+    const always = coverCells(inked, 20, 8, () => 0).map(key);
+    expect(always).toContain("-1,-1");
+    expect(always).not.toContain("7,2");
+  });
+
+  it("falls back on the whole box when the ink is unknown", () => {
+    expect(coverCells([], 3, 2)).toHaveLength(6);
   });
 });
