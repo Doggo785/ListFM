@@ -3,9 +3,11 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getLatestRuns } from "@/lib/api";
 import Automations from "./Automations";
 
 const hook = vi.hoisted(() => ({ value: {} }));
+vi.mock("@/lib/api", () => ({ getLatestRuns: vi.fn() }));
 vi.mock("@/hooks/useAutomations", () => ({ useAutomations: () => hook.value }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { lastfm_username: "doggo" } }) }));
 
@@ -25,6 +27,7 @@ describe("Automations", () => {
     host = document.body.appendChild(document.createElement("div"));
     root = createRoot(host);
     hook.value = LOADED;
+    getLatestRuns.mockResolvedValue([]);
   });
   afterEach(async () => {
     await act(async () => root.unmount());
@@ -38,6 +41,31 @@ describe("Automations", () => {
     expect(card.textContent).toContain("Every season");
     expect(card.textContent).toContain("2 playlists");
     expect(card.querySelector("canvas")).toBeTruthy();
+  });
+
+  it("says on each card how its last run went", async () => {
+    getLatestRuns.mockResolvedValue([{ automation_id: "a1", status: "completed", attempt: 1, tracks_generated: 32, target_size: 50 }]);
+    await show();
+    expect(host.querySelector('a[href="/automations/a1"]').textContent).toContain("32/50 tracks");
+    expect(host.querySelector("[data-ribbon-hot]")).toBeNull();
+  });
+
+  it("marks the page when a last run failed", async () => {
+    getLatestRuns.mockResolvedValue([{ automation_id: "a1", status: "failed", attempt: 4, retries_exhausted: true }]);
+    await show();
+    expect(host.querySelector('a[href="/automations/a1"]').textContent).toContain("No more automatic tries");
+    expect(host.querySelector("[data-ribbon-hot]")).not.toBeNull();
+  });
+
+  it("says when a card has no run yet", async () => {
+    await show();
+    expect(host.querySelector('a[href="/automations/a1"]').textContent).toContain("No runs yet");
+  });
+
+  it("claims nothing about runs when they could not load", async () => {
+    getLatestRuns.mockRejectedValue(new Error("API 500: boom"));
+    await show();
+    expect(host.querySelector('a[href="/automations/a1"]').textContent).not.toContain("No runs yet");
   });
 
   it("says when an automation is paused", async () => {

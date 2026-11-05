@@ -26,7 +26,7 @@ const Dashboard = page(() => import("./views/Dashboard"));
 const AuthCallback = page(() => import("./views/AuthCallback"));
 const LinkLastfm = page(() => import("./views/LinkLastfm"));
 const PlaylistNew = page(() => import("./views/PlaylistNew"));
-const PlaylistDetail = page(() => import("./views/PlaylistDetail"));
+const Automation = page(() => import("./views/Automation"));
 const Automations = page(() => import("./views/Automations"));
 const Playlists = page(() => import("./views/Playlists"));
 const Playlist = page(() => import("./views/Playlist"));
@@ -100,7 +100,15 @@ function App() {
                 path="/automations/:id"
                 element={
                   <AuthGuard>
-                    <PlaylistDetail />
+                    <Automation />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/automations/:id/edit"
+                element={
+                  <AuthGuard>
+                    <PlaylistNew />
                   </AuthGuard>
                 }
               />

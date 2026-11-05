@@ -8,6 +8,8 @@ const LOADER_PULL = 0.9;
 const SOFT_EDGE = 0.15;
 const CHAIN_FILL = 0.85; // Of the band: the wavy edge stays inside it.
 const CHAIN_FLOOR = 0.12;
+const HOTTER = 2; // Steps up the ramp while a page holds data-ribbon-hot: warmer, never a siren.
+const MAX_HEAT = 5;
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
 const SCENES = {
@@ -22,7 +24,7 @@ const SCENES = {
 
 export function sceneFor(pathname) {
   if (pathname.startsWith("/dashboard")) return SCENES.dashboard;
-  if (pathname === "/automations/new") return SCENES.creator;
+  if (pathname === "/automations/new" || pathname.endsWith("/edit")) return SCENES.creator;
   if (pathname === "/automations") return SCENES.automations;
   if (pathname.startsWith("/automations/")) return SCENES.detail;
   if (pathname === "/playlists") return SCENES.playlists;
@@ -163,6 +165,8 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
   const now = { ...target, cols: [...target.cols], ramp: [...target.ramp] };
   let started = false;
   let scene = { cols: target.cols, angle: target.angle, off: target.off };
+  let sceneHeat = 0;
+  let heat = 0;
 
   const resize = () => {
     canvas.width = Math.ceil(window.innerWidth / CELL);
@@ -223,6 +227,11 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     } else {
       Object.assign(target, scene, { calm: 0, edge: SOFT_EDGE });
     }
+    const wantedHeat = document.querySelector("[data-ribbon-hot]") ? Math.min(sceneHeat + HOTTER, MAX_HEAT) : sceneHeat;
+    if (wantedHeat !== heat) {
+      heat = wantedHeat;
+      target.ramp = rampFor(heat, palette);
+    }
     const ease = (rate) => (reducedMotion ? 1 : 1 - Math.exp(-dt * rate));
     const shape = ease(4.5);
     const glow = ease(3);
@@ -281,6 +290,7 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
   return {
     setScene(next) {
       scene = { cols: next.shape, angle: next.angle, off: next.offset };
+      sceneHeat = heat = next.heat;
       Object.assign(target, scene, { ramp: rampFor(next.heat, palette) });
       // The first scene appears in place; only later ones travel.
       if (!started) {

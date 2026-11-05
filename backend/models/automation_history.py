@@ -17,6 +17,7 @@ class AutomationHistory(Base):
     status: Mapped[str] = mapped_column(String(20))  # running|completed|failed
     attempt: Mapped[int] = mapped_column(Integer, default=1)  # 1 = initial run, 2+ = retries
     scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True))  # decided-at; started_at = actual pipeline start
+    target_size: Mapped[int | None] = mapped_column(Integer, nullable=True)  # snapshot: the size asked for at this run
     tracks_generated: Mapped[int] = mapped_column(Integer, default=0)
     tracks_before_filter: Mapped[int] = mapped_column(Integer, default=0)
     tracks_after_filter: Mapped[int] = mapped_column(Integer, default=0)

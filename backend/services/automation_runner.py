@@ -449,6 +449,7 @@ async def run_automation(
         automation_id=automation.id,
         status="running",
         filter_groups_used=_filter_groups_to_json(automation.filter_groups),
+        target_size=automation.output_max_size,
         scheduled_for=scheduled_for,
         attempt=attempt,
         started_at=started_at,

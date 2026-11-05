@@ -4,14 +4,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { forgetPlaylist, useAutomations } from "@/hooks/useAutomations";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
-import Modal from "@/components/ui/Modal";
+import DeleteAction from "@/components/ui/DeleteAction";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
+import { Gone, LoadFailed, StatePage } from "@/components/elements/PageStates";
 import { deleteGeneratedPlaylist, getGeneratedPlaylistTracks } from "@/lib/api";
 import { glide, glideArrived } from "@/lib/glide";
 import { describeCoverage, describeMade, plural, tracksAsText } from "@/lib/playlists";
+import { FOCUS } from "@/lib/utils";
 
-const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9)";
 const COPIED_MS = 2000;
 
 /** navigator.clipboard only exists on HTTPS and localhost, and the site may run on plain HTTP. */
@@ -104,8 +105,6 @@ export default function Playlist() {
   const [tracks, setTracks] = useState(null);
   const [tracksFailed, setTracksFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
 
   const title = useRef(null);
@@ -139,45 +138,12 @@ export default function Playlist() {
     glide(() => navigate("/playlists", { state: { from: id } }));
   };
 
-  const confirmDelete = async () => {
-    setDeleting(true);
-    setDeleteFailed(false);
-    try {
-      await deleteGeneratedPlaylist(id);
-      forgetPlaylist(id);
-      // Replaced: browser Back must not reopen what was just deleted.
-      navigate("/playlists", { replace: true });
-    } catch {
-      setDeleteFailed(true);
-      setConfirming(false);
-      setDeleting(false);
-    }
-  };
-
   if (!playlist) {
-    if (isLoading) {
-      return <main className="h-full w-full px-4 pt-4 text-left md:px-8"><Loader /></main>;
-    }
-    if (error || playlistsFailed) {
-      return (
-        <main className="h-full w-full px-4 pt-4 text-left md:px-8">
-          <div data-quiet role="alert" className="mx-auto max-w-6xl">
-            <p className="pb-3 text-base">This playlist could not load.</p>
-            <Button variant="outline" onClick={() => refetch()}>Try again</Button>
-          </div>
-        </main>
-      );
-    }
+    if (isLoading) return <StatePage><Loader /></StatePage>;
+    if (error || playlistsFailed) return <StatePage><LoadFailed subject="This playlist" onRetry={refetch} /></StatePage>;
     // This address used to be an automation's page: old links still arrive there.
     if (automations.some((candidate) => candidate.id === id)) return <Navigate to={`/automations/${id}`} replace />;
-    return (
-      <main className="h-full w-full px-4 pt-4 text-left md:px-8">
-        <div data-quiet className="mx-auto max-w-6xl">
-          <p className="pb-4 text-2xl">This playlist no longer exists</p>
-          <Link to="/playlists" className={buttonVariants({ variant: "outline" })}>Back to playlists</Link>
-        </div>
-      </main>
-    );
+    return <StatePage><Gone subject="This playlist" to="/playlists" back="Back to playlists" /></StatePage>;
   }
 
   const name = playlist.name || "Untitled";
@@ -203,7 +169,18 @@ export default function Playlist() {
           <div className="flex flex-wrap gap-2 pt-4">
             <CopyList tracks={tracks} />
             {automation && <Link to={`/automations/${automation.id}`} className={buttonVariants({ variant: "outline" })}>See automation</Link>}
-            <Button variant="outline" onClick={() => setConfirming(true)}>Delete</Button>
+            <DeleteAction
+              title="Delete this playlist?"
+              description={`${name}, ${describeCoverage(playlist)}, will be gone for good. Its automation keeps running.`}
+              onDelete={async () => {
+                setDeleteFailed(false);
+                await deleteGeneratedPlaylist(id);
+                forgetPlaylist(id);
+                // Replaced: browser Back must not reopen what was just deleted.
+                navigate("/playlists", { replace: true });
+              }}
+              onFailed={() => setDeleteFailed(true)}
+            />
           </div>
           {deleteFailed && <p role="alert" className="pt-2 text-sm text-(--ember)">This playlist could not be deleted. Try again.</p>}
         </header>
@@ -212,16 +189,6 @@ export default function Playlist() {
           <Tracks tracks={tracks} failed={tracksFailed} onRetry={() => setAttempt((n) => n + 1)} />
         </section>
       </div>
-
-      <Modal
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        title="Delete this playlist?"
-        description={`${name}, ${describeCoverage(playlist)}, will be gone for good. Its automation keeps running.`}
-      >
-        <Button variant="outline" size="sm" onClick={() => setConfirming(false)}>Cancel</Button>
-        <Button variant="danger" size="sm" onClick={confirmDelete} disabled={deleting}>{deleting ? "Deleting" : "Delete"}</Button>
-      </Modal>
     </main>
   );
 }

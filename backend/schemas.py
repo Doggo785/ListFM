@@ -462,6 +462,7 @@ class AutomationHistoryRead(BaseModel):
     status: str
     attempt: int = 1
     scheduled_for: datetime
+    target_size: int | None = None
     tracks_generated: int
     tracks_before_filter: int
     tracks_after_filter: int
@@ -470,6 +471,8 @@ class AutomationHistoryRead(BaseModel):
     started_at: datetime
     completed_at: datetime | None = None
     created_at: datetime
+    next_retry_at: datetime | None = None
+    retries_exhausted: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -9,6 +9,7 @@ Covers:
 """
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -956,3 +957,92 @@ async def test_retry_route_refuses_other_runs_and_other_users(client: AsyncClien
         assert len(await _history_rows(automation_id)) == 2
     finally:
         await _cleanup_user_with_automations(client, other_email)
+
+
+async def _history_json(client: AsyncClient, automation_id: str) -> list[dict]:
+    return (await client.get(f"/api/automations/{automation_id}/history")).json()
+
+
+@pytest.mark.asyncio
+async def test_a_run_keeps_the_size_it_asked_for(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        body = _create_body()
+        body["output"] = {"maxSize": 50}
+        automation_id = (await client.post("/api/automations", json=body)).json()["id"]
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks):
+            assert (await client.post(f"/api/automations/{automation_id}/run")).status_code == 200
+
+        body["output"] = {"maxSize": 10}
+        assert (await client.patch(f"/api/automations/{automation_id}", json=body)).status_code == 200
+
+        run = (await _history_json(client, automation_id))[0]
+        assert (run["tracks_generated"], run["target_size"]) == (1, 50)
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_history_says_what_a_failed_run_does_next(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        automation_id = (await client.post("/api/automations", json=_create_body())).json()["id"]
+        started = datetime(2026, 1, 15, 8, tzinfo=UTC)
+        await _insert_failed_run(automation_id, attempt=1, scheduled_for=started)
+        await _insert_failed_run(
+            automation_id, attempt=2, scheduled_for=started, started_at=started + timedelta(minutes=5)
+        )
+
+        settings = SimpleNamespace(enable_scheduler=True)
+        with patch("routers.automations.get_settings", return_value=settings):
+            head, older = await _history_json(client, automation_id)
+            # Only the latest row retries, 20 minutes after attempt 2 started.
+            assert datetime.fromisoformat(head["next_retry_at"]) == started + timedelta(minutes=25)
+            assert older["next_retry_at"] is None
+            assert head["retries_exhausted"] is False
+
+            # A paused automation is skipped by the sweep: promising a retry would be a lie.
+            await client.patch(f"/api/automations/{automation_id}", json={"enabled": False})
+            assert (await _history_json(client, automation_id))[0]["next_retry_at"] is None
+            await client.patch(f"/api/automations/{automation_id}", json={"enabled": True})
+
+        # Without the scheduler nothing retries by itself either.
+        with patch("routers.automations.get_settings", return_value=SimpleNamespace(enable_scheduler=False)):
+            assert (await _history_json(client, automation_id))[0]["next_retry_at"] is None
+
+        await _insert_failed_run(
+            automation_id, attempt=MAX_ATTEMPT, scheduled_for=started, started_at=started + timedelta(hours=2)
+        )
+        with patch("routers.automations.get_settings", return_value=settings):
+            last = (await _history_json(client, automation_id))[0]
+        assert last["retries_exhausted"] is True
+        assert last["next_retry_at"] is None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_latest_runs_gives_each_live_automation_its_last_run(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        ids = [(await client.post("/api/automations", json=_create_body())).json()["id"] for _ in range(3)]
+        first_id, deleted_id = ids[0], ids[1]  # The third never ran: it has no line.
+        started = datetime(2026, 1, 15, 8, tzinfo=UTC)
+        await _insert_failed_run(first_id, attempt=1, scheduled_for=started)
+        latest_id = await _insert_failed_run(
+            first_id, attempt=2, scheduled_for=started, started_at=started + timedelta(minutes=5)
+        )
+        await _insert_failed_run(deleted_id, attempt=1, scheduled_for=started)
+        assert (await client.delete(f"/api/automations/{deleted_id}")).status_code == 204
+
+        settings = SimpleNamespace(enable_scheduler=True)
+        with patch("routers.automations.get_settings", return_value=settings):
+            runs = (await client.get("/api/automations/latest-runs")).json()
+        assert [run["id"] for run in runs] == [latest_id]
+        assert runs[0]["next_retry_at"] is not None
+    finally:
+        await _cleanup_user_with_automations(client, email)

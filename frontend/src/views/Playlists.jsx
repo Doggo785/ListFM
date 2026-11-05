@@ -3,14 +3,14 @@ import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAutomations } from "@/hooks/useAutomations";
-import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
+import { LinkLastfmHint, LoadFailed } from "@/components/elements/PageStates";
 import { glide, glideArrived } from "@/lib/glide";
 import { describeCoverage, plural, shelvesOf } from "@/lib/playlists";
+import { FOCUS } from "@/lib/utils";
 
-const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9)";
 
 // Browser Back carries no state: this is how the shelves still find the playlist that was open.
 let lastOpened = null;
@@ -103,18 +103,9 @@ export default function Playlists() {
           )}
         </header>
 
-        {!username && (
-          <p data-quiet className="text-base text-(--text-muted)">
-            <Link to="/link-lastfm" className={`text-(--ember) underline underline-offset-4 ${FOCUS}`}>Link your Last.fm account</Link> to get playlists.
-          </p>
-        )}
+        {!username && <LinkLastfmHint purpose="to get playlists." />}
         {username && isLoading && <Loader />}
-        {username && failed && !isLoading && (
-          <div data-quiet role="alert">
-            <p className="pb-3 text-base">Your playlists could not load.</p>
-            <Button variant="outline" onClick={() => refetch()}>Try again</Button>
-          </div>
-        )}
+        {username && failed && !isLoading && <LoadFailed subject="Your playlists" onRetry={refetch} />}
         {username && empty && (
           <div data-quiet>
             <p className="text-2xl">Nothing here yet</p>

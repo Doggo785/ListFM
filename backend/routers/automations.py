@@ -2,11 +2,13 @@ import logging
 import time
 from datetime import UTC, datetime
 
+from config import get_settings
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models.automation import Automation
+from models.automation_history import AutomationHistory
 from models.user import User
-from repositories.automation_history import get_automation_history
+from repositories.automation_history import get_automation_history, get_latest_runs
 from repositories.automations import (
     create_automation,
     delete_automation,
@@ -30,6 +32,8 @@ from schemas import (
 )
 from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.automation_runner import (
+    MAX_ATTEMPT,
+    RETRY_DELAYS,
     last_fire_time,
     next_fire_time,
     run_automation,
@@ -167,6 +171,25 @@ async def run_progress(
     return ProgressRead(stage="running", done=0, total=0)
 
 
+def _read_run(row: AutomationHistory, *, retries_pending: bool) -> AutomationHistoryRead:
+    """A history row, with what happens next: only a live chain head retries by itself."""
+    read = AutomationHistoryRead.model_validate(row)
+    if row.status != "failed":
+        return read
+    read.retries_exhausted = row.attempt >= MAX_ATTEMPT
+    if retries_pending and not read.retries_exhausted and get_settings().enable_scheduler:
+        read.next_retry_at = row.started_at + RETRY_DELAYS[row.attempt]
+    return read
+
+
+@router.get("/automations/latest-runs", response_model=list[AutomationHistoryRead])
+async def list_latest_runs(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return [_read_run(row, retries_pending=enabled) for row, enabled in await get_latest_runs(db, current_user.id)]
+
+
 @router.get("/automations", response_model=list[AutomationRead])
 async def list_automations(
     username: str = Depends(get_current_user_lastfm_username),
@@ -191,7 +214,8 @@ async def get_automation_history_entries(
     automation: Automation = Depends(get_owned_automation),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_automation_history(db, automation.id)
+    rows = await get_automation_history(db, automation.id)
+    return [_read_run(row, retries_pending=automation.enabled and i == 0) for i, row in enumerate(rows)]
 
 
 async def _lock_or_409(db: AsyncSession, automation: Automation) -> None:
