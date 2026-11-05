@@ -1,12 +1,9 @@
-"""Write-only repository for the existing ``automation_history`` table.
-
-The table and its migration already exist (see models/automation_history.py);
-this module only inserts rows. No read API or UI yet (write-only phase).
-"""
+"""Repository for the ``automation_history`` table: one row per attempt of a run."""
 
 import uuid
 from datetime import UTC, datetime
 
+from models.automation import Automation
 from models.automation_history import AutomationHistory
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +14,7 @@ async def create_automation_history(
     *,
     automation_id: str,
     status: str,
+    target_size: int | None = None,
     tracks_generated: int = 0,
     tracks_before_filter: int = 0,
     tracks_after_filter: int = 0,
@@ -36,6 +34,7 @@ async def create_automation_history(
         id=str(uuid.uuid4()),
         automation_id=automation_id,
         status=status,
+        target_size=target_size,
         tracks_generated=tracks_generated,
         tracks_before_filter=tracks_before_filter,
         tracks_after_filter=tracks_after_filter,
@@ -63,3 +62,15 @@ async def get_automation_history(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def get_latest_runs(db: AsyncSession, user_id: str) -> list[tuple[AutomationHistory, bool]]:
+    """Each live automation's latest run, with whether the automation is enabled."""
+    result = await db.execute(
+        select(AutomationHistory, Automation.enabled)
+        .join(Automation, Automation.id == AutomationHistory.automation_id)
+        .where(Automation.user_id == user_id, Automation.deleted_at.is_(None))
+        .distinct(AutomationHistory.automation_id)
+        .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
+    )
+    return [(row, enabled) for row, enabled in result.all()]
