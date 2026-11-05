@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { forgetPlaylist, useAutomations } from "@/hooks/useAutomations";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
-import ConfirmDelete from "@/components/ui/ConfirmDelete";
+import DeleteAction from "@/components/ui/DeleteAction";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
 import { Gone, LoadFailed, StatePage } from "@/components/elements/PageStates";
@@ -105,8 +105,6 @@ export default function Playlist() {
   const [tracks, setTracks] = useState(null);
   const [tracksFailed, setTracksFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
 
   const title = useRef(null);
@@ -140,21 +138,6 @@ export default function Playlist() {
     glide(() => navigate("/playlists", { state: { from: id } }));
   };
 
-  const confirmDelete = async () => {
-    setDeleting(true);
-    setDeleteFailed(false);
-    try {
-      await deleteGeneratedPlaylist(id);
-      forgetPlaylist(id);
-      // Replaced: browser Back must not reopen what was just deleted.
-      navigate("/playlists", { replace: true });
-    } catch {
-      setDeleteFailed(true);
-      setConfirming(false);
-      setDeleting(false);
-    }
-  };
-
   if (!playlist) {
     if (isLoading) return <StatePage><Loader /></StatePage>;
     if (error || playlistsFailed) return <StatePage><LoadFailed subject="This playlist" onRetry={refetch} /></StatePage>;
@@ -186,7 +169,18 @@ export default function Playlist() {
           <div className="flex flex-wrap gap-2 pt-4">
             <CopyList tracks={tracks} />
             {automation && <Link to={`/automations/${automation.id}`} className={buttonVariants({ variant: "outline" })}>See automation</Link>}
-            <Button variant="outline" onClick={() => setConfirming(true)}>Delete</Button>
+            <DeleteAction
+              title="Delete this playlist?"
+              description={`${name}, ${describeCoverage(playlist)}, will be gone for good. Its automation keeps running.`}
+              onDelete={async () => {
+                setDeleteFailed(false);
+                await deleteGeneratedPlaylist(id);
+                forgetPlaylist(id);
+                // Replaced: browser Back must not reopen what was just deleted.
+                navigate("/playlists", { replace: true });
+              }}
+              onFailed={() => setDeleteFailed(true)}
+            />
           </div>
           {deleteFailed && <p role="alert" className="pt-2 text-sm text-(--ember)">This playlist could not be deleted. Try again.</p>}
         </header>
@@ -195,15 +189,6 @@ export default function Playlist() {
           <Tracks tracks={tracks} failed={tracksFailed} onRetry={() => setAttempt((n) => n + 1)} />
         </section>
       </div>
-
-      <ConfirmDelete
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        onConfirm={confirmDelete}
-        deleting={deleting}
-        title="Delete this playlist?"
-        description={`${name}, ${describeCoverage(playlist)}, will be gone for good. Its automation keeps running.`}
-      />
     </main>
   );
 }

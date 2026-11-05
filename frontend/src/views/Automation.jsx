@@ -7,7 +7,7 @@ import { useAutomations } from "@/hooks/useAutomations";
 import { useScrobbleSync } from "@/hooks/useScrobbleSync";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
-import ConfirmDelete from "@/components/ui/ConfirmDelete";
+import DeleteAction from "@/components/ui/DeleteAction";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
 import { Gone, LinkLastfmHint, LoadFailed, StatePage } from "@/components/elements/PageStates";
@@ -156,8 +156,6 @@ export default function Automation() {
   const [run, setRun] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [pausing, setPausing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (automation?.name) document.title = `${automation.name} - ListFM`;
@@ -236,18 +234,6 @@ export default function Automation() {
     }
   };
 
-  const confirmDelete = async () => {
-    setDeleting(true);
-    try {
-      await deleteAutomation(id);
-      navigate("/automations", { replace: true });
-    } catch (err) {
-      setActionError(apiMessage(err, "This automation could not be deleted. Try again."));
-      setConfirming(false);
-      setDeleting(false);
-    }
-  };
-
   if (!automation) {
     if (!username) return <StatePage><LinkLastfmHint purpose="to see this automation." /></StatePage>;
     if (isLoading || !error) return <StatePage><Loader /></StatePage>;
@@ -282,7 +268,15 @@ export default function Automation() {
             <Button onClick={runNow} disabled={Boolean(run) || listensLoading}>{run ? "Running" : "Run now"}</Button>
             <Link to={`/automations/${id}/edit`} className={buttonVariants({ variant: "outline" })}>Edit</Link>
             <Button variant="outline" onClick={togglePaused} disabled={pausing}>{paused ? "Resume" : "Pause"}</Button>
-            <Button variant="outline" onClick={() => setConfirming(true)}>Delete</Button>
+            <DeleteAction
+              title="Delete this automation?"
+              description={`${name} will stop making playlists. The playlists it already made stay in your list.`}
+              onDelete={async () => {
+                await deleteAutomation(id);
+                navigate("/automations", { replace: true });
+              }}
+              onFailed={(err) => setActionError(apiMessage(err, "This automation could not be deleted. Try again."))}
+            />
           </div>
           {listensLoading && <p className="pt-2 text-sm text-(--text-muted)">Runs can start once your listening history has finished loading.</p>}
           {arrival?.notice && !actionError && <p role="status" className="pt-2 text-sm text-(--ember)">{arrival.notice}</p>}
@@ -294,15 +288,6 @@ export default function Automation() {
           <History rows={rows} failed={historyFailed} onReload={loadHistory} run={run} listensLoading={listensLoading} onRetry={retry} automation={automation} />
         </section>
       </div>
-
-      <ConfirmDelete
-        open={confirming}
-        onClose={() => setConfirming(false)}
-        onConfirm={confirmDelete}
-        deleting={deleting}
-        title="Delete this automation?"
-        description={`${name} will stop making playlists. The playlists it already made stay in your list.`}
-      />
     </main>
   );
 }
