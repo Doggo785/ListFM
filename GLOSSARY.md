@@ -45,7 +45,7 @@ _Avoid_ : Cache, enrichissement
 ## La chaîne d'une automation
 
 **Fenêtre** :
-Le choix des écoutes qu'une automation regarde, comptée depuis la date prévue du run (un nouvel essai garde la même fenêtre) : glissante (« les 30 derniers jours »), décalée (« le même mois il y a un an ») ou toutes les écoutes.
+Le choix des écoutes qu'une automation regarde, comptée depuis la date prévue du run, soit le dernier passage de son planning même si le run part en retard ou à la main (un nouvel essai garde la même fenêtre ; sans planning, elle compte depuis maintenant) : glissante (« les 30 derniers jours »), décalée (« le même mois il y a un an ») ou toutes les écoutes.
 _Avoid_ : Période, plage de dates, source
 
 **Filtre** :

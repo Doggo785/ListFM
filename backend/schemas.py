@@ -1,5 +1,5 @@
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -18,12 +18,41 @@ def _validate_email(v: str) -> str:
     return normalized
 
 
+_WEEKDAY_NAMES = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
+_WEEKDAY_ITEM = re.compile(r"^(\*|\d+)(?:-(\d+))?(?:/(\d+))?$")
+
+
+def _named_weekdays(field: str) -> str:
+    """Crontab weekday numbers (0 and 7 are Sunday) as names, because APScheduler starts at Monday."""
+    days: list[str] = []
+    for item in field.split(","):
+        match = _WEEKDAY_ITEM.match(item)
+        if match is None or item == "*":
+            days.append(item)
+            continue
+        start, end, step = match.groups()
+        first = 0 if start == "*" else int(start)
+        last = int(end) if end else (6 if start == "*" or step else first)
+        if first > 7 or last > 7:
+            raise ValueError(f"Weekday out of range: {item}")
+        days += [_WEEKDAY_NAMES[day % 7] for day in range(first, last + 1, int(step or 1))]
+    return ",".join(dict.fromkeys(days))
+
+
+def cron_trigger(expr: str, timezone: tzinfo) -> CronTrigger:
+    """The trigger of a standard crontab, whose weekday number means what cron says it means."""
+    parts = expr.split()
+    if len(parts) == 5:
+        parts[4] = _named_weekdays(parts[4])
+    return CronTrigger.from_crontab(" ".join(parts), timezone=timezone)
+
+
 def _validate_cron(v: str) -> str:
     """Accept empty (unscheduled) or a crontab the scheduler can parse."""
     if not v:
         return v
     try:
-        CronTrigger.from_crontab(v, timezone=UTC)
+        cron_trigger(v, UTC)
     except Exception as e:  # noqa: BLE001 -- any parse failure becomes ValueError for pydantic
         raise ValueError(f"Invalid cron expression: {e}")
     return v
