@@ -100,11 +100,27 @@ export function writeSchedule({ frequency, minute = 0, hour = 8, weekday = 1, da
   return "";
 }
 
-/** What happens once the automation exists. The sweep passes every minute, and a never-run automation is due at once. */
-export function describeOutcome(cron) {
+const formatDay = (day, withYear = true) =>
+  new Date(`${day}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(withYear && { year: "numeric" }) });
+
+/** The dates a run covers, as the preview returned them. */
+export function describePeriod(period) {
+  if (!period) return null;
+  if (!period.start) return `all your listens up to ${formatDay(period.end)}`;
+  return `${formatDay(period.start, period.start.slice(0, 4) !== period.end.slice(0, 4))} to ${formatDay(period.end)}`;
+}
+
+/** The two ways to start, before the preview has answered too. */
+export function describeOutcome(cron, { period, next_run: nextRun } = {}) {
   if (!cron) return "Nothing runs until you start it.";
-  const rhythm = readSchedule(cron).frequency === "custom" ? "on your schedule" : describeCron(cron).replace(/^./, (c) => c.toLowerCase());
-  return `First playlist in about a minute, from the last full period, then ${rhythm}.`;
+  const next = nextRun ? formatDay(nextRun) : "the next date";
+  return `Create and run makes ${describePeriod(period) ?? "the last full period"} now. Create only starts on ${next}.`;
+}
+
+/** Said on arrival after Create only. */
+export function describeWaiting(cron, { next_run: nextRun } = {}) {
+  if (!cron) return "Nothing runs until you start it.";
+  return `First playlist on ${nextRun ? formatDay(nextRun) : "the next date"}.`;
 }
 
 const ordinal = (n) => {

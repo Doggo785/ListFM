@@ -19,6 +19,8 @@ import {
   countIncompleteConditions,
   createDefaultAutomation,
   describeOutcome,
+  describePeriod,
+  describeWaiting,
   isValidCron,
   matchingPreset,
   suggestName,
@@ -125,6 +127,7 @@ function Preview({ preview, draft, linked }) {
           {loading ? "Updating" : result && plural(result.total, "track")}
         </p>
       </div>
+      {result?.period && <p className="pb-2 text-sm text-(--text-muted)">Covers {describePeriod(result.period)}.</p>}
       {failed && !loading && <p className="pb-2 text-sm text-(--ember)" role="alert">The preview could not update. Change a setting to try again.</p>}
       {result && result.total > 0 && result.total < wanted && (
         <p className="pb-2 text-sm text-(--text-muted)">Only {result.total} of the {wanted} tracks you asked for fit these settings.</p>
@@ -190,7 +193,7 @@ export default function PlaylistNew() {
   const setOutput = (patch) => setDraft((d) => ({ ...d, output: { ...d.output, ...patch } }));
 
   const payload = toPayload(draft);
-  // The schedule sets the first run's period; a half-typed cron must not fail the preview.
+  // The schedule sets the period a run covers; a half-typed cron must not fail the preview.
   const preview = useLivePreview(linked ? { ...payload, name, cron: isValidCron(draft.cron) ? draft.cron : "", id: undefined, createdAt: undefined, updatedAt: undefined } : null);
   const { result } = preview;
 
@@ -206,7 +209,7 @@ export default function PlaylistNew() {
   const ruleState = [ruleCount ? plural(ruleCount, "rule") : "No rules", incompleteCount > 0 && `${incompleteCount} not applied yet`].filter(Boolean).join(", ");
   const selected = matchingPreset(draft)?.id;
   const badSchedule = Boolean(draft.cron) && !isValidCron(draft.cron);
-  const outcome = badSchedule ? "Fix the schedule to create this automation." : describeOutcome(draft.cron);
+  const outcome = badSchedule ? "Fix the schedule to create this automation." : describeOutcome(draft.cron, result ?? undefined);
 
   const create = async ({ run = false } = {}) => {
     if (creating) return;
@@ -215,7 +218,7 @@ export default function PlaylistNew() {
     try {
       const created = await createAutomation({ ...payload, name });
       // The detail page runs it: its progress and its "history still loading" answer already live there.
-      navigate(`/playlists/${created.id}`, { state: { created: run ? "Created." : `Created. ${outcome}`, runNow: run } });
+      navigate(`/playlists/${created.id}`, { state: { created: run ? "Created." : `Created. ${describeWaiting(draft.cron, result ?? undefined)}`, runNow: run } });
     } catch (err) {
       console.error("Failed to create automation:", err);
       const reason = (err.message || "The automation could not be created. Try again.").replace(/^API \d+: /, "");
@@ -299,20 +302,12 @@ export default function PlaylistNew() {
               {outcome}
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              {draft.cron ? (
-                <Button size="lg" onClick={() => create()} disabled={creating || !linked || badSchedule}>
-                  {creating ? "Creating" : "Create automation"}
-                </Button>
-              ) : (
-                <>
-                  <Button size="lg" onClick={() => create({ run: true })} disabled={creating || !linked}>
-                    {creating ? "Creating" : "Create and run"}
-                  </Button>
-                  <Button size="lg" variant="outline" onClick={() => create()} disabled={creating || !linked}>
-                    Create only
-                  </Button>
-                </>
-              )}
+              <Button size="lg" onClick={() => create({ run: true })} disabled={creating || !linked || badSchedule}>
+                {creating ? "Creating" : "Create and run"}
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => create()} disabled={creating || !linked || badSchedule}>
+                Create only
+              </Button>
               <Button size="lg" variant="outline" onClick={() => navigate("/playlists")} className="max-lg:hidden">
                 Cancel
               </Button>

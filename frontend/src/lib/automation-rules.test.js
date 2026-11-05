@@ -16,6 +16,7 @@ import {
   describeAutomation,
   describeAutomationWithSchedule,
   describeCron,
+  describePeriod,
   usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
@@ -142,5 +143,14 @@ describe("presets and names", () => {
     });
     expect(payload.window).toEqual({ length: { amount: 1, unit: "week" }, ago: null });
     expect(payload.output.maxSize).toBe(50);
+  });
+});
+
+describe("describePeriod", () => {
+  it("names the dates, with the first year only when it differs", () => {
+    expect(describePeriod({ start: "2026-06-01", end: "2026-08-31" })).toBe("Jun 1 to Aug 31, 2026");
+    expect(describePeriod({ start: "2025-12-01", end: "2026-02-28" })).toBe("Dec 1, 2025 to Feb 28, 2026");
+    expect(describePeriod({ start: null, end: "2026-08-31" })).toBe("all your listens up to Aug 31, 2026");
+    expect(describePeriod(undefined)).toBeNull();
   });
 });

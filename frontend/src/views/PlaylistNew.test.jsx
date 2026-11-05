@@ -145,21 +145,26 @@ describe("creator", () => {
 
     await type(container.querySelector('[aria-label="Name"]'), "Mine");
     await click(button(container, "Seasonal"));
-    await click(button(container, "Create automation"));
+    await click(button(container, "Create only"));
     expect(createAutomation.mock.calls[1][0]).toMatchObject({ name: "Mine", cron: "0 0 1 3,6,9,12 *", output: { maxSize: 30 } });
   });
 
-  it("says what creating does: a schedule starts by itself, otherwise it offers to run", async () => {
+  it("says what each button does: with a schedule, which period now and which date next", async () => {
+    previewAutomation.mockImplementation(async (draft) => result(draft.cron ? { period: { start: "2026-06-01", end: "2026-08-31" }, next_run: "2026-12-01" } : {}));
     const container = await render();
+    await wait(400);
     expect(container.textContent).toContain("Nothing runs until you start it.");
+    expect(container.textContent).not.toContain("Covers");
     await click(button(container, "Create and run"));
     expect(navigate).toHaveBeenCalledWith("/playlists/a1", { state: { created: "Created.", runNow: true } });
 
     await click(button(container, "Seasonal"));
-    expect(container.textContent).toContain("First playlist in about a minute, from the last full period, then the 1st of March, June, September and December at 00:00.");
-    expect(button(container, "Create and run")).toBeUndefined();
-    await click(button(container, "Create automation"));
-    expect(navigate.mock.lastCall[1].state.runNow).toBe(false);
+    expect(container.textContent).toContain("Create and run makes the last full period now. Create only starts on the next date.");
+    await wait(400);
+    expect(container.textContent).toContain("Covers Jun 1 to Aug 31, 2026.");
+    expect(container.textContent).toContain("Create and run makes Jun 1 to Aug 31, 2026 now. Create only starts on Dec 1, 2026.");
+    await click(button(container, "Create only"));
+    expect(navigate).toHaveBeenLastCalledWith("/playlists/a1", { state: { created: "Created. First playlist on Dec 1, 2026.", runNow: false } });
   });
 
   it("blocks creating on a malformed schedule and says where to look", async () => {
@@ -170,7 +175,8 @@ describe("creator", () => {
     await type(container.querySelector('[aria-label="Cron expression"]'), "0 0");
     expect(container.textContent).toContain("Use five parts");
     expect(container.textContent).toContain("Fix the schedule");
-    expect(button(container, "Create automation").disabled).toBe(true);
+    expect(button(container, "Create and run").disabled).toBe(true);
+    expect(button(container, "Create only").disabled).toBe(true);
   });
 
   it("offers every preview row on a phone from one button", async () => {
