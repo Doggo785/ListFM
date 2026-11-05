@@ -51,13 +51,15 @@ export default function Automations() {
         )}
         {!error && automations.length > 0 && (
           <ul data-quiet className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {automations.map((automation) => (
+            {automations.map((automation) => {
+              const latest = generatedPlaylists.find((playlist) => playlist.automation_id === automation.id);
+              return (
               <li key={automation.id} className="min-w-0">
                 <Link
                   to={`/automations/${automation.id}`}
                   className={`group flex h-full gap-4 border-2 border-(--line) p-3 transition-colors duration-(--duration-quick) hover:border-(--ember) ${FOCUS}`}
                 >
-                  <PlaylistCover images={generatedPlaylists.find((playlist) => playlist.automation_id === automation.id)?.cover_images} className="size-[96px] shrink-0" />
+                  <PlaylistCover seed={latest?.id ?? automation.id} images={latest?.cover_images} className="size-[128px] shrink-0" />
                   <span className="min-w-0">
                     <span className="block text-lg break-words group-hover:text-(--ember)">{automation.name || "Untitled"}</span>
                     <span className="block text-sm text-(--text-muted)">{describeAutomation(automation)}</span>
@@ -68,7 +70,8 @@ export default function Automations() {
                   </span>
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

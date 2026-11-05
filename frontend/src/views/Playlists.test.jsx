@@ -54,7 +54,7 @@ describe("Playlists", () => {
     expect(host.textContent).toContain("Jun 1 to Aug 31, 2026");
     expect(host.textContent).toContain("30 tracks");
     expect(host.querySelector("[data-chain]")).toBe(null);
-    expect(host.querySelector("li img").getAttribute("src")).toBe("https://img/a.png");
+    expect(host.querySelector("li canvas")).toBeTruthy();
   });
 
   it("opens a playlist on its own page, carrying what the page shows first", async () => {

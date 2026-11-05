@@ -184,13 +184,13 @@ export default function Playlist() {
 
   return (
     <main className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-8 text-left md:px-8">
-      <div className="mx-auto grid max-w-6xl gap-x-12 gap-y-6 pt-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="mx-auto grid max-w-6xl gap-x-12 gap-y-6 pt-4 lg:grid-cols-[384px_minmax(0,1fr)]">
         <header data-quiet className="min-w-0 [@media(min-width:64rem)_and_(min-height:50rem)]:sticky [@media(min-width:64rem)_and_(min-height:50rem)]:top-4 lg:self-start">
           <Link to="/playlists" onClick={backToShelf} className={`inline-block pb-3 text-sm text-(--text-muted) hover:text-(--ember) pointer-coarse:py-2.5 ${FOCUS}`}>
             Back to playlists
           </Link>
           <div className="flex gap-4 lg:block">
-            <PlaylistCover images={playlist.cover_images} className="aspect-square w-[96px] shrink-0 md:w-[128px] lg:w-[320px]" style={{ viewTransitionName: "playlist-cover" }} />
+            <PlaylistCover seed={playlist.id} images={playlist.cover_images} className="w-[128px] shrink-0 lg:w-[384px]" style={{ viewTransitionName: "playlist-cover" }} />
             <div className="min-w-0 lg:pt-4">
               <h1 ref={title} tabIndex={-1} className="w-fit max-w-full text-2xl break-words outline-none md:text-4xl" style={{ viewTransitionName: "playlist-title" }}>{name}</h1>
               <p className="w-fit pt-1 text-base" style={{ viewTransitionName: "playlist-period" }}>{describeCoverage(playlist)}</p>

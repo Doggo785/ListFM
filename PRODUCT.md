@@ -53,7 +53,7 @@ ListFM works from everything a person has listened to, because Last.fm logs list
 - Tokens stay in httpOnly cookies, internal errors are not shown to users, and there is no unnecessary tracking.
 
 **Open decisions:**
-- When streaming-app import ships, and for which apps. It is the stated final goal but needs its own go-ahead. Shape the owner has in mind: link music accounts in the future settings, import a playlist from its page, and set auto-import on each automation.
+- When streaming-app import ships, and for which apps. It is the stated final goal but needs its own go-ahead. Shape the owner has in mind: link music accounts in the future settings, import a playlist from its page, and set auto-import on each automation. Before sending covers anywhere, check the rights on altered album art and each service's image limits; drawing the cover would also move to the server, since auto-import runs with no browser open. An image creator is left for after v1.
 - Whether the public can actually sign up at v1.0.0. The current deployment is a small single-worker VPS used by the owner and friends.
 
 ## Brand Commitments
