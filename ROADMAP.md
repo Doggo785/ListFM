@@ -49,7 +49,7 @@ But : une seule DA sur tout le site, animée partout, avec un style qui évolue 
 2. *(fait)* **Socle** : tokens (couleurs, typo, mouvement) à un seul endroit, ruban de pixels, navigation en haut à la place de la sidebar, changement de page immédiat. Les anciens écrans restent utilisables, ruban autour de leur contenu, jusqu'à leur tour en phase C.
 3. *(fait)* **Composants de base** sur ces tokens : Button, Select, modale accessible (role, focus, Échap), SVG OAuth. Les options de fenêtre et de tri n'ont déjà plus qu'une source (`lib/automation-rules.js`).
 4. *(fait)* **Suivi des tâches de fond** : indicateur discret visible sur toutes les pages, qui remplace `SyncBanner`, reste tant qu'une tâche peut changer les résultats (« Recherche des tags : 1 200 / 9 552 artistes. Les filtres de tag peuvent être incomplets d'ici là. ») et reste muet pour les petites synchros de routine.
-5. **Détecteur bloquant** : `npx impeccable detect` dans `scripts/ci-local.sh` et en CI.
+5. *(fait)* **Détecteur bloquant** : `npm run check:design` dans `scripts/ci-local.sh` et en CI (job `frontend-build`).
 
 Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
 

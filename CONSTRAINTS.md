@@ -27,6 +27,7 @@ Seule exception : un « go merge #N » de l'owner citant la PR. L'agent squash-m
 |-----------|----------------|-----------|---------|
 | Lint backend | 0 erreur ruff. `ruff.toml` pin `0.16.8`, `B008` ignoré = idiome FastAPI `Depends()`. Raison : gate CI déjà bloquant (Phase 3 close, 38 findings triés → 0). | `ruff check backend` (pin `ruff==0.16.8`, local : `uvx ruff@0.16.8 check backend`) | every edit (fichiers touchés), CI job `ruff` |
 | Lint frontend | 0 erreur, 0 warning. Raison : coût nul, `eslint . --max-warnings 0` vert aujourd'hui. | `npx eslint . --max-warnings 0` (dans `frontend/`, alias `npm run check:fast`) | every edit, CI job `frontend-build` (step Lint) |
+| Design frontend | 0 anti-pattern Impeccable. Raison : la DA pixel est l'identité du site, une dérive vers le style générique doit casser le build. Scan de texte seulement (pas de page rendue) : contraste et tailles restent à `impeccable audit` en phase C. | `npm run check:design` (dans `frontend/`, pin `impeccable` exact) | task end, CI job `frontend-build` (step Design anti-patterns) |
 | Types backend | 0 erreur mypy. Raison : volume purgé (10 erreurs → 0 le 2026-09-27), un gate strict immédiat empêche le nouveau code de s'appuyer sur des types faux. | `mypy backend --ignore-missing-imports` (pin `mypy==2.3.1`) | every edit, task end, CI job `mypy` |
 | Build frontend | Vert. Raison : filet syntax/bundling ; pas de `tsc` car projet JS sans `tsconfig` (voir Mesuré). | `npm run build` (dans `frontend/`) | task end, CI job `frontend-build` (step Build) |
 | Tests backend | Suite verte. Raison : preuve de non-régression sur auth JWT/cookies + Last.fm. | `python -m pytest backend/tests/ -q` (DB `listfm-db:5433` en local, service Postgres en CI) | task end (budget 90 s), CI job `backend-tests` |
@@ -64,7 +65,7 @@ Toujours scoper au diff : coverage des lignes touchées, semgrep sur fichiers to
 
 1. Le seuil a bougé (budget baissé, sévérité descendue, check sorti du fast stage).
 2. Un test est devenu plus facile (`.skip`, fichier supprimé, assertions retirées).
-3. Un checker est réduit au silence (nouveau `eslint-disable`, `noqa`, `istanbul ignore`, `nosemgrep`, `gitleaks:allow`).
+3. Un checker est réduit au silence (nouveau `eslint-disable`, `noqa`, `istanbul ignore`, `nosemgrep`, `gitleaks:allow`, `impeccable-disable`).
 4. Travail inachevé (stub, `catch` vide, `TODO` à la place de l'implémentation).
 5. Une exception est apparue au tableau ci-dessous sans discussion.
 
