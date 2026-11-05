@@ -1,7 +1,7 @@
 # ListFM — Roadmap
 
 Seul endroit où le statut est écrit. Le cap est dans `VISION.md`, la barre qualité dans `CONSTRAINTS.md`.
-Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert de l'owner.
+Dans l'ordre, en regroupant les points dans une même PR dès que possible. Ce qui n'est pas listé ici attend le feu vert de l'owner.
 
 ## Versions
 
@@ -18,7 +18,7 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 ## Maintenant
 
-Phase A, dans l'ordre, une PR par point. Le vocabulaire est dans `GLOSSARY.md`, les décisions structurantes dans `docs/adr/`. La PR de release ouverte par release-please se merge quand l'owner le dit, une release par phase finie et testée en vrai (0.3.0 après A, 0.4.0 après B, 0.5.0 après C).
+Phase A, dans l'ordre. Le vocabulaire est dans `GLOSSARY.md`, les décisions structurantes dans `docs/adr/`. La PR de release ouverte par release-please se merge quand l'owner le dit, une release par phase finie et testée en vrai (0.3.0 après A, 0.4.0 après B, 0.5.0 après C).
 
 ## Avant v1.0.0
 
@@ -53,7 +53,7 @@ But : une seule DA sur tout le site, animée partout, avec un style qui évolue 
 
 Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
 
-### Phase C : écrans réécrits, une PR par écran
+### Phase C : écrans réécrits
 
 Chaque PR passe `impeccable critique` et `audit` avant le merge, branche le ruban sur les vraies données de l'écran et supprime l'ancien code qu'elle remplace. Le Créateur vient en premier : `DESIGN.md` s'écrit à sa fin, depuis le résultat construit (pas `document`, qui décrirait l'ancien style).
 
