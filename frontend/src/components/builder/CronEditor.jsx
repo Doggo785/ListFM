@@ -27,8 +27,9 @@ const DAY_OPTIONS = asOptions(Array.from({ length: 28 }, (_, i) => String(i + 1)
 const HOUR_OPTIONS = asOptions(Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`));
 
 export default function CronEditor({ value, onChange }) {
-  // Kept apart from the value: a half-typed cron must not throw the user out of the custom box.
-  const [custom, setCustom] = useState(false);
+  // What the custom box last wrote: a half-typed cron keeps it open, and a value from elsewhere, a preset say, closes it.
+  const [typed, setTyped] = useState(null);
+  const custom = typed === value;
   const schedule = readSchedule(value);
   const frequency = custom ? "custom" : schedule.frequency;
   const description = describeCron(value);
@@ -37,11 +38,13 @@ export default function CronEditor({ value, onChange }) {
 
   const set = (patch) => onChange(writeSchedule({ ...schedule, ...patch }));
   const pickFrequency = (next) => {
-    setCustom(next === "custom");
     if (next === "custom") {
-      if (!value) onChange(DEFAULT_CRON);
+      const start = value || DEFAULT_CRON;
+      setTyped(start);
+      onChange(start);
       return;
     }
+    setTyped(null);
     set({ frequency: next });
   };
 
@@ -73,14 +76,17 @@ export default function CronEditor({ value, onChange }) {
             aria-label="Cron expression"
             aria-invalid={invalid}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              setTyped(e.target.value);
+              onChange(e.target.value);
+            }}
             placeholder="minute hour day month weekday"
             className="min-w-56 flex-1"
           />
         )}
       </div>
       {frequency === "custom" && invalid && (
-        <p className="text-sm text-(--ember)">Use five parts: minute hour day month weekday.</p>
+        <p className="text-sm text-(--ember)">Use five parts: minute (0-59), hour (0-23), day (1-31), month (1-12), weekday (0-7).</p>
       )}
       {description && (
         <p className="text-sm text-(--text-muted)">

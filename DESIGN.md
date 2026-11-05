@@ -89,6 +89,8 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 ## Components
 
 - Controls (`Button` outline, `CustomSelect`, `Input`) are edged with `--control`, at least 3:1 on the ground. `--line` stays for hairlines between rows.
+- On touch screens (`pointer-coarse`), controls are 44px tall.
+- A scrolling page carries `.scroll-edge`: it dissolves in dither under the bar above it, and the ribbon's band leaves with it.
 - `Button`: `default` for the one primary action and the selected choice, `outline` for the rest, `danger` for destruction.
 - `Input`, `NumberInput`, `CustomSelect`: same height and border, and the focus or hover state turns the border amber.
 - Folded sections are native `details`, and the closed row still states what it holds ("4 rules").

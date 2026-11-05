@@ -216,7 +216,7 @@ describe("createRibbon", () => {
     tick(32);
     expect(lastPull(gl)).toBe(0);
     // The time uniform is the first float of each frame: it must not advance.
-    const times = gl.calls.uniform1f.filter((_, i) => i % 7 === 0).map(([, v]) => v);
+    const times = gl.calls.uniform1f.filter((_, i) => i % 8 === 0).map(([, v]) => v);
     expect(new Set(times)).toEqual(new Set([0]));
   });
 

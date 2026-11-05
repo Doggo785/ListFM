@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconCopy, IconPlus, IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { Input, NumberInput } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import {
   FILTER_OPERATORS,
   WEEKDAYS,
   WINDOW_OPTIONS,
+  cloneCondition,
+  cloneGroup,
   completeMoment,
   conditionForField,
   createCondition,
@@ -229,7 +231,7 @@ function ConditionValue({ condition, onChange, knownTags, operator }) {
   );
 }
 
-function ConditionRow({ condition, onChange, onRemove, knownTags }) {
+function ConditionRow({ condition, onChange, onDuplicate, onRemove, knownTags }) {
   const { type = "number", hint } = FILTER_FIELDS[condition.field] ?? {};
   const operators = FILTER_OPERATORS[type];
   return (
@@ -245,14 +247,19 @@ function ConditionRow({ condition, onChange, onRemove, knownTags }) {
         {hint && <p className="w-full text-sm text-(--text-muted)">{hint}</p>}
         {!isCompleteCondition(condition) && <p className="w-full text-sm text-(--ember)">Not applied until it has a value.</p>}
       </div>
-      <Button variant="outline" aria-label="Remove rule" onClick={onRemove} className="w-10 px-0">
-        <IconX size={16} />
-      </Button>
+      <div className="flex shrink-0 gap-2">
+        <Button variant="outline" aria-label="Duplicate rule" onClick={onDuplicate} className="w-10 px-0 pointer-coarse:w-11">
+          <IconCopy size={16} />
+        </Button>
+        <Button variant="outline" aria-label="Remove rule" onClick={onRemove} className="w-10 px-0 pointer-coarse:w-11">
+          <IconX size={16} />
+        </Button>
+      </div>
     </li>
   );
 }
 
-function FilterGroup({ group, onChange, onRemove, advanced, nested, boxed, knownTags }) {
+function FilterGroup({ group, onChange, onDuplicate, onRemove, advanced, nested, boxed, knownTags }) {
   const subGroups = group.groups ?? [];
   const replaceAt = (list, i, item) => list.map((old, j) => (j === i ? item : old));
   const ruleCount = group.conditions.length + subGroups.length;
@@ -287,6 +294,7 @@ function FilterGroup({ group, onChange, onRemove, advanced, nested, boxed, known
               condition={condition}
               knownTags={knownTags}
               onChange={(next) => onChange({ ...group, conditions: replaceAt(group.conditions, i, next) })}
+              onDuplicate={() => onChange({ ...group, conditions: group.conditions.toSpliced(i + 1, 0, cloneCondition(condition)) })}
               onRemove={() => onChange({ ...group, conditions: group.conditions.filter((_, j) => j !== i) })}
             />
           ))}
@@ -300,6 +308,7 @@ function FilterGroup({ group, onChange, onRemove, advanced, nested, boxed, known
             advanced={advanced}
             knownTags={knownTags}
             onChange={(next) => onChange({ ...group, groups: replaceAt(subGroups, i, next) })}
+            onDuplicate={() => onChange({ ...group, groups: subGroups.toSpliced(i + 1, 0, cloneGroup(sub)) })}
             onRemove={() => onChange({ ...group, groups: subGroups.filter((_, j) => j !== i) })}
           />
         </div>
@@ -313,6 +322,11 @@ function FilterGroup({ group, onChange, onRemove, advanced, nested, boxed, known
         {advanced && !nested && (
           <Button variant="outline" size="sm" onClick={() => onChange({ ...group, groups: [...subGroups, createGroup()] })}>
             Add sub-group
+          </Button>
+        )}
+        {advanced && ruleCount > 0 && (
+          <Button variant="outline" size="sm" onClick={onDuplicate}>
+            Duplicate group
           </Button>
         )}
         {onRemove && (
@@ -361,6 +375,7 @@ export default function FilterBuilder({ value, onChange }) {
             advanced={advanced}
             knownTags={knownTags}
             onChange={(next) => onChange(groups.map((g, j) => (j === i ? next : g)))}
+            onDuplicate={() => onChange(groups.toSpliced(i + 1, 0, cloneGroup(group)))}
             onRemove={groups.length > 1 ? () => onChange(groups.filter((_, j) => j !== i)) : undefined}
           />
         </div>
@@ -370,7 +385,7 @@ export default function FilterBuilder({ value, onChange }) {
           Add alternative group
         </Button>
       ) : (
-        <button type="button" onClick={() => setAdvancedOpen(true)} className="text-sm text-(--text-muted) underline underline-offset-4 outline-none hover:text-(--text) focus-visible:text-(--ember)">
+        <button type="button" onClick={() => setAdvancedOpen(true)} className="text-sm text-(--text-muted) underline underline-offset-4 outline-none hover:text-(--text) focus-visible:text-(--ember) pointer-coarse:py-2.5">
           Advanced
         </button>
       )}

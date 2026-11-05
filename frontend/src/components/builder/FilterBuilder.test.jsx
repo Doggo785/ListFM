@@ -180,6 +180,21 @@ describe("FilterBuilder", () => {
     expect(button(container, "Advanced")).toBeUndefined();
   });
 
+  it("duplicates a rule and a group under new ids", async () => {
+    const container = await render({ field: "playcount", value: 3 });
+    await click(container.querySelector('[aria-label="Duplicate rule"]'));
+    const [first, copy] = seen.groups[0].conditions;
+    expect(copy).toMatchObject({ field: "playcount", value: 3 });
+    expect(copy.id).not.toBe(first.id);
+
+    await click(button(container, "Advanced"));
+    await click(button(container, "Duplicate group"));
+    expect(seen.groups).toHaveLength(2);
+    expect(seen.groups[1].id).not.toBe(seen.groups[0].id);
+    expect(seen.groups[1].conditions[0].id).not.toBe(first.id);
+    expect(seen.groups[1].conditions).toHaveLength(2);
+  });
+
   it("removes a rule from a button that is always there", async () => {
     const container = await render({ field: "playcount", value: 3 });
     await click(container.querySelector('[aria-label="Remove rule"]'));
