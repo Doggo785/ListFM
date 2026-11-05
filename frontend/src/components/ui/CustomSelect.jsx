@@ -1,65 +1,45 @@
-import { useState, useRef, useEffect } from "react";
+import { Select } from "radix-ui";
 import { IconChevronDown } from "@tabler/icons-react";
 
-export default function CustomSelect({
-  value,
-  onChange,
-  options,
-  placeholder,
-  className = "",
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+import { cn } from "@/lib/utils";
 
-  useEffect(() => {
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const selected = options.find((o) => o.value === value);
-
+export default function CustomSelect({ value, onChange, options, placeholder, label, className = "" }) {
   return (
-    <div ref={ref} className={`relative ${className}`}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full rounded-xl border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white hover:border-neutral-500 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)]/30 transition-all"
+    <Select.Root value={value} onValueChange={onChange}>
+      <Select.Trigger
+        aria-label={label}
+        className={cn(
+          "flex h-10 w-full items-center gap-2 border-2 border-(--line) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) hover:border-(--ember) focus-visible:border-(--ember)",
+          className,
+        )}
       >
-        <span className="truncate flex-1 text-left">
-          {selected?.label || placeholder}
+        <span className="flex-1 truncate text-left">
+          <Select.Value placeholder={placeholder} />
         </span>
-        <IconChevronDown
-          size={14}
-          className={`text-neutral-500 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
-          <div className="max-h-56 overflow-y-auto p-1">
+        <Select.Icon>
+          <IconChevronDown size={16} className="text-(--text-muted)" />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content
+          position="popper"
+          sideOffset={4}
+          className="z-50 max-h-80 w-(--radix-select-trigger-width) min-w-40 overflow-hidden border-2 border-(--ember) bg-(--ground) text-(--text)"
+        >
+          <Select.Viewport>
             {options.map((opt) => (
-              <button
+              <Select.Item
                 key={opt.value}
-                type="button"
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-lg transition-colors text-left ${
-                  opt.value === value
-                    ? "bg-[var(--ember)]/15 text-[var(--ember)]"
-                    : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                }`}
+                value={opt.value}
+                className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm outline-none select-none data-[highlighted]:bg-(--ember-1) data-[state=checked]:text-(--ember)"
               >
-                {opt.icon && <opt.icon size={14} className="shrink-0" />}
-                <span className="truncate">{opt.label}</span>
-              </button>
+                {opt.icon && <opt.icon size={16} className="shrink-0" />}
+                <Select.ItemText>{opt.label}</Select.ItemText>
+              </Select.Item>
             ))}
-          </div>
-        </div>
-      )}
-    </div>
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
   );
 }

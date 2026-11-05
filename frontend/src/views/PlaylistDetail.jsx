@@ -15,6 +15,8 @@ import {
   IconHistory,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import CustomSelect from "@/components/ui/CustomSelect";
+import Modal from "@/components/ui/Modal";
 import BorderGlow from "@/components/ui/BorderGlow";
 import Loader from "@/components/elements/Loader";
 import FilterBuilder from "@/components/builder/FilterBuilder";
@@ -269,6 +271,8 @@ export default function PlaylistDetail() {
       console.error("Failed to delete automation:", err);
       setDeleteError(err.message || "Failed to delete automation");
       setDeleting(false);
+      // The message sits on the page: left open, the dialog would hide it.
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -454,7 +458,7 @@ export default function PlaylistDetail() {
           <p className="text-neutral-400 mb-6">
             This automation may have been deleted or the link is invalid.
           </p>
-          <Button onClick={() => navigate("/playlists")} className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90">
+          <Button onClick={() => navigate("/playlists")}>
             Back to playlists
           </Button>
         </div>
@@ -504,16 +508,14 @@ export default function PlaylistDetail() {
                 size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={deleting}
-                className="border-red-900/50 bg-transparent text-red-400 hover:bg-red-950 hover:text-red-300"
               >
-                <IconTrash size={14} className="mr-1.5" />
+                <IconTrash size={14} />
                 Delete
               </Button>
               <Button
                 size="sm"
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
               >
                 {saving ? (
                   "Saving..."
@@ -521,7 +523,7 @@ export default function PlaylistDetail() {
                   "Saved!"
                 ) : (
                   <>
-                    <IconDeviceFloppy size={14} className="mr-1.5" />
+                    <IconDeviceFloppy size={14} />
                     Save
                   </>
                 )}
@@ -597,19 +599,13 @@ export default function PlaylistDetail() {
               </div>
 
               <FieldRow label="Time window">
-                <select
+                <CustomSelect
+                  label="Time window"
+                  placeholder="Choose a window"
                   value={windowOption(automation.window)?.value ?? ""}
-                  onChange={(e) =>
-                    updateListens({ window: WINDOW_OPTIONS.find((o) => o.value === e.target.value).window })
-                  }
-                  className="w-full rounded-xl border border-neutral-700 bg-[#141414] px-4 py-3.5 text-base text-white focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-all appearance-none shadow-inner"
-                >
-                  {WINDOW_OPTIONS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => updateListens({ window: WINDOW_OPTIONS.find((o) => o.value === value).window })}
+                  options={WINDOW_OPTIONS}
+                />
               </FieldRow>
             </SectionCard>
 
@@ -630,12 +626,12 @@ export default function PlaylistDetail() {
                   size="default"
                   onClick={handleRunNow}
                   disabled={runningNow || listensLoading}
-                  className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 shrink-0 shadow-[0_4px_14px_rgba(255,83,11,0.3)]"
+                  className="shrink-0"
                 >
                   {runningNow ? (
-                    <IconRefresh size={16} className="animate-spin mr-1.5" />
+                    <IconRefresh size={16} className="animate-spin" />
                   ) : (
-                    <IconPlayerPlay size={16} className="mr-1.5" />
+                    <IconPlayerPlay size={16} />
                   )}
                   {runningNow ? "Running..." : unsavedChanges ? "Save & run" : "Run now"}
                 </Button>
@@ -818,15 +814,15 @@ export default function PlaylistDetail() {
 
                   <div className="p-5 space-y-3 shrink-0 border-b border-white/5">
                     <Button
-                      size="default"
+                      size="lg"
                       onClick={loadPreview}
                       disabled={previewLoading || !username?.trim()}
-                      className="w-full bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 shadow-[0_4px_14px_rgba(255,83,11,0.3)] px-5 h-12"
+                      className="w-full"
                     >
                       {previewLoading ? (
                         <IconRefresh size={16} className="animate-spin" />
                       ) : (
-                        <IconPlayerPlay size={16} className="mr-1.5" />
+                        <IconPlayerPlay size={16} />
                       )}
                       {previewTracks ? "Refresh" : "Load"}
                     </Button>
@@ -936,49 +932,20 @@ export default function PlaylistDetail() {
           </div>
         </div>
 
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={() => setShowDeleteConfirm(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2 }}
-              className="relative z-10 w-full max-w-sm rounded-2xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-6"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="rounded-lg bg-red-500/10 p-2">
-                  <IconTrash size={18} className="text-red-400" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Delete automation</h3>
-              </div>
-              <p className="text-sm text-neutral-400 mb-6">
-                Are you sure you want to delete <span className="text-white font-medium">{automation.name || "this automation"}</span>? This action cannot be undone.
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="border-neutral-700 bg-transparent text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={confirmDelete}
-                  disabled={deleting}
-                  className="bg-red-600 text-white hover:bg-red-700"
-                >
-                  <IconTrash size={14} className="mr-1.5" />
-                  {deleting ? "Deleting..." : "Delete"}
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
+        <Modal
+          open={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          title="Delete automation"
+          description={`Are you sure you want to delete ${automation.name || "this automation"}? This action cannot be undone.`}
+        >
+          <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" size="sm" onClick={confirmDelete} disabled={deleting}>
+            <IconTrash size={14} />
+            {deleting ? "Deleting..." : "Delete"}
+          </Button>
+        </Modal>
 
       </div>
     </div>
