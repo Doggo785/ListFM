@@ -6,6 +6,7 @@ colors:
   text: "#fff3d6"
   text-muted: "#e0bd9c"
   line: "#ffba0838"
+  control: "#94722f"
   ember-1: "#370617"
   ember-2: "#6a040f"
   ember-3: "#9d0208"
@@ -87,6 +88,7 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 
 ## Components
 
+- Controls (`Button` outline, `CustomSelect`, `Input`) are edged with `--control`, at least 3:1 on the ground. `--line` stays for hairlines between rows.
 - `Button`: `default` for the one primary action and the selected choice, `outline` for the rest, `danger` for destruction.
 - `Input`, `NumberInput`, `CustomSelect`: same height and border, and the focus or hover state turns the border amber.
 - Folded sections are native `details`, and the closed row still states what it holds ("4 rules").

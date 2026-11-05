@@ -120,6 +120,7 @@
   --ember: var(--ember-8);
   --on-ember: var(--ink);
   --line: #ffba0838;
+  --control: #94722f; /* A control's edge: 3:1 at least on the ground, where --line is a hairline. */
 
   /* Pixel fonts are only sharp where a font pixel lands on whole screen pixels:
      Tiny5 at multiples of 8px, Jersey 20 at 34px (17px on hi-dpi screens). */

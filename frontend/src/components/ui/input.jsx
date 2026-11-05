@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 export const FIELD_CLASS =
-  "h-10 border-2 border-(--line) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) placeholder:text-(--text-muted) hover:border-(--ember) focus-visible:border-(--ember)";
+  "h-10 border-2 border-(--control) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) placeholder:text-(--text-muted) hover:border-(--ember) focus-visible:border-(--ember)";
 
 export function Input({ className, ...props }) {
   return <input className={cn(FIELD_CLASS, className)} {...props} />;
