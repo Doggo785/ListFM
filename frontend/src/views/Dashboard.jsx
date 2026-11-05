@@ -24,11 +24,11 @@ import { fadeUp, stagger } from "../lib/animation";
 
 const TOTALS_POLL_MS = 3000;
 
-function StatBlock({ value, label, color, delay = 0 }) {
+function StatBlock({ value, label, color }) {
   return (
     <motion.div variants={fadeUp} className="text-center">
       <div className="font-heading text-3xl md:text-5xl whitespace-nowrap" style={{ color }}>
-        <CountUp to={value} duration={2} delay={delay} separator=" " />
+        <CountUp to={value} separator=" " />
       </div>
       <p className="text-xs text-neutral-500 mt-2 uppercase tracking-wider font-medium">
         {label}
@@ -215,11 +215,11 @@ function Dashboard() {
             variants={stagger}
             className="grid grid-cols-2 md:grid-cols-5 gap-8 md:gap-4"
           >
-            <StatBlock value={totals?.listens ?? 0} label="Listens" color="#ffffff" delay={0} />
-            <StatBlock value={totals?.tracks ?? 0} label="Tracks" color="#17AEFF" delay={0.1} />
-            <StatBlock value={totals?.artists ?? 0} label="Artists" color="#c084fc" delay={0.2} />
-            <StatBlock value={totals?.albums ?? 0} label="Albums" color="var(--ember)" delay={0.3} />
-            <StatBlock value={automations.length} label="Automations" color="#22c55e" delay={0.4} />
+            <StatBlock value={totals?.listens ?? 0} label="Listens" color="#ffffff" />
+            <StatBlock value={totals?.tracks ?? 0} label="Tracks" color="#17AEFF" />
+            <StatBlock value={totals?.artists ?? 0} label="Artists" color="#c084fc" />
+            <StatBlock value={totals?.albums ?? 0} label="Albums" color="var(--ember)" />
+            <StatBlock value={automations.length} label="Automations" color="#22c55e" />
           </motion.div>
 
           <motion.div variants={fadeUp}>
