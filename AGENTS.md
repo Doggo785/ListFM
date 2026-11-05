@@ -12,7 +12,7 @@ Lire avant d'agir :
 ## Travailler avec l'owner
 
 - Parler en français à l'owner. Expliquer un point technique avec une image vulgarisée d'une phrase.
-- Une PR par changement, commits Conventional Commits atomiques.
+- Le moins de PR possible : regrouper les changements qui peuvent aller ensemble et limiter les pushs, car chaque CI et chaque merge coûtent du temps. Commits Conventional Commits atomiques dans la PR.
 - Commits et PR en anglais : titre `type(scope): summary`, corps `Summary` / `Changes` / `Test plan` comme les PR mergées. Aucun lien de session ni ligne d'attribution.
 - `scripts/ci-local.sh` passe vert avant chaque push, même pour une PR de docs.
 - Merge seulement sur « go merge #N » citant la PR (détail dans `CONSTRAINTS.md`).

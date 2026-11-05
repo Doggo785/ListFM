@@ -64,6 +64,7 @@ Chaque PR passe `impeccable critique` et `audit` avant le merge, branche le ruba
 5. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` s'il ne sert plus.
 6. **Page d'accueil** : refaite à 100 % avant le login, avec une présentation propre de ListFM.
 7. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
+8. **Filtres compréhensibles** : dire en clair ce que fait chaque filtre et son effet sur les morceaux choisis (par exemple « strength » du filtre Tag, que l'owner ne comprend pas). Les anciennes explications sont parties avec la réécriture de `FilterBuilder`.
 
 ### Phase D : finition
 
