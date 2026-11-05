@@ -33,7 +33,7 @@ from repositories.users import (
 from routers.deps import get_current_active_user, set_auth_cookies
 from schemas import LinkLastfmRequest, LinkLastfmResponse, OAuthCompleteEmailRequest
 from services.auth import create_access_token, create_refresh_token
-from services.lastfm import get_user_info
+from services.lastfm import get_session_username
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
     complete_email_limiter,
@@ -50,6 +50,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth-oauth"])
 OAUTH_STATE_COOKIE = "oauth_state"
 OAUTH_STATE_MAX_AGE = 600  # 10 minutes
 OAUTH_HTTP_TIMEOUT = 10.0  # seconds for outbound OAuth provider calls
+LASTFM_AUTH_URL = "https://www.last.fm/api/auth/"
 
 
 def _clear_oauth_state_cookie(response: Response) -> None:
@@ -337,37 +338,60 @@ async def discord_login(request: Request):
     return await _start_oauth_login(request, "discord")
 
 
-@router.post("/link-lastfm", response_model=LinkLastfmResponse)
+@router.get("/lastfm/authorize")
+async def lastfm_authorize(
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Where to send the browser: Last.fm's consent page, which comes back to /auth/lastfm with a token."""
+    settings = get_settings()
+    state = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key=OAUTH_STATE_COOKIE,
+        value=state,
+        httponly=True,
+        samesite="lax",
+        secure=settings.cookie_secure,
+        max_age=OAUTH_STATE_MAX_AGE,
+    )
+    back = f"{settings.frontend_url}/auth/lastfm?{urlencode({'state': state})}"
+    return {"url": f"{LASTFM_AUTH_URL}?{urlencode({'api_key': settings.lastfm_api_key, 'cb': back})}"}
+
+
+@router.post("/lastfm/link", response_model=LinkLastfmResponse)
 async def link_lastfm(
     body: LinkLastfmRequest,
     request: Request,
+    response: Response,
+    oauth_state: str | None = Cookie(None),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     rate_limit(request, link_lastfm_limiter)
-
-    # Last.fm usernames are case-insensitive; normalize before validating and
-    # storing so the unique (provider, provider_user_id) index is meaningful.
-    username = body.username.strip().lower()
-    if not username:
-        raise HTTPException(status_code=400, detail="Username is required")
+    # Changing account erases listens: a link nobody asked for must not get this far.
+    if not oauth_state or not secrets.compare_digest(body.state, oauth_state):
+        raise HTTPException(status_code=400, detail="Your Last.fm authorization expired. Please try again.")
 
     try:
-        info = await asyncio.to_thread(get_user_info, username)
+        name = await asyncio.to_thread(get_session_username, body.token)
     except pylast.WSError:
-        # pylast.WSError means the username does not exist on Last.fm.
-        raise HTTPException(status_code=400, detail="Invalid Last.fm username")
+        raise HTTPException(status_code=400, detail="Last.fm did not accept this authorization. Please try again.")
     except Exception:  # noqa: BLE001 -- deliberate: see comment below
-        # Anything else is a genuine upstream failure (outage, network) — do
-        # not mislead the user into thinking their username is wrong, and do
-        # not leak internal exception text.
+        # Anything else is a genuine upstream failure (outage, network): do not
+        # blame the authorization, and do not leak internal exception text.
         raise HTTPException(status_code=502, detail="Unable to reach Last.fm. Please try again later.")
+    _clear_oauth_state_cookie(response)
+
+    # Last.fm usernames are case-insensitive; normalize before storing so the
+    # unique (provider, provider_user_id) index is meaningful.
+    username = name.strip().lower()
 
     existing_user = await get_user_by_lastfm_username(db, username)
     if existing_user is not None and existing_user.id != current_user.id:
         raise HTTPException(status_code=409, detail="Last.fm username is already linked to another account")
 
     existing_provider = await get_lastfm_provider(db, current_user.id)
+    first_link = existing_provider is None
     if existing_provider is not None:
         if existing_provider.provider_user_id != username:
             # Another Last.fm account: automations must run on it, and the
@@ -403,7 +427,7 @@ async def link_lastfm(
         raise HTTPException(status_code=500, detail="Failed to link Last.fm account")
 
     start_scrobble_sync(current_user.id, username)
-    return LinkLastfmResponse(username=username, image=info.get("image"))
+    return LinkLastfmResponse(username=username, first_link=first_link)
 
 
 @router.post("/oauth/complete-email")

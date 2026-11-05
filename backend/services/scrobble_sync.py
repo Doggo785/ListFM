@@ -53,6 +53,12 @@ def progress_key(user_id: str) -> str:
     return f"sync:{user_id}"
 
 
+def stop_scrobble_sync(user_id: str) -> None:
+    """A sync running for an account being deleted stops before its next write."""
+    if user_id in _running:
+        _running[user_id] = ""
+
+
 def _check_current(user_id: str, username: str) -> None:
     """Stop before writing if a relink replaced this sync's account."""
     if user_id in _running and _running[user_id] != username:

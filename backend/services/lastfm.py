@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import threading
 import time
@@ -81,6 +82,18 @@ async def call_retrying_rate_limit(fn, *args):
             # The shared throttle sleeps out the backoff before the next call.
             note_rate_limited()
     raise AssertionError("unreachable")
+
+
+def get_session_username(token: str) -> str:
+    """Who authorized this web auth token. The session key that comes with the name is never kept."""
+    settings = get_settings()
+    signed = {"api_key": settings.lastfm_api_key, "method": "auth.getSession", "token": token}
+    payload = "".join(f"{key}{signed[key]}" for key in sorted(signed)) + settings.lastfm_api_secret
+    # Last.fm's own signature scheme, not a choice made here.
+    signature = hashlib.md5(payload.encode(), usedforsecurity=False).hexdigest()
+    username = _lastfm_json("auth.getSession", token=token, api_sig=signature)["session"]["name"]
+    log_activity("lastfm", username, "autorisation")
+    return username
 
 
 def get_user_info(username: str) -> dict:

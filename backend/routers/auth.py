@@ -7,19 +7,35 @@ from database import get_db
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from models.refresh_token import RefreshToken
 from models.user import User
+from repositories.automations import delete_user_automations
+from repositories.generated_playlists import delete_user_playlists
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     get_refresh_token_by_hash,
     revoke_all_user_refresh_tokens,
     revoke_refresh_token_family,
 )
-from repositories.users import create_user, get_lastfm_provider, get_user_by_email
+from repositories.scrobbles import delete_scrobbles
+from repositories.user_tracks import delete_user_tracks
+from repositories.users import (
+    create_user,
+    delete_user,
+    get_lastfm_provider,
+    get_user_by_email,
+)
 from routers.deps import (
     clear_auth_cookies,
     get_current_active_user,
     set_auth_cookies,
 )
-from schemas import TimezoneUpdate, TokenResponse, UserCreate, UserLogin
+from schemas import (
+    AccountDelete,
+    PasswordChange,
+    TimezoneUpdate,
+    TokenResponse,
+    UserCreate,
+    UserLogin,
+)
 from services.auth import (
     create_access_token,
     create_refresh_token,
@@ -38,6 +54,7 @@ from services.rate_limit import (
     register_email_limiter,
     register_limiter,
 )
+from services.scrobble_sync import stop_scrobble_sync
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -258,6 +275,7 @@ async def me(
         "lastfm_username": lastfm_username,
         "is_lastfm_linked": lastfm_username is not None,
         "timezone": current_user.timezone,
+        "has_password": current_user.password_hash is not None,
     }
 
 
@@ -275,3 +293,49 @@ async def set_timezone(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save timezone")
     return {"timezone": body.timezone}
+
+
+@router.put("/me/password")
+async def change_password(
+    body: PasswordChange,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Every other device is signed out; this one gets a fresh session."""
+    rate_limit(request, login_limiter)
+    if current_user.password_hash is None:
+        raise HTTPException(status_code=400, detail="This account signs in with Google or Discord")
+    if not verify_password(body.current_password, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Your current password is wrong")
+    current_user.password_hash = hash_password(body.password)
+    await _establish_session(db, current_user, request, response, error_detail="Failed to change password")
+    return {"detail": "Password changed"}
+
+
+@router.post("/me/delete")
+async def delete_account(
+    body: AccountDelete,
+    response: Response,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Listens and play counts are erased; the rest follows the soft-delete rule and stops running."""
+    # A Discord account can have no email to type back.
+    if body.confirm.strip().lower() != (current_user.email or "delete").lower():
+        raise HTTPException(status_code=400, detail="That does not match")
+    stop_scrobble_sync(current_user.id)
+    await delete_scrobbles(db, current_user.id)
+    await delete_user_tracks(db, current_user.id)
+    await delete_user_automations(db, current_user.id)
+    await delete_user_playlists(db, current_user.id)
+    await revoke_all_user_refresh_tokens(db, current_user.id)
+    await delete_user(db, current_user.id)
+    try:
+        await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete the account")
+    clear_auth_cookies(response)
+    return {"detail": "Account deleted"}

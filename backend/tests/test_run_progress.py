@@ -21,6 +21,7 @@ from .conftest import (
     _get_user_id_from_cookies,
     _TestSessionLocal,
     _unique_email,
+    link_lastfm,
 )
 
 
@@ -36,9 +37,7 @@ async def _register_login_link(client: AsyncClient, email: str) -> None:
         json={"email": email, "password": "StrongP@ss1!"},
     )
     assert login.status_code == 200
-    mock_info = {"username": "sched_user", "image": None}
-    with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-        link = await client.post("/api/auth/link-lastfm", json={"username": "sched_user"})
+    link = await link_lastfm(client, "sched_user")
     assert link.status_code == 200
 
 

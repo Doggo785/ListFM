@@ -10,7 +10,7 @@ import pylast
 import pytest
 from httpx import AsyncClient
 
-from .conftest import _cleanup_user, _register_and_login, _unique_email
+from .conftest import _cleanup_user, _register_and_login, _unique_email, link_lastfm
 
 GENERIC_DETAIL = "Last.fm service unavailable"
 SECRET_MSG = "secret internal lastfm detail"
@@ -19,12 +19,7 @@ SECRET_MSG = "secret internal lastfm detail"
 async def _register_login_link(client: AsyncClient, email: str) -> None:
     """Register, log in, and link a Last.fm account (mocked get_user_info)."""
     await _register_and_login(client, email)
-    mock_info = {"username": "users_test_user", "image": None}
-    with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-        link = await client.post(
-            "/api/auth/link-lastfm",
-            json={"username": "users_test_user"},
-        )
+    link = await link_lastfm(client, "users_test_user")
     assert link.status_code == 200
 
 

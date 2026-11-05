@@ -23,7 +23,7 @@ from repositories.user_tracks import get_user_track, upsert_user_track
 from services import scrobble_sync
 from sqlalchemy import func, select
 
-from .conftest import _register_and_login, _TestSessionLocal, _unique_email
+from .conftest import _register_and_login, _TestSessionLocal, _unique_email, link_lastfm
 
 
 class FakeLastfm:
@@ -151,16 +151,13 @@ async def test_sync_superseded_by_relink_writes_nothing():
 @pytest.mark.asyncio
 async def test_link_starts_sync_and_relink_drops_history(client: AsyncClient, _no_background_sync):
     await _register_and_login(client, _unique_email())
-    info = {"username": "first", "image": None}
-    with patch("routers.auth_oauth.get_user_info", return_value=info):
-        assert (await client.post("/api/auth/link-lastfm", json={"username": "first"})).status_code == 200
+    assert (await link_lastfm(client, "first")).status_code == 200
     user_id, username = _no_background_sync.call_args.args
     assert username == "first"
     await _sync(user_id, FakeLastfm([_listen(1)]))
     assert await _count(user_id) == 1
 
-    with patch("routers.auth_oauth.get_user_info", return_value=info):
-        assert (await client.post("/api/auth/link-lastfm", json={"username": "second"})).status_code == 200
+    assert (await link_lastfm(client, "second")).status_code == 200
     assert _no_background_sync.call_args.args == (user_id, "second")
     assert await _count(user_id) == 0
     async with _TestSessionLocal() as db:
@@ -224,8 +221,7 @@ async def test_sync_prints_a_line_per_page_oldest_first(activity_lines):
 @pytest.mark.asyncio
 async def test_sync_endpoint_skips_a_fresh_history(client: AsyncClient):
     await _register_and_login(client, _unique_email())
-    with patch("routers.auth_oauth.get_user_info", return_value={"username": "me", "image": None}):
-        await client.post("/api/auth/link-lastfm", json={"username": "me"})
+    await link_lastfm(client, "me")
 
     with patch("routers.users.start_scrobble_sync") as start:
         resp = await client.post("/api/scrobbles/sync")
