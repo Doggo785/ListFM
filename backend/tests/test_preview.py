@@ -221,19 +221,25 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_preview_of_a_scheduled_draft_shows_its_first_run(client: AsyncClient):
-    """A saved automation previews from now, like Run now; a draft previews its first run."""
+async def test_preview_of_a_schedule_shows_what_a_run_makes_and_says_which_period(client: AsyncClient):
+    """Same period as a run, and the screen gets its dates; without a schedule, up to now."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
         body = _preview_body(cron="0 0 1 3,6,9,12 *")
         with patch("services.automation_runner.get_window_tracks", return_value=[]) as window_tracks:
-            assert (await client.post("/api/automations/preview", json=body)).status_code == 200
-            draft_end = window_tracks.call_args.args[3]
-            saved = {**body, "automation_id": "a1"}
-            assert (await client.post("/api/automations/preview", json=saved)).status_code == 200
-            saved_end = window_tracks.call_args.args[3]
-        assert (draft_end.month, draft_end.day) in [(3, 1), (6, 1), (9, 1), (12, 1)]
-        assert saved_end > draft_end
+            resp = await client.post("/api/automations/preview", json=body)
+            assert resp.status_code == 200
+            end = window_tracks.call_args.args[3]
+            data = resp.json()
+            rolling = await client.post("/api/automations/preview", json=_preview_body())
+            assert window_tracks.call_args.args[3] > end
+        assert (end.month, end.day) in [(3, 1), (6, 1), (9, 1), (12, 1)]
+        assert data["period"]["end"] < end.date().isoformat()
+        assert data["period"]["end"][-2:] in ("28", "29", "30", "31")
+        assert data["period"]["start"][-2:] == "01"
+        assert data["next_run"] > end.date().isoformat()
+        assert "period" not in rolling.json()
+        assert "next_run" not in rolling.json()
     finally:
         await _cleanup_user(email=email)

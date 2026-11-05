@@ -235,7 +235,9 @@ async def test_failed_run_is_not_rerun_by_next_sweep(client: AsyncClient):
             "services.automation_runner.get_window_tracks",
             side_effect=Exception("upstream down"),
         ):
-            await run_due_automations(session_factory=_TestSessionLocal)
+            # Its date came once: the first sweep runs it, the next one reads the real schedule.
+            with patch("services.automation_runner.is_due", return_value=True):
+                await run_due_automations(session_factory=_TestSessionLocal)
             await run_due_automations(session_factory=_TestSessionLocal)
 
         async with _TestSessionLocal() as db:
@@ -785,8 +787,18 @@ def test_last_fire_time_reaches_rare_and_frequent_schedules():
     assert last_fire_time("not a cron", now, "UTC") is None
 
 
+def test_a_new_automation_waits_for_its_next_date():
+    from types import SimpleNamespace
+
+    from services.automation_runner import is_due
+
+    automation = SimpleNamespace(cron=SEASONS, last_run=None, created_at=datetime(2026, 11, 5, tzinfo=UTC))
+    assert is_due(automation, datetime(2026, 11, 5, 12, tzinfo=UTC)) is False
+    assert is_due(automation, datetime(2026, 12, 1, 0, 1, tzinfo=UTC)) is True
+
+
 @pytest.mark.asyncio
-async def test_first_scheduled_run_covers_the_last_complete_period(client: AsyncClient):
+async def test_running_a_scheduled_automation_by_hand_covers_the_last_full_period(client: AsyncClient):
     """Created mid-season, it makes the season that ended, not a window straddling two."""
     email = _unique_email()
     try:
@@ -795,13 +807,14 @@ async def test_first_scheduled_run_covers_the_last_complete_period(client: Async
         assert created.status_code == 201
         automation_id = created.json()["id"]
 
+        await run_due_automations(session_factory=_TestSessionLocal)
+        assert await _history_rows(automation_id) == []
+
         tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with patch("services.automation_runner.get_window_tracks", return_value=tracks) as window_tracks:
-            await run_due_automations(session_factory=_TestSessionLocal)
+            assert (await client.post(f"/api/automations/{automation_id}/run")).status_code == 200
 
-        rows = await _history_rows(automation_id)
-        assert len(rows) == 1
-        scheduled = rows[0].scheduled_for
+        scheduled = (await _history_rows(automation_id))[0].scheduled_for
         assert (scheduled.month, scheduled.day) in [(3, 1), (6, 1), (9, 1), (12, 1)]
         start, end = window_tracks.call_args.args[2:4]
         assert end == scheduled

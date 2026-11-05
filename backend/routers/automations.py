@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -31,8 +31,10 @@ from schemas import (
 from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.automation_runner import (
     last_fire_time,
+    next_fire_time,
     run_automation,
     run_automation_pipeline_cached,
+    window_bounds,
 )
 from services.progress import store as progress_store
 from services.scrobble_sync import start_scrobble_sync
@@ -73,10 +75,10 @@ async def preview_automation(
     if progress_key is not None:
         progress_store.start(progress_key)
 
-    # A draft shows its first scheduled run. A saved automation shows what Run now makes, which starts from now.
-    at = None
-    if body.automation_id is None and automation.cron:
-        at = last_fire_time(automation.cron, datetime.now(UTC), current_user.timezone or "UTC")
+    # What a run makes: with a schedule, the last period it closed, not a window straddling two.
+    now = datetime.now(UTC)
+    zone = current_user.timezone or "UTC"
+    at = last_fire_time(automation.cron, now, zone) if automation.cron else None
 
     started = time.monotonic()
     result = await run_automation_pipeline_cached(
@@ -99,6 +101,15 @@ async def preview_automation(
     if progress_key is not None:
         progress_store.finish(progress_key)
     result["cancelled"] = False
+    if at is not None:
+        start, end = window_bounds(automation.window.model_dump(), at)
+        # end is exclusive: 1 September 00:00 means up to 31 August.
+        result["period"] = {
+            "start": start.date().isoformat() if start else None,
+            "end": (end - timedelta(microseconds=1)).date().isoformat(),
+        }
+    if automation.cron and (next_run := next_fire_time(automation.cron, now, zone)):
+        result["next_run"] = next_run.date().isoformat()
     return result
 
 
@@ -240,9 +251,9 @@ async def run_automation_now(
 ):
     """Trigger one manual run now (same pipeline as the scheduled sweep).
 
-    A manual trigger starts a fresh chain (scheduled_for = now, attempt = 1):
-    it never rewrites another chain's season label, and it supersedes any
-    pending auto-retry of an older chain (only the latest row retries).
+    A manual trigger starts a fresh chain (attempt = 1) and supersedes any
+    pending auto-retry of an older chain (only the latest row retries). With a
+    schedule it covers the last period the schedule closed; without one, up to now.
 
     Single-flight per automation via a transaction-scoped advisory lock
     shared with the sweep: a second trigger while one runs gets an instant
@@ -255,7 +266,10 @@ async def run_automation_now(
     (GET run-progress?token=); otherwise to the legacy run:{id} ticket.
     """
     await _lock_or_409(db, automation)
-    return await _run_and_commit(db, automation, datetime.now(UTC), 1, body)
+    now = datetime.now(UTC)
+    zone = await db.scalar(select(User.timezone).where(User.id == automation.user_id)) or "UTC"
+    scheduled_for = (last_fire_time(automation.cron, now, zone) if automation.cron else None) or now
+    return await _run_and_commit(db, automation, scheduled_for, 1, body)
 
 
 @router.post(

@@ -297,8 +297,8 @@ def is_due(
     """Return True when the automation's cron schedule says it should run now.
 
     The cron is read in ``timezone`` (the owner's zone): "0 8 * * *" means
-    08:00 on their clock. An automation that has never run (``last_run`` is
-    None) is due immediately.
+    08:00 on their clock. An automation that has never run waits for the first
+    date after its creation: running the period already over is the owner's call.
     """
     now = now or datetime.now(UTC)
     cron = getattr(automation, "cron", None)
@@ -308,9 +308,7 @@ def is_due(
         trigger = cron_trigger(cron, ZoneInfo(timezone))
     except (ValueError, ZoneInfoNotFoundError):
         return False
-    last_run = getattr(automation, "last_run", None)
-    if last_run is None:
-        return True
+    last_run = getattr(automation, "last_run", None) or automation.created_at
     next_run = trigger.get_next_fire_time(last_run, now)
     return next_run is not None and next_run <= now
 
@@ -322,8 +320,9 @@ _LAST_FIRE_LOOKBACKS = tuple(timedelta(days=days) for days in (1 / 24, 1, 32, 36
 def last_fire_time(cron: str, now: datetime, timezone: str) -> datetime | None:
     """When the schedule last fired, at or before ``now`` (None without a usable schedule).
 
-    A scheduled run covers the period ending there, however late it starts: a
-    seasonal playlist stays on its season after downtime or a mid-season creation.
+    A run of a scheduled automation covers the period ending there, however late
+    or by whatever it starts: a seasonal playlist stays on its season after
+    downtime, or when run by hand in mid-season.
     """
     try:
         trigger = cron_trigger(cron, ZoneInfo(timezone))
@@ -338,6 +337,14 @@ def last_fire_time(cron: str, now: datetime, timezone: str) -> datetime | None:
         if last is not None:
             return last
     return None
+
+
+def next_fire_time(cron: str, now: datetime, timezone: str) -> datetime | None:
+    """When the schedule fires next (None without a usable schedule)."""
+    try:
+        return cron_trigger(cron, ZoneInfo(timezone)).get_next_fire_time(None, now)
+    except (ValueError, ZoneInfoNotFoundError):
+        return None
 
 
 def _filter_groups_to_json(filter_groups):
