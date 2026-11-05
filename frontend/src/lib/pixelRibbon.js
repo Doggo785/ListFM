@@ -3,6 +3,8 @@
 export const CELL = 4; // CSS pixels per ribbon pixel: rendering one fragment per cell keeps it cheap.
 const MAX_QUIET = 12;
 const COLUMNS = 12;
+const OPENING_SECONDS = 0.42;
+const LOADER_PULL = 0.9;
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
 const SCENES = {
@@ -50,6 +52,16 @@ export function quietRects(rects, viewportHeight) {
     count += 1;
   }
   return { data, count };
+}
+
+/** A quiet area part-way through opening: k runs from 0 at `from` to 1 at `to`. */
+export function openingRect(from, to, k) {
+  const mix = (a, b) => a + (b - a) * k;
+  const left = mix(from.left, to.left);
+  const top = mix(from.top, to.top);
+  const width = mix(from.width, to.width);
+  const height = mix(from.height, to.height);
+  return { left, top, width, height, bottom: top + height };
 }
 
 const VERTEX = `#version 300 es
@@ -162,6 +174,10 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
   let last = performance.now();
   let t = 0;
   let wander = 0;
+  let clock = 0;
+  let drawn = false;
+  let loaderRect;
+  const opening = new WeakMap();
   const frame = (time) => {
     // A frame's timestamp can precede the last one: a negative step would make the easing diverge.
     const dt = Math.max(0, Math.min((time - last) / 1000, 0.05));
@@ -181,7 +197,21 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     now.py += (target.py - now.py) * glow;
     now.pull += (target.pull - now.pull) * glow;
 
-    const rects = [...document.querySelectorAll("[data-quiet]")].map((el) => el.getBoundingClientRect());
+    clock += dt;
+    const loader = document.querySelector("[data-loader]")?.getBoundingClientRect();
+    if (loader) aim(loader.left + loader.width / 2, loader.top + loader.height / 2, reducedMotion ? 0 : LOADER_PULL);
+    else if (loaderRect) target.pull = 0;
+
+    const rects = [...document.querySelectorAll("[data-quiet]")].map((el) => {
+      const rect = el.getBoundingClientRect();
+      // A new quiet area opens out of the loader it replaces, so the wave parts instead of jumping.
+      if (!opening.has(el)) opening.set(el, { born: clock, from: loaderRect ?? { left: rect.left + rect.width / 2, top: rect.top + rect.height / 2, width: 0, height: 0 } });
+      const { born, from } = opening.get(el);
+      const k = reducedMotion || !drawn ? 1 : Math.min((clock - born) / OPENING_SECONDS, 1);
+      return k === 1 ? rect : openingRect(from, rect, 1 - (1 - k) ** 3);
+    });
+    loaderRect = loader;
+    drawn = true;
     const quiet = quietRects(rects, window.innerHeight);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform1f(uniforms.uT, t);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CELL, createRibbon, hexToRgb, quietRects, rampFor, sceneFor } from "./pixelRibbon";
+import { CELL, createRibbon, hexToRgb, openingRect, quietRects, rampFor, sceneFor } from "./pixelRibbon";
 
 const PALETTE = ["#000000", "#010101", "#020202", "#030303", "#040404", "#050505", "#060606", "#070707", "#080808"];
 
@@ -60,6 +60,16 @@ describe("quietRects", () => {
     const { count, data } = quietRects(Array(40).fill(rect(0, 10)), 800);
     expect(count).toBe(12);
     expect(data).toHaveLength(48);
+  });
+});
+
+describe("openingRect", () => {
+  it("runs from one rectangle to the other", () => {
+    const from = { left: 100, top: 100, width: 20, height: 10 };
+    const to = { left: 0, top: 0, width: 200, height: 100 };
+    expect(openingRect(from, to, 0)).toEqual({ ...from, bottom: 110 });
+    expect(openingRect(from, to, 0.5)).toEqual({ left: 50, top: 50, width: 110, height: 55, bottom: 105 });
+    expect(openingRect(from, to, 1)).toEqual({ ...to, bottom: 100 });
   });
 });
 
@@ -154,6 +164,37 @@ describe("createRibbon", () => {
     button.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     expect(settle()).toBeCloseTo(onButton);
     button.remove();
+  });
+
+  it("leans on the loader, then opens the page out of it", () => {
+    const quietBox = (left, top, width, height) => {
+      const el = document.createElement("div");
+      el.dataset.quiet = "";
+      el.getBoundingClientRect = () => ({ left, top, width, height, bottom: top + height });
+      document.body.append(el);
+      return el;
+    };
+    const loader = quietBox(100, 100, 40, 20);
+    loader.dataset.loader = "";
+    const gl = fakeGl();
+    createRibbon(canvasWith(gl), { palette: PALETTE });
+    let clock = 0;
+    const run = (frameCount) => {
+      for (let i = 0; i < frameCount; i += 1) tick((clock += 50));
+    };
+    run(40);
+    const leaning = lastPull(gl);
+    expect(leaning).toBeGreaterThan(0.5);
+
+    loader.remove();
+    const page = quietBox(0, 0, 800, 600);
+    const halfWidth = () => lastCall(gl, "uniform4fv")[1][2];
+    run(1);
+    expect(halfWidth()).toBeCloseTo(20 / CELL);
+    run(20);
+    expect(halfWidth()).toBeCloseTo(400 / CELL);
+    expect(lastPull(gl)).toBeLessThan(leaning);
+    page.remove();
   });
 
   it("does not diverge when a frame's timestamp goes backwards", () => {
