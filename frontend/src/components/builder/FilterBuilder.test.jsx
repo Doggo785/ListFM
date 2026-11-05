@@ -56,9 +56,15 @@ async function type(input, value) {
   });
 }
 
+// jsdom has no layout, and the select scrolls its current option into view.
+Element.prototype.scrollIntoView = () => {};
+
+const options = () => [...document.querySelectorAll('[role="option"]')];
+const option = (label) => options().find((o) => o.textContent.trim() === label);
+
 async function pickField(container, current, next) {
   await click(button(container, current));
-  await click(button(container, next));
+  await click(option(next));
 }
 
 const condition = () => seen.groups[0].conditions[0];
@@ -74,11 +80,13 @@ describe("FilterBuilder", () => {
   it("offers neither rank nor the removed operators", async () => {
     const container = await render({ field: "playcount", value: 3 });
     await click(button(container, "at least"));
-    const labels = [...container.querySelectorAll("button")].map((b) => b.textContent.trim());
+    const labels = options().map((o) => o.textContent.trim());
     expect(labels).toEqual(expect.arrayContaining(["at most", "exactly", "between"]));
     expect(labels).not.toContain("≠");
+    await click(option("at least"));
     await click(button(container, "Your plays (window)"));
-    expect(container.textContent).not.toContain("Rank");
+    expect(options().length).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toContain("Rank");
   });
 
   it("starts a loved filter on Loved with no operator to choose", async () => {

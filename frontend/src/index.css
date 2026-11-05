@@ -235,10 +235,6 @@ body {
   box-sizing: border-box;
 }
 
-p {
-  margin: 0;
-}
-
 code {
   font-family: var(--mono);
   display: inline-flex;

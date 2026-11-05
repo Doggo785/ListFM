@@ -270,6 +270,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
         </div>
 
         <CustomSelect
+          label="Filter field"
           value={condition.field}
           onChange={(newField) => {
             setTagSearch("");
@@ -282,6 +283,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
 
         {operatorOptions.length > 1 && (
           <CustomSelect
+            label="Filter operator"
             value={condition.operator}
             onChange={(op) => onChange({ ...condition, operator: op })}
             options={operatorOptions}

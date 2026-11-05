@@ -120,9 +120,8 @@ export default function PlaylistNew() {
               variant="outline"
               size="lg"
               onClick={() => (step > 1 ? setStep(step - 1) : navigate("/playlists"))}
-              className="border-neutral-700 bg-transparent text-neutral-300 hover:bg-neutral-800 hover:text-white"
             >
-              <IconArrowLeft size={16} className="mr-2" />
+              <IconArrowLeft size={16} />
               {step > 1 ? "Back" : "Cancel"}
             </Button>
 
@@ -131,19 +130,17 @@ export default function PlaylistNew() {
                 size="lg"
                 disabled={!canGoNext()}
                 onClick={() => setStep(step + 1)}
-                className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next
-                <IconArrowRight size={16} className="ml-2" />
+                <IconArrowRight size={16} />
               </Button>
             ) : (
               <Button
                 size="lg"
                 onClick={handleCreate}
                 disabled={creating}
-                className="bg-[var(--ember)] text-white hover:bg-[var(--ember)]/90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <IconCheck size={16} className="mr-2" />
+                <IconCheck size={16} />
                 {creating ? "Creating..." : "Create automation"}
               </Button>
             )}

@@ -1,4 +1,5 @@
 import { SORT_OPTIONS, WINDOW_OPTIONS, windowOption } from "@/lib/automation-rules";
+import CustomSelect from "@/components/ui/CustomSelect";
 
 export function StepSource({ data, onChange }) {
   return (
@@ -49,25 +50,14 @@ export function StepSource({ data, onChange }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-300 mb-1.5">
-            Time window
-          </label>
-          <select
+          <p className="mb-1.5 text-sm font-medium text-neutral-300">Time window</p>
+          <CustomSelect
+            label="Time window"
+            placeholder="Choose a window"
             value={windowOption(data.window)?.value ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...data,
-                window: WINDOW_OPTIONS.find((o) => o.value === e.target.value).window,
-              })
-            }
-            className="w-full rounded-lg border border-neutral-700 bg-[#1c1c1c] px-4 py-3 text-white focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)] transition-colors appearance-none"
-          >
-            {WINDOW_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => onChange({ ...data, window: WINDOW_OPTIONS.find((o) => o.value === value).window })}
+            options={WINDOW_OPTIONS}
+          />
         </div>
       </div>
     </div>
