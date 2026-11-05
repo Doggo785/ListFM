@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/Doggo785/ListFM/compare/v0.4.0...v0.5.0) (2026-11-05)
+
+
+### Features
+
+* **ui:** cut playlist covers with the site's ribbon ([#134](https://github.com/Doggo785/ListFM/issues/134)) ([4f89fc0](https://github.com/Doggo785/ListFM/commit/4f89fc09508990a2d6ea6b907f039f92a0dbda94))
+* **ui:** show playlists on shelves and open them full screen ([#132](https://github.com/Doggo785/ListFM/issues/132)) ([203ca39](https://github.com/Doggo785/ListFM/commit/203ca39b786e080eeb0f3797489f1ac2367e704d))
+
+
+### Bug Fixes
+
+* **ui:** clear the Codacy findings and follow Codacy again ([#135](https://github.com/Doggo785/ListFM/issues/135)) ([0e90afa](https://github.com/Doggo785/ListFM/commit/0e90afa289646aee057865cf8fe4aea64d7740a4))
+
 ## [0.4.0](https://github.com/Doggo785/ListFM/compare/v0.3.0...v0.4.0) (2026-11-05)
 
 
