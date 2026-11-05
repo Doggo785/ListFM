@@ -1,5 +1,8 @@
 /** The ember ribbon behind every page: one WebGL2 canvas that morphs instead of remounting. */
 
+import { burstEmber, createEmberLayer, linkProgram, stepEmbers } from "@/lib/ribbonEmbers";
+import { monthAt, smoothstep } from "@/lib/ribbonTrack";
+
 export const CELL = 4; // CSS pixels per ribbon pixel: rendering one fragment per cell keeps it cheap.
 const MAX_QUIET = 12;
 const COLUMNS = 12;
@@ -10,10 +13,19 @@ const CHAIN_FILL = 0.85; // Of the band: the wavy edge stays inside it.
 const CHAIN_FLOOR = 0.12;
 const HOTTER = 2; // Steps up the ramp while a page holds data-ribbon-hot: warmer, never a siren.
 const MAX_HEAT = 5;
+const TRACK_HEAT = 3; // The Dashboard's wave: listens burning, hotter than any other page at rest.
+const TRACK_CURVE = 0.012; // Of the viewport's height: how far the wave's centre line bends.
+const TRACK_RISE_FROM = 0.6; // Of the width: left of it the wave keeps to its line, under the name.
+const TRACK_RISE = 0.45; // Of the room above the line: how far it then sweeps up, like the ribbon of the other pages.
+const TRACK_EDGE = 0.92; // Of its half-width: only the tallest days reach the core's colour.
+const TRACK_QUIET_FADE = 44; // CSS pixels. It must fit between a poster's rows; other pages have room for the wide one.
+const QUIET_FADE = 130;
+const MAX_HOLES = 4;
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
 const SCENES = {
-  dashboard: { shape: [0.12, 0.17, 0.14, 0.2, 0.24, 0.18, 0.14, 0.19, 0.26, 0.21, 0.15, 0.12], angle: -0.38, offset: -0.2, heat: 0 },
+  // Near where its wave will lie, so the wave grows in place when the listens arrive.
+  dashboard: { shape: [0.11, 0.1, 0.09, 0.11, 0.13, 0.1, 0.09, 0.11, 0.14, 0.12, 0.1, 0.09], angle: -0.04, offset: 0.08, heat: 0 },
   creator: { shape: [0.16, 0.16, 0.16, 0.16, 0.13, 0.13, 0.13, 0.13, 0.1, 0.1, 0.1, 0.1], angle: 0.1, offset: -0.33, heat: 1 },
   automations: { shape: [0.09, 0.09, 0.1, 0.1, 0.11, 0.12, 0.12, 0.13, 0.15, 0.16, 0.18, 0.2], angle: -0.22, offset: -0.2, heat: 2 },
   detail: { shape: [0.2, 0.19, 0.17, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0.1, 0.09, 0.09], angle: 1.2, offset: 0.42, heat: 2 },
@@ -21,6 +33,12 @@ const SCENES = {
   playlist: { shape: [0.08, 0.09, 0.1, 0.12, 0.14, 0.17, 0.2, 0.22, 0.2, 0.17, 0.14, 0.12], angle: 1.45, offset: 0.46, heat: 3 },
   other: { shape: [0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14], angle: -0.3, offset: -0.28, heat: 0 },
 };
+
+/**
+ * What a page asks of the ribbon, read at every frame. Only the Dashboard sets it:
+ * track is the wave of listens (see drawTrack below), embers how many pixels climb from it.
+ */
+export const ribbonStage = { track: null, embers: 0, beforeDraw: null, alive: false, burst() {} };
 
 export function sceneFor(pathname) {
   if (pathname.startsWith("/dashboard")) return SCENES.dashboard;
@@ -91,10 +109,15 @@ const FRAGMENT = `#version 300 es
 precision highp float;
 uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull,uCalm,uEdge,uClip;uniform vec2 uPoint,uBand;
 uniform float uCols[${COLUMNS}];uniform vec3 uRamp[4];uniform vec4 uQuiet[${MAX_QUIET}];uniform int uN;
+uniform vec3 uHot[2];uniform vec4 uMap,uWave,uDrum,uDrumB;uniform sampler2D uSeries;
+uniform vec4 uHoles[${MAX_HOLES}],uCut,uBurn;uniform vec3 uEdges[${MAX_HOLES * 4}],uInk;uniform float uFade;
 out vec4 o;
 float b2(vec2 a){a=floor(a);return fract(a.x/2.+a.y*a.y*.75);}
 float b4(vec2 a){return b2(.5*a)*.25+b2(a);}
 float b8(vec2 a){return b4(.5*a)*.25+b2(a);}
+float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(h21(i),h21(i+vec2(1.,0.)),f.x),mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)),f.x),f.y);}
+float angleAt(float x){float R=uDrum.z,P=uDrum.w;return 2.*atan(P*x/(P*R+sqrt(max(0.,P*P*R*R-(P+2.*R)*P*x*x))));}
 void main(){
   vec2 cell=floor(gl_FragCoord.xy);
   if(cell.y>uClip){o=vec4(0.);return;}
@@ -109,59 +132,178 @@ void main(){
   hw+=loose*.012*(sin(s*9.+uT*.5)*.5+sin(s*17.-uT*.35+1.3)*.25);
   float c=uOff+loose*(.2*sin(uWander*.13)+.09*sin(q.x*3.+uWander*.21)+.045*sin(q.x*7.-uWander*.31));
   c=mix(c,g.y,uPull*exp(-pow((q.x-g.x)/.42,2.)));
-  float v=clamp((hw-abs(q.y-c))/uEdge,0.,1.);
+  float heat=0.,tongue=0.;
+  float track=uDrumB.w;
+  if(track>.001){
+    float px=(cell.x+.5)*${CELL.toFixed(1)};
+    float th=angleAt(px-uDrum.y);
+    float mo=mix((px-uMap.x)/uMap.y,uDrumB.x+.5+th/uDrumB.y,uDrum.x);
+    // Held at the last listen beyond it: the days still to come must not read as a wall of silence.
+    float amount=texture(uSeries,vec2(min(mo,uMap.z-.02)/uMap.w,.5)).r;
+    // Past the year's ends the drum's fire keeps burning, low, so one side of the deck is never bare.
+    float beyond=smoothstep(uMap.z-.2,uMap.z+.5,mo)+smoothstep(.2,-.5,mo);
+    amount=max(amount,.5*uDrum.x*min(beyond,1.));
+    float past=uDrum.x*1.8;float ends=smoothstep(-past,.3-past*.5,mo)*smoothstep(uMap.z+past,uMap.z-.14+past*.5,mo);
+    heat=track*exp(-pow((px-uWave.z)/90.,2.));
+    amount=max(amount,.6*heat); // The playhead stands out even over a quiet day.
+    float wave=uWave.y*(.17+.83*amount)*ends*(1.+.22*heat);
+    wave+=.005*(sin(s*9.+uT*.5)*.5+sin(s*17.-uT*.35+1.3)*.25)*ends;
+    float scale=uDrum.w/(uDrum.w+uDrum.z*(1.-cos(th)));
+    hw=mix(hw,wave,track);
+    // Upward only: the name leaves room on the right, and below the line there is text.
+    float sweep=smoothstep(${TRACK_RISE_FROM.toFixed(2)},1.,(px-uMap.x)/(uMap.y*uMap.z))*max(.5-uWave.x,0.)*${TRACK_RISE.toFixed(2)}*(1.+.2*sin(q.x*3.+uWander*.21)+.1*sin(q.x*7.-uWander*.31));
+    float curve=(1.-uDrum.x)*(${TRACK_CURVE.toFixed(3)}*sin(q.x*2.+uWander*.1)+sweep); // The slow bend of the site's ribbon.
+    c=mix(c,uWave.x+curve-uDrum.x*uDrumB.z*(1.-cos(th))*scale,track);
+    // A flame climbs: its tongues reach upward from the core and barely below it.
+    vec2 f=vec2(cell.x*.055,cell.y*.03-uT*1.7);
+    tongue=vn(f)*.65+vn(f*2.1+9.)*.35;
+    hw*=1.+uWave.w*track*(q.y>c?2.6+2.6*heat:.3)*tongue*tongue;
+  }
+  // On the track the flame's heat falls off all the way to its edge, instead of a flat band with a dithered rim.
+  float v=clamp((hw-abs(q.y-c))/mix(uEdge,max(uEdge,hw*.82),track),0.,1.);
   float m=1.;
-  for(int k=0;k<uN;k++){vec4 r=uQuiet[k];vec2 d=abs(cell+.5-r.xy)-r.zw;float e=length(max(d,0.))+min(max(d.x,d.y),0.);m=min(m,smoothstep(0.,${(130 / CELL).toFixed(1)},e));}
+  for(int k=0;k<uN;k++){vec4 r=uQuiet[k];vec2 d=abs(cell+.5-r.xy)-r.zw;float e=length(max(d,0.))+min(max(d.x,d.y),0.);m=min(m,smoothstep(0.,uFade,e+(tongue-1.)*10.*track));}
   if(cell.y>=uBand.x&&cell.y<=uBand.y)m=1.;
-  v*=m;
-  float idx=floor(v*4.+b8(cell));
-  if(idx<1.){o=vec4(0.);return;}
-  o=vec4(uRamp[int(min(idx,4.))-1],1.);
+  // A card opens the flame, and burns from its own edges: low at its foot, in tall tongues over its top. They come nearest first.
+  float calm=m,edgeFire=0.,covered=0.,burnt=0.,rim=0.,charred=0.;
+  float fl=vn(vec2(cell.x*.11,cell.y*.05-uT*2.4))*.6+vn(vec2(cell.x*.27+5.,cell.y*.12-uT*3.4))*.4;
+  for(int k=0;k<${MAX_HOLES};k++){
+    vec4 r=uHoles[k];float strength=uCut[k];
+    if(strength<=0.)continue;
+    float inside=-1e4;
+    for(int side=0;side<4;side++){vec3 line=uEdges[k*4+side];inside=max(inside,dot(line.xy,cell+.5)-line.z);}
+    // Far along the arc it is eaten from its outer side inward, foot first, and an arriving one comes out of the fire the same way.
+    float burn=uBurn[k],front=1.;
+    if(burn>0.){
+      vec3 outer=uEdges[k*4+(r.x*${CELL.toFixed(1)}<uDrum.y?3:1)];
+      front=clamp((outer.z-dot(outer.xy,cell+.5))/(2.*r.z),0.,1.)+(fl-.5)*.7+(cell.y-r.y)/r.w*.12-(burn*1.7-.35);
+      if(inside<0.&&covered<=0.){
+        float lit=strength*smoothstep(0.,.1,burn);
+        rim=max(rim,lit*clamp(1.-abs(front)/(front>0.?.05:.14),0.,1.));
+        if(front>0.)charred=max(charred,lit*clamp(1.-front/.2,0.,1.));
+      }
+    }
+    if(front<0.){
+      if(inside<1.)burnt=max(burnt,strength); // A cell's centre can be just off a card it still overlaps.
+      continue;
+    }
+    float e=inside+tongue*4.; // It bites the card's edge like burning paper, and never leaves a gap beside it.
+    m=min(m,1.-strength*(1.-smoothstep(0.,2.,e)));
+    if(e<0.)covered=max(covered,strength);
+    else{
+      float up=(cell.y-r.y)/r.w; // -1 at the card's foot, 1 at its top.
+      float high=clamp(up,0.,1.);
+      float reach=1.5+high*high*(3.+70.*fl*fl*fl);
+      // A crown over the top, separate tongues up the sides, and nothing at the foot: fire rises.
+      float gate=mix(smoothstep(.36,.62,fl),1.,smoothstep(.75,1.,high))*smoothstep(-.1,.3,up);
+      edgeFire=max(edgeFire,strength*smoothstep(0.,.06,front)*gate*clamp(1.-e/reach,0.,1.));
+    }
+  }
+  v=max(max(v*m,edgeFire*uWave.w*track*calm*(1.-covered)),rim*track);
+  float idx=floor(v*(4.+2.*heat)+b8(cell));
+  // What has burnt is gone: the page's own ink over it, unless a card still whole lies there.
+  if(idx<1.){o=(burnt>0.&&covered<=0.)||b8(cell)<charred?vec4(uInk,1.):vec4(0.);return;}
+  int tone=int(min(idx,6.))-1;
+  o=vec4(tone<4?uRamp[tone]:uHot[tone-4],1.);
 }`;
 
-const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN"];
+const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN", "uHot", "uMap", "uWave", "uDrum", "uDrumB", "uSeries", "uHoles", "uCut", "uBurn", "uEdges", "uInk", "uFade"];
 
 function compile(gl) {
-  const shader = (type, source) => {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, source);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-    return s;
-  };
-  const program = gl.createProgram();
-  gl.attachShader(program, shader(gl.VERTEX_SHADER, VERTEX));
-  gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAGMENT));
-  gl.linkProgram(program);
+  const program = linkProgram(gl, VERTEX, FRAGMENT);
   gl.useProgram(program);
+  const vao = gl.createVertexArray();
+  gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const position = gl.getAttribLocation(program, "p");
   gl.enableVertexAttribArray(position);
   gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
   gl.clearColor(0, 0, 0, 0);
-  return Object.fromEntries(UNIFORMS.map((n) => [n, gl.getUniformLocation(program, n)]));
+  return { program, vao, uniforms: Object.fromEntries(UNIFORMS.map((n) => [n, gl.getUniformLocation(program, n)])) };
 }
 
 const INERT = { setScene() {}, destroy() {} };
+
+/** One side of a card, walked clockwise, as (outward normal, offset) in cells from the bottom-left corner. */
+function cardEdge(from, to, height) {
+  const ax = from.x / CELL;
+  const ay = (height - from.y) / CELL;
+  const dx = to.x / CELL - ax;
+  const dy = (height - to.y) / CELL - ay;
+  const length = Math.hypot(dx, dy) || 1;
+  const nx = -dy / length;
+  const ny = dx / length;
+  return [nx, ny, nx * ax + ny * ay];
+}
+
+/** Sets the wave's numbers for this frame. Without a track yet there is nothing to show: its weight is 0. */
+function drawTrack(gl, uniforms, track, weight) {
+  if (!track) {
+    gl.uniform4f(uniforms.uDrumB, 0, 1, 0, 0);
+    return;
+  }
+  const height = window.innerHeight;
+  gl.uniform4f(uniforms.uMap, track.x0, track.perMonth, track.end, track.count);
+  gl.uniform4f(uniforms.uWave, 0.5 - track.y / height, track.half / height, track.head, track.flame);
+  gl.uniform4f(uniforms.uDrum, track.zoom, track.cx, track.layout.radius, track.layout.perspective);
+  gl.uniform4f(uniforms.uDrumB, track.focus, track.layout.step, track.layout.bow / height, weight);
+  const holes = new Float32Array(MAX_HOLES * 4);
+  const edges = new Float32Array(MAX_HOLES * 4 * 3);
+  const strengths = [0, 0, 0, 0];
+  const burns = [0, 0, 0, 0];
+  track.holes.slice(0, MAX_HOLES).forEach(({ rect, corners, strength, burn }, i) => {
+    holes.set([(rect.left + rect.width / 2) / CELL, (height - rect.top - rect.height / 2) / CELL, rect.width / 2 / CELL, rect.height / 2 / CELL], i * 4);
+    corners.forEach((corner, side) => edges.set(cardEdge(corner, corners[(side + 1) % 4], height), (i * 4 + side) * 3));
+    strengths[i] = strength * weight;
+    burns[i] = burn;
+  });
+  gl.uniform4fv(uniforms.uHoles, holes);
+  gl.uniform3fv(uniforms.uEdges, edges);
+  gl.uniform4f(uniforms.uCut, ...strengths);
+  gl.uniform4f(uniforms.uBurn, ...burns);
+}
+
+/** A place on the wave where an ember can leave: above the core, along what is on screen. */
+function emberOrigin(track) {
+  const x = Math.random() * window.innerWidth;
+  const months = monthAt(x, track);
+  // Wrapped on the drum the flame carries on past both ends of the year, and so do its embers.
+  if (track.zoom < 0.5 && (months < 0 || months > track.end)) return null;
+  const sweep = (1 - track.zoom) * smoothstep(TRACK_RISE_FROM, 1, x / window.innerWidth) * track.y * TRACK_RISE;
+  return { x, y: track.y - sweep - Math.random() * track.half * 0.7 };
+}
 
 /**
  * Starts the ribbon on a canvas and returns its controls. Without WebGL2 the page simply has no
  * ribbon: nothing depends on it.
  * shortcut: a lost GL context stays blank until the next page load, rebuild it if that shows up.
  */
-export function createRibbon(canvas, { palette, reducedMotion = false }) {
+export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion = false }) {
   const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
   if (!gl) return INERT;
-  let uniforms;
+  let main;
+  let emberLayer;
   try {
-    uniforms = compile(gl);
+    main = compile(gl);
+    emberLayer = createEmberLayer(gl, [8, 7, 6, 4, 2, 1].map((i) => hexToRgb(palette[i])));
+    gl.useProgram(main.program);
+    gl.bindVertexArray(main.vao);
   } catch (error) {
     console.error("Ribbon shader failed to compile", error);
     return INERT;
   }
+  const { uniforms } = main;
+  gl.uniform3fv(uniforms.uHot, [...hexToRgb(palette[7]), ...hexToRgb(palette[8])]);
+  gl.uniform3fv(uniforms.uInk, hexToRgb(ink));
+  const seriesTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, seriesTexture);
+  gl.uniform1i(uniforms.uSeries, 0);
+  let embers = [];
+  let shownSeries = null;
+  let lastTrack = null;
 
-  const target = { cols: Array(COLUMNS).fill(0.08), ramp: rampFor(0, palette), angle: 0, off: -0.3, px: 0.5, py: 0.5, pull: 0, calm: 0, edge: SOFT_EDGE };
+  const target = { cols: Array(COLUMNS).fill(0.08), ramp: rampFor(0, palette), angle: 0, off: -0.3, px: 0.5, py: 0.5, pull: 0, calm: 0, edge: SOFT_EDGE, track: 0 };
   const now = { ...target, cols: [...target.cols], ramp: [...target.ramp] };
   let started = false;
   let scene = { cols: target.cols, angle: target.angle, off: target.off };
@@ -211,6 +353,17 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
       t += dt;
       wander += dt;
     }
+    ribbonStage.beforeDraw?.();
+    const track = ribbonStage.track;
+    if (track) lastTrack = track;
+    if (track && track.series !== shownSeries) {
+      shownSeries = track.series;
+      gl.bindTexture(gl.TEXTURE_2D, seriesTexture);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, shownSeries.length, 1, 0, gl.RED, gl.UNSIGNED_BYTE, shownSeries);
+      for (const filter of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, filter, gl.LINEAR);
+      for (const wrap of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, wrap, gl.CLAMP_TO_EDGE);
+    }
     // A chain on the page pulls the ribbon straight into its band, and its counts set the width.
     const chain = document.querySelector("[data-chain]");
     const band = chain?.getBoundingClientRect();
@@ -224,10 +377,14 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
         calm: 1,
         edge: half,
       });
+    } else if (track) {
+      Object.assign(target, scene, { angle: 0, calm: 1, edge: (track.half / window.innerHeight) * TRACK_EDGE });
     } else {
       Object.assign(target, scene, { calm: 0, edge: SOFT_EDGE });
     }
-    const wantedHeat = document.querySelector("[data-ribbon-hot]") ? Math.min(sceneHeat + HOTTER, MAX_HEAT) : sceneHeat;
+    target.track = track ? 1 : 0;
+    const baseHeat = track ? TRACK_HEAT : sceneHeat;
+    const wantedHeat = document.querySelector("[data-ribbon-hot]") ? Math.min(baseHeat + HOTTER, MAX_HEAT) : baseHeat;
     if (wantedHeat !== heat) {
       heat = wantedHeat;
       target.ramp = rampFor(heat, palette);
@@ -241,6 +398,7 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     now.off += (target.off - now.off) * shape;
     now.calm += (target.calm - now.calm) * shape;
     now.edge += (target.edge - now.edge) * shape;
+    now.track += (target.track - now.track) * shape;
     now.px += (target.px - now.px) * glow;
     now.py += (target.py - now.py) * glow;
     now.pull += (target.pull - now.pull) * glow;
@@ -261,21 +419,26 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     loaderRect = loader;
     drawn = true;
     const quiet = quietRects(rects, window.innerHeight);
+    gl.useProgram(main.program);
+    gl.bindVertexArray(main.vao);
     gl.clear(gl.COLOR_BUFFER_BIT);
+    drawTrack(gl, uniforms, lastTrack, now.track);
     gl.uniform1f(uniforms.uT, t);
+    gl.uniform1f(uniforms.uFade, (track ? TRACK_QUIET_FADE : QUIET_FADE) / CELL);
     gl.uniform1f(uniforms.uWander, wander);
     gl.uniform1f(uniforms.uAngle, now.angle);
     gl.uniform1f(uniforms.uOff, now.off);
     gl.uniform1f(uniforms.uCalm, now.calm);
     gl.uniform1f(uniforms.uEdge, now.edge);
     // A band scrolled out of its page leaves with the page, instead of crossing what sits above it.
-    const page = chain?.closest("main")?.getBoundingClientRect();
+    const page = (chain ?? (track && canvas.ownerDocument.querySelector("main")))?.closest("main")?.getBoundingClientRect();
     gl.uniform1f(uniforms.uClip, page ? (window.innerHeight - page.top) / CELL : window.innerHeight);
     gl.uniform1f(uniforms.uPull, now.pull * (1 - now.calm));
+    const bandRect = band ?? (track ? { top: track.bandTop, bottom: track.bandBottom } : null);
     gl.uniform2f(
       uniforms.uBand,
-      band ? (window.innerHeight - band.bottom) / CELL : -1,
-      band ? (window.innerHeight - band.top) / CELL : -1,
+      bandRect ? (window.innerHeight - bandRect.bottom) / CELL : -1,
+      bandRect ? (window.innerHeight - bandRect.top) / CELL : -1,
     );
     gl.uniform2f(uniforms.uPoint, now.px, now.py);
     gl.uniform1fv(uniforms.uCols, now.cols);
@@ -283,9 +446,19 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     gl.uniform4fv(uniforms.uQuiet, quiet.data);
     gl.uniform1i(uniforms.uN, quiet.count);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (!reducedMotion) {
+      // Embers stop at content, and at the covers' faces: they are never specks on the art.
+      const solid = track ? [...rects, ...track.holes] : rects;
+      embers = stepEmbers(embers, dt, track ? ribbonStage.embers : 0, () => (track ? emberOrigin(track) : null), solid, clock);
+      emberLayer.draw(embers, CELL, window.innerHeight, canvas.width, canvas.height);
+    }
     frameId = window.requestAnimationFrame(frame);
   };
   frameId = window.requestAnimationFrame(frame);
+  ribbonStage.alive = true;
+  ribbonStage.burst = (x, y) => {
+    if (!reducedMotion) embers.push(burstEmber(x, y));
+  };
 
   return {
     setScene(next) {
@@ -299,6 +472,8 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
       }
     },
     destroy() {
+      ribbonStage.alive = false;
+      ribbonStage.burst = () => {};
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
       document.removeEventListener("pointermove", onPointer);

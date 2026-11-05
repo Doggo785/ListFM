@@ -36,7 +36,7 @@ Tant que 1→2→3 ne marche pas de bout en bout de façon fiable, ne pas partir
 - Side-project plaisir MAIS déployé sur petit VPS perso (owner + potes, jamais 1000 users visés). Donc: single-worker acceptable, pas de Redis/K8s par défaut, migrations sûres (jamais de DROP CASCADE en prod), backups Postgres minimales (dump nightly suffit).
 - Infra validée: **Docker Compose sur petit Linux**. Domaine + HTTPS (Let's Encrypt) en réflexion (flemme de payer un domaine pour l'instant, décision repoussée, prévoir `COOKIE_SECURE` + CORS strict quand ce sera tranché).
 - OAuth Google/Discord + password: on garde tel quel tant que ça marche, pas de nouvel OAuth, pas de simplification forcée.
-- En attendant l'export: **playlists 100% in-app**, suffisant. Dashboard: ne pas tromper sur les 50 recents (étiquette « aperçu partiel »).
+- En attendant l'export: **playlists 100% in-app**, suffisant.
 - Dette: l'owner a passé du temps à corriger sans fin et craint le puits sans fond. Règle: **stop-the-bleeding P0 d'abord, puis boucle feature/stable par petits incréments**, pas de big-bang sécu. Budget dette ~20% par itération après P0.
 
 ## 5. Règles pour les agents

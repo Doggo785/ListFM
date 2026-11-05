@@ -64,7 +64,7 @@ components:
 
 ## Overview
 
-One dithered ember ribbon is the site's only ornament, and it never restarts: it travels between pages and changes shape and heat. Everything else stays out of its way, on an ink ground with hairlines instead of cards. Written from the Creator, the first screen built entirely in this world (`frontend/src/views/PlaylistNew.jsx`). The other screens still carry old styling until their turn in Phase C, so they are not a reference.
+One dithered ember ribbon is the site's only ornament, and it never restarts: it travels between pages and changes shape and heat. Everything else stays out of its way, on an ink ground with hairlines instead of cards. Written from the Creator, the first screen built entirely in this world (`frontend/src/views/PlaylistNew.jsx`). Login, settings and the landing page still carry old styling until their turn in Phase C, so they are not a reference. The Dashboard is the one loud screen: a poster of what you listen to, over your year in flight.
 
 ## Colors
 
@@ -80,7 +80,7 @@ A 4px grid, the size of a ribbon pixel. Work screens read top to bottom in hairl
 
 ## Elevation & Depth
 
-Flat. No shadows, no glow, no glass. Overlays are set apart by an amber border.
+Flat. No shadows, no glow, no glass. Overlays are set apart by an amber border. The Dashboard's flight is the one place with real depth: its covers turn on a 3D drum, under the ribbon's canvas.
 
 ## Shapes
 
@@ -102,6 +102,9 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - Automation card: the only bordered card, a whole link holding a cover and a few lines, the last one saying how its latest run went. Its border turns amber on hover.
 - Run line: time, then what the run came to, one line per run under its day. Only a failure or a pending retry takes the ember colour: a short or empty run is a result, so it stays neutral. Attempts fold under the line.
 - Ribbon band: an empty `data-chain` element pulls the ribbon straight into it, with the widths set by its counts. Text never sits in it.
+- The Dashboard's ribbon: the same ribbon, fed through `ribbonStage`. Its width is the listens day by day, with a playhead that crosses once and stays breathing at the right edge, flame tongues rising from it, and one ember per listen of the last day. It keeps to its line under the name and past it sweeps up into the free room, the same long bend as on the other pages. It morphs from and to every page's scene without a second canvas.
+- Forged name: the top artist in Tiny5, as large as it fits, at sizes that land on the 4px grid (multiples of 32). The playhead sets it on fire, from cold iron to cream, once per page load. After that a flame crosses it now and then, and each pass takes the letters down to red and back up to cream, so a flame never crosses letters that don't react. The pointer does nothing to it. The page's own text stays underneath, sharp and selectable. It is plain under reduced motion, and shortened when too long for any size.
+- Flight: the page's scroll rewinds the year, newest first. Covers come out of the left on a 3D arc, dwell facing the visitor, and leave by the right, each month's top artist with their own album. Only the card in front is flat and at full size: its neighbours turn and sit back in real perspective. Further along the arc a card burns away before it goes edge-on: a ragged front with a glowing rim and charred pixels eats it from its outer side inward, and an arriving card comes out of the fire the same way. The flight eases over a few tenths of a second, so a wheel notch unrolls instead of jumping. The ribbon wraps the same drum, opens around the cards and burns from their edges, in a crown over their top and separate tongues up their sides, nothing at their foot. Months and Automations share the deck, and its ticks scroll sideways when they don't fit. Under reduced motion it is a flat shelf that scrolls sideways.
 
 ## Do's and Don'ts
 
@@ -109,5 +112,5 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - Do keep anything the server can do within reach, folded when it is advanced.
 - Do keep motion to state changes, and keep a complete experience under reduced motion.
 - Don't add other cards, rounded corners, gradients, glow or a second ornament.
-- Don't set text over the ribbon. Mark content blocks `data-quiet` (12 at most on screen).
+- Don't set text over the ribbon. Mark content blocks `data-quiet` (12 at most on screen). The forged name is the one exception: it is the fire's subject.
 - Don't use the ember ramp for interface text or controls.

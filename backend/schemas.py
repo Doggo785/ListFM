@@ -217,10 +217,6 @@ class UserInfo(BaseModel):
     image: str | None = None
 
 
-class RecentTracksResponse(BaseModel):
-    tracks: list[Track]
-
-
 class ErrorResponse(BaseModel):
     error: str
 
@@ -316,6 +312,42 @@ class ListeningTotals(BaseModel):
     albums: int
     # False during the first full load: the totals are still growing.
     complete: bool
+
+
+class StoryAlbum(BaseModel):
+    title: str
+    artist: str
+    plays: int
+    cover_url: str | None
+
+
+class StoryMoment(BaseModel):
+    """Who the person is listening to now. Over all listens when the last days hold none."""
+
+    artist: str
+    plays: int
+    days: int | None
+    runners_up: list[str]
+    albums: list[StoryAlbum]
+
+
+class StoryMonth(BaseModel):
+    """A month's most played artist, with their own most played album of that month."""
+
+    month: str
+    listens: int
+    days: list[int]
+    artist: str
+    artist_plays: int
+    album: StoryAlbum | None
+
+
+class ListeningStory(BaseModel):
+    moment: StoryMoment | None
+    months: list[StoryMonth]
+    listens_last_day: int
+    # Some art is still being looked up: asking again shortly will show more.
+    covers_pending: bool
 
 
 class ProgressRead(BaseModel):

@@ -46,6 +46,8 @@ function App() {
   return (
     <div className="app-container">
       <ScrollToTop />
+      {/* Before the ribbon, so what a page puts here passes under its flame. */}
+      <div id="under-ribbon" className="under-ribbon" />
       <PixelRibbon />
       {showNav && <TopNav />}
       <div className="app-main">

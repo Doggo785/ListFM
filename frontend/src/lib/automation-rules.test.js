@@ -21,7 +21,6 @@ import {
   usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
-import { getPlaylistImageSrc } from "@/lib/playlist-logo";
 
 describe("automation summaries", () => {
   it("names the sort and the window", () => {
@@ -38,10 +37,6 @@ describe("automation summaries", () => {
     expect(describeAutomation({ sort: "random", window: { length: { amount: 2, unit: "day" } } })).toBe(
       "Random · Custom window",
     );
-  });
-
-  it("draws the playlist icon from the sort", () => {
-    expect(getPlaylistImageSrc("x", "random")).not.toBe(getPlaylistImageSrc("x", "most_played"));
   });
 });
 

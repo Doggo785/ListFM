@@ -70,10 +70,6 @@ export async function request(path, options = {}) {
   return res.json();
 }
 
-export async function getRecentTracks(limit = 50) {
-  return request(`/api/recent-tracks?limit=${limit}`);
-}
-
 export async function startScrobbleSync() {
   return request("/api/scrobbles/sync", { method: "POST" });
 }
@@ -84,6 +80,10 @@ export async function getScrobbleSync() {
 
 export async function getListeningTotals() {
   return request("/api/scrobbles/totals");
+}
+
+export async function getListeningStory() {
+  return request("/api/scrobbles/story");
 }
 
 export async function previewAutomation(automation, progressToken, automationId) {

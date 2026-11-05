@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CELL, chainShape, createRibbon, hexToRgb, openingRect, quietRects, rampFor, sceneFor } from "./pixelRibbon";
+import { CELL, chainShape, createRibbon, hexToRgb, openingRect, quietRects, rampFor, ribbonStage, sceneFor } from "./pixelRibbon";
 
 const PALETTE = ["#000000", "#010101", "#020202", "#030303", "#040404", "#050505", "#060606", "#070707", "#080808"];
 
@@ -235,7 +235,7 @@ describe("createRibbon", () => {
     tick(32);
     expect(lastPull(gl)).toBe(0);
     // The time uniform is the first float of each frame: it must not advance.
-    const times = gl.calls.uniform1f.filter((_, i) => i % 8 === 0).map(([, v]) => v);
+    const times = gl.calls.uniform1f.filter((_, i) => i % 9 === 0).map(([, v]) => v);
     expect(new Set(times)).toEqual(new Set([0]));
   });
 
@@ -256,6 +256,110 @@ describe("createRibbon", () => {
     band.remove();
     tick(32);
     expect(lastCall(gl, "uniform1fv")[1][0]).toBeCloseTo(sceneFor("/dashboard").shape[0]);
+  });
+
+  describe("with a track on the stage", () => {
+    const layout = { radius: 1000, perspective: 3000, step: 0.4, bow: 300, roll: 0.18 };
+    const track = (more = {}) => ({
+      series: new Uint8Array(32),
+      count: 1,
+      end: 1,
+      x0: 0,
+      perMonth: 800,
+      y: 200,
+      half: 80,
+      head: 300,
+      flame: 1,
+      zoom: 0,
+      cx: 400,
+      focus: 0,
+      layout,
+      bandTop: 100,
+      bandBottom: 300,
+      holes: [],
+      ...more,
+    });
+    afterEach(() => {
+      ribbonStage.track = null;
+      ribbonStage.embers = 0;
+      ribbonStage.beforeDraw = null;
+    });
+
+    it("asks the page for its numbers each frame, before drawing", () => {
+      const gl = fakeGl();
+      const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE });
+      ribbon.setScene(sceneFor("/dashboard"));
+      ribbonStage.beforeDraw = vi.fn();
+      tick(16);
+      expect(ribbonStage.beforeDraw).toHaveBeenCalledTimes(1);
+      ribbon.destroy();
+    });
+
+    it("sends each series once, and the wave's numbers on every frame", () => {
+      const gl = fakeGl();
+      const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE, reducedMotion: true });
+      ribbon.setScene(sceneFor("/dashboard"));
+      ribbonStage.track = track();
+      tick(16);
+      tick(32);
+      expect(gl.calls.texImage2D).toHaveLength(1);
+      const waves = gl.calls.uniform4f.filter((call) => call[2] === 80 / window.innerHeight);
+      expect(waves.at(-1)[1]).toBeCloseTo(0.5 - 200 / window.innerHeight);
+      ribbon.destroy();
+    });
+
+    it("eases out from its last track when the page leaves", () => {
+      const gl = fakeGl();
+      const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE });
+      ribbon.setScene(sceneFor("/dashboard"));
+      ribbonStage.track = track();
+      tick(16);
+      tick(600);
+      const weightOn = gl.calls.uniform4f.filter((call) => call[3] === 300 / window.innerHeight).at(-1)[4];
+      expect(weightOn).toBeGreaterThan(0);
+      ribbonStage.track = null;
+      tick(632);
+      const weightAfter = gl.calls.uniform4f.filter((call) => call[3] === 300 / window.innerHeight).at(-1)[4];
+      expect(weightAfter).toBeGreaterThan(0);
+      expect(weightAfter).toBeLessThanOrEqual(weightOn);
+      ribbon.destroy();
+    });
+
+    it("opens the flame around the cards it is given, at most four, and says how far each has burnt", () => {
+      const gl = fakeGl();
+      const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE, reducedMotion: true });
+      ribbon.setScene(sceneFor("/dashboard"));
+      const rect = { left: 40, top: 80, width: 80, height: 40 };
+      const corners = [{ x: 40, y: 80 }, { x: 120, y: 80 }, { x: 120, y: 120 }, { x: 40, y: 120 }];
+      ribbonStage.track = track({ holes: Array(5).fill({ rect, corners, strength: 1, burn: 0.25 }) });
+      tick(16);
+      const holes = gl.calls.uniform4fv.filter((call) => call[1].length === 16).at(-1)[1];
+      expect(holes.slice(0, 4)).toEqual(new Float32Array([80 / CELL, (window.innerHeight - 100) / CELL, 40 / CELL, 20 / CELL]));
+      const edges = gl.calls.uniform3fv.find((call) => call[1].length === 48)[1];
+      // The top side faces up, the right side faces right.
+      expect(edges[0]).toBeCloseTo(0);
+      expect(edges[1]).toBeCloseTo(1);
+      expect(edges[2]).toBeCloseTo((window.innerHeight - 80) / CELL);
+      expect(edges[3]).toBeCloseTo(1);
+      expect(edges[4]).toBeCloseTo(0);
+      expect(gl.calls.uniform4f.some((call) => call[1] === 0.25 && call[4] === 0.25)).toBe(true);
+      ribbon.destroy();
+    });
+
+    it("climbs in embers, and sprays where it is asked to", () => {
+      const gl = fakeGl();
+      const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE });
+      ribbon.setScene(sceneFor("/dashboard"));
+      ribbonStage.track = track({ zoom: 1 });
+      ribbonStage.embers = 4;
+      ribbonStage.burst(10, 10);
+      tick(16);
+      tick(32);
+      expect(gl.calls.drawArrays.length).toBeGreaterThan(2);
+      ribbon.destroy();
+      expect(ribbonStage.alive).toBe(false);
+      expect(() => ribbonStage.burst(1, 1)).not.toThrow();
+    });
   });
 
   it("stops the loop and listeners on destroy", () => {

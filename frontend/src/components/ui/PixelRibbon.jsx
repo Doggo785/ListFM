@@ -14,7 +14,7 @@ export default function PixelRibbon() {
     const styles = getComputedStyle(document.documentElement);
     const palette = Array.from({ length: EMBER_STEPS }, (_, i) => styles.getPropertyValue(`--ember-${i + 1}`));
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const instance = createRibbon(canvas.current, { palette, reducedMotion });
+    const instance = createRibbon(canvas.current, { palette, ink: styles.getPropertyValue("--ground"), reducedMotion });
     ribbon.current = instance;
     return () => instance.destroy();
   }, []);
