@@ -9,6 +9,7 @@ from repositories.user_tracks import bulk_store_recent_plays, get_recent_user_tr
 from routers.deps import get_current_active_user, get_current_user_lastfm_username
 from schemas import (
     KnownTag,
+    ListeningStory,
     ListeningTotals,
     RecentTracksResponse,
     ScrobbleSyncStatus,
@@ -16,11 +17,13 @@ from schemas import (
     UserInfo,
 )
 from services.activity_log import log_activity
+from services.album_covers import start_album_covers
 from services.lastfm import (
     epoch_to_datetime,
     get_recent_tracks,
     get_user_info,
 )
+from services.listening_story import build_story
 from services.progress import store as progress_store
 from services.scrobble_sync import is_fresh, progress_key, start_scrobble_sync
 from services.tag_catalogue import tags_progress_key
@@ -118,6 +121,19 @@ async def listening_totals(
         **await get_listening_totals(db, current_user.id),
         complete=current_user.scrobbles_complete_at is not None,
     )
+
+
+@router.get("/scrobbles/story", response_model=ListeningStory)
+async def listening_story(
+    username: str = Depends(get_current_user_lastfm_username),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The Dashboard's poster and year, from stored listens only; missing album art is looked up behind."""
+    story, awaiting_art = await build_story(db, current_user.id, current_user.timezone or "UTC")
+    if awaiting_art:
+        start_album_covers(current_user.id, username, awaiting_art)
+    return story
 
 
 @router.post("/scrobbles/sync", response_model=ScrobbleSyncStatus, status_code=202)

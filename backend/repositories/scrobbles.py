@@ -11,6 +11,7 @@ from models.track import Track
 from models.user_track import UserTrack
 from repositories.user_tracks import bulk_store_recent_plays, ensure_tracks
 from sqlalchemy import (
+    Row,
     and_,
     between,
     bindparam,
@@ -142,6 +143,71 @@ async def get_listening_totals(db: AsyncSession, user_id: str) -> dict[str, int]
         )
     ).one()
     return dict(row._mapping)
+
+
+async def get_daily_listens(db: AsyncSession, user_id: str, start: datetime, timezone: str) -> dict[datetime, int]:
+    """Listens per local day since start."""
+    rows = await db.execute(
+        select(func.date_trunc("day", func.timezone(timezone, Scrobble.played_at)).label("day"), func.count().label("listens"))
+        .where(Scrobble.user_id == user_id, Scrobble.played_at >= start)
+        .group_by("day")
+    )
+    return {row.day: row.listens for row in rows}
+
+
+async def get_monthly_albums(db: AsyncSession, user_id: str, start: datetime, timezone: str) -> list[Row]:
+    """Plays per local month, artist and album since start. A track without an album has a null album id."""
+    rows = await db.execute(
+        select(
+            func.date_trunc("month", func.timezone(timezone, Scrobble.played_at)).label("month"),
+            Track.artist,
+            Album.id,
+            Album.title,
+            Album.image_url,
+            Album.image_fetched_at,
+            func.count().label("plays"),
+        )
+        .join(Track, Track.id == Scrobble.track_id)
+        .outerjoin(Album, Album.id == Track.album_id)
+        .where(Scrobble.user_id == user_id, Scrobble.played_at >= start)
+        .group_by("month", Track.artist, Album.id)
+    )
+    return list(rows)
+
+
+async def get_top_artists(db: AsyncSession, user_id: str, start: datetime | None, limit: int) -> list[Row]:
+    """The most played artists since start, or over all listens."""
+    query = (
+        select(Track.artist, func.count().label("plays"))
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .where(Scrobble.user_id == user_id)
+        .group_by(Track.artist)
+        .order_by(func.count().desc(), Track.artist)
+        .limit(limit)
+    )
+    if start is not None:
+        query = query.where(Scrobble.played_at >= start)
+    return list(await db.execute(query))
+
+
+async def get_top_albums(db: AsyncSession, user_id: str, start: datetime | None, limit: int) -> list[Row]:
+    """The most played albums since start, or over all listens."""
+    query = (
+        select(Album.id, Album.title, Album.artist, Album.image_url, Album.image_fetched_at, func.count().label("plays"))
+        .join(Track, Track.album_id == Album.id)
+        .join(Scrobble, Scrobble.track_id == Track.id)
+        .where(Scrobble.user_id == user_id)
+        .group_by(Album.id)
+        .order_by(func.count().desc(), Album.title)
+        .limit(limit)
+    )
+    if start is not None:
+        query = query.where(Scrobble.played_at >= start)
+    return list(await db.execute(query))
+
+
+async def count_listens_since(db: AsyncSession, user_id: str, start: datetime) -> int:
+    return await db.scalar(select(func.count()).select_from(Scrobble).where(Scrobble.user_id == user_id, Scrobble.played_at >= start)) or 0
 
 
 async def get_window_tracks(

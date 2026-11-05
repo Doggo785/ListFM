@@ -159,7 +159,7 @@ async def test_a_deleted_playlist_asks_for_nothing():
 async def test_one_pass_at_a_time_per_user():
     gate = asyncio.Event()
 
-    async def held(user_id, username):
+    async def held(user_id, username, lists=None):
         await gate.wait()
         album_covers._running.discard(user_id)
 
