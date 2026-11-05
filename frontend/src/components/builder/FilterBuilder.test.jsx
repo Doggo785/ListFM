@@ -89,6 +89,13 @@ describe("FilterBuilder", () => {
     expect(document.body.textContent).not.toContain("Rank");
   });
 
+  it("keeps the operator select at its own width beside the field", async () => {
+    const container = await render({ field: "playcount", value: 3 });
+    const operator = container.querySelector('[aria-label="Filter operator"]');
+    expect(operator.classList.contains("w-32")).toBe(true);
+    expect(operator.classList.contains("w-full")).toBe(false);
+  });
+
   it("starts a loved filter on Loved with no operator to choose", async () => {
     const container = await render({ field: "playcount", value: 3 });
     await pickField(container, "Your plays (window)", "Loved");

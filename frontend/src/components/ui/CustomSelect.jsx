@@ -1,12 +1,17 @@
 import { Select } from "radix-ui";
 import { IconChevronDown } from "@tabler/icons-react";
 
+import { cn } from "@/lib/utils";
+
 export default function CustomSelect({ value, onChange, options, placeholder, label, className = "" }) {
   return (
     <Select.Root value={value} onValueChange={onChange}>
       <Select.Trigger
         aria-label={label}
-        className={`flex h-10 w-full items-center gap-2 border-2 border-(--line) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) hover:border-(--ember) focus-visible:border-(--ember) ${className}`}
+        className={cn(
+          "flex h-10 w-full items-center gap-2 border-2 border-(--line) bg-(--ground) px-3 text-sm text-(--text) outline-none transition-colors duration-(--duration-quick) hover:border-(--ember) focus-visible:border-(--ember)",
+          className,
+        )}
       >
         <span className="flex-1 truncate text-left">
           <Select.Value placeholder={placeholder} />
