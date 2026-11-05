@@ -2,6 +2,8 @@ import { plural } from "@/lib/playlists";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+export const RUN_TONES = { plain: "text-(--text)", muted: "text-(--text-muted)", alert: "text-(--ember)" };
+
 export const timeOf = (iso) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 /** One line per run: the attempts of a chain share a scheduled date and count up. The list comes newest first. */

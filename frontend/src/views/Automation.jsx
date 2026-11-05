@@ -7,9 +7,10 @@ import { useAutomations } from "@/hooks/useAutomations";
 import { useScrobbleSync } from "@/hooks/useScrobbleSync";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
-import Modal from "@/components/ui/Modal";
+import ConfirmDelete from "@/components/ui/ConfirmDelete";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
+import { Gone, LinkLastfmHint, LoadFailed, StatePage } from "@/components/elements/PageStates";
 import {
   deleteAutomation,
   getAutomationHistory,
@@ -20,10 +21,9 @@ import {
   runAutomationNow,
 } from "@/lib/api";
 import { describeAutomation, describeSchedule, describeWaiting } from "@/lib/automation-rules";
-import { chainsOf, daysOf, describeRun, timeOf } from "@/lib/runs";
+import { RUN_TONES, chainsOf, daysOf, describeRun, timeOf } from "@/lib/runs";
+import { FOCUS } from "@/lib/utils";
 
-const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9)";
-const TONES = { plain: "text-(--text)", muted: "text-(--text-muted)", alert: "text-(--ember)" };
 const STAGES = new Map([["source", "Reading your listens"], ["filter", "Applying filters"], ["done", "Finishing"]]);
 const ROW = "grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-start gap-x-3 py-2.5";
 const HISTORY_LIMIT = 50; // What the server returns.
@@ -70,7 +70,7 @@ function RunRow({ chain, progress, retryable, busy, onRetry }) {
         className={`${ROW} transition-colors duration-(--duration-quick) hover:bg-(--ember-1) focus-visible:bg-(--ember-1) ${FOCUS}`}
       >
         {time}
-        <span className={`text-base ${TONES[tone]}`}>{label}</span>
+        <span className={`text-base ${RUN_TONES[tone]}`}>{label}</span>
         <IconChevronRight size={16} className="mt-1 text-(--text-muted)" aria-hidden="true" />
       </Link>
     );
@@ -80,7 +80,7 @@ function RunRow({ chain, progress, retryable, busy, onRetry }) {
     <div className={ROW} data-loader={head.status === "running" ? "" : undefined}>
       {time}
       <div className="min-w-0">
-        <p className={`text-base ${TONES[tone]}`}>{label}</p>
+        <p className={`text-base ${RUN_TONES[tone]}`}>{label}</p>
         {head.status === "running" && progress && <RunningDetail progress={progress} />}
         {head.status === "failed" && head.error_message && <p className="text-sm text-(--text-muted)">{head.error_message}</p>}
         {head.status !== "running" && <Tries tries={tries} />}
@@ -91,14 +91,7 @@ function RunRow({ chain, progress, retryable, busy, onRetry }) {
 }
 
 function History({ rows, failed, onReload, run, listensLoading, onRetry, automation }) {
-  if (failed && !rows) {
-    return (
-      <div role="alert">
-        <p className="pb-3 text-base">The history could not load.</p>
-        <Button variant="outline" onClick={onReload}>Try again</Button>
-      </div>
-    );
-  }
+  if (failed && !rows) return <LoadFailed subject="The history" onRetry={onReload} />;
   if (!rows) return <p role="status" className="text-sm text-(--text-muted)">Loading history</p>;
 
   const chains = chainsOf(rows);
@@ -256,34 +249,10 @@ export default function Automation() {
   };
 
   if (!automation) {
-    if (!username) {
-      return (
-        <main className="h-full w-full px-4 pt-4 text-left md:px-8">
-          <p data-quiet className="mx-auto max-w-6xl text-base text-(--text-muted)">
-            <Link to="/link-lastfm" className={`text-(--ember) underline underline-offset-4 ${FOCUS}`}>Link your Last.fm account</Link> to see this automation.
-          </p>
-        </main>
-      );
-    }
-    if (isLoading || !error) return <main className="h-full w-full px-4 pt-4 text-left md:px-8"><Loader /></main>;
-    if (!/API 404/.test(error)) {
-      return (
-        <main className="h-full w-full px-4 pt-4 text-left md:px-8">
-          <div data-quiet role="alert" className="mx-auto max-w-6xl">
-            <p className="pb-3 text-base">This automation could not load.</p>
-            <Button variant="outline" onClick={() => refetch()}>Try again</Button>
-          </div>
-        </main>
-      );
-    }
-    return (
-      <main className="h-full w-full px-4 pt-4 text-left md:px-8">
-        <div data-quiet className="mx-auto max-w-6xl">
-          <p className="pb-4 text-2xl">This automation no longer exists</p>
-          <Link to="/automations" className={buttonVariants({ variant: "outline" })}>Back to automations</Link>
-        </div>
-      </main>
-    );
+    if (!username) return <StatePage><LinkLastfmHint purpose="to see this automation." /></StatePage>;
+    if (isLoading || !error) return <StatePage><Loader /></StatePage>;
+    if (/API 404/.test(error)) return <StatePage><Gone subject="This automation" to="/automations" back="Back to automations" /></StatePage>;
+    return <StatePage><LoadFailed subject="This automation" onRetry={refetch} /></StatePage>;
   }
 
   const paused = automation.enabled === false;
@@ -326,15 +295,14 @@ export default function Automation() {
         </section>
       </div>
 
-      <Modal
+      <ConfirmDelete
         open={confirming}
         onClose={() => setConfirming(false)}
+        onConfirm={confirmDelete}
+        deleting={deleting}
         title="Delete this automation?"
         description={`${name} will stop making playlists. The playlists it already made stay in your list.`}
-      >
-        <Button variant="outline" size="sm" onClick={() => setConfirming(false)}>Cancel</Button>
-        <Button variant="danger" size="sm" onClick={confirmDelete} disabled={deleting}>{deleting ? "Deleting" : "Delete"}</Button>
-      </Modal>
+      />
     </main>
   );
 }

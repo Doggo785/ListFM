@@ -5,9 +5,9 @@ import { AnimatePresence, motion } from "motion/react";
 import CronEditor from "@/components/builder/CronEditor";
 import FilterBuilder from "@/components/builder/FilterBuilder";
 import Loader from "@/components/elements/Loader";
+import { Gone, LoadFailed, StatePage } from "@/components/elements/PageStates";
 import PixelNumber from "@/components/elements/PixelNumber";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/buttonVariants";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { Input, NumberInput } from "@/components/ui/input";
 import { useAutomation } from "@/hooks/useAutomation";
@@ -406,23 +406,9 @@ function EditAutomation({ id }) {
   const { user } = useAuth();
   const { automation, error, refetch } = useAutomation(user?.lastfm_username ? id : null);
   if (automation) return <Creator saved={automation} />;
-  return (
-    <main className="h-full w-full px-4 pt-4 text-left md:px-8">
-      {!error && <Loader />}
-      {error && /API 404/.test(error) && (
-        <div data-quiet className="mx-auto max-w-6xl">
-          <p className="pb-4 text-2xl">This automation no longer exists</p>
-          <Link to="/automations" className={buttonVariants({ variant: "outline" })}>Back to automations</Link>
-        </div>
-      )}
-      {error && !/API 404/.test(error) && (
-        <div data-quiet role="alert" className="mx-auto max-w-6xl">
-          <p className="pb-3 text-base">This automation could not load.</p>
-          <Button variant="outline" onClick={() => refetch()}>Try again</Button>
-        </div>
-      )}
-    </main>
-  );
+  if (!error) return <StatePage><Loader /></StatePage>;
+  if (/API 404/.test(error)) return <StatePage><Gone subject="This automation" to="/automations" back="Back to automations" /></StatePage>;
+  return <StatePage><LoadFailed subject="This automation" onRetry={refetch} /></StatePage>;
 }
 
 export default function PlaylistNew() {
