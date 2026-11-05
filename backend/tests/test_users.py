@@ -1,4 +1,4 @@
-"""Tests for the /api user-data endpoints (info, recent-tracks).
+"""Tests for the /api/info user-data endpoint.
 
 Upstream Last.fm failures must return 502 with a generic detail that leaks no
 internal exception text; the real error goes to server logs only.
@@ -28,26 +28,18 @@ async def _register_login_link(client: AsyncClient, email: str) -> None:
     assert link.status_code == 200
 
 
-# (endpoint, service function patched in routers.users)
-_ENDPOINTS = [
-    ("/api/info", "get_user_info"),
-    ("/api/recent-tracks", "get_recent_tracks"),
-]
-
-
 @pytest.mark.asyncio
-@pytest.mark.parametrize("path,service_fn", _ENDPOINTS)
-async def test_lastfm_wserror_masked_as_502(client: AsyncClient, path: str, service_fn: str):
-    """A pylast.WSError from any user-data endpoint must return 502 with a
-    generic detail and must NOT leak the raw exception message."""
+async def test_lastfm_wserror_masked_as_502(client: AsyncClient):
+    """A pylast.WSError must return 502 with a generic detail and must NOT
+    leak the raw exception message."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
         with patch(
-            f"routers.users.{service_fn}",
+            "routers.users.get_user_info",
             side_effect=pylast.WSError(None, 6, SECRET_MSG),
         ):
-            resp = await client.get(path)
+            resp = await client.get("/api/info")
         assert resp.status_code == 502
         body = resp.json()
         assert body["detail"] == GENERIC_DETAIL

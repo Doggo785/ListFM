@@ -4,7 +4,6 @@ import asyncio
 import logging
 import threading
 import time
-from datetime import UTC, datetime
 
 import httpx
 import pylast
@@ -71,12 +70,6 @@ def is_rate_limit_error(exc: BaseException) -> bool:
     return False
 
 
-
-
-
-
-
-
 async def call_retrying_rate_limit(fn, *args):
     """One Last.fm call off the event loop, retried after a rate limit (29)."""
     for attempt in range(RATE_LIMIT_RETRIES + 1):
@@ -90,14 +83,6 @@ async def call_retrying_rate_limit(fn, *args):
     raise AssertionError("unreachable")
 
 
-def epoch_to_datetime(ts) -> datetime | None:
-    """Last.fm epoch seconds (or None) to aware datetime, forgiving."""
-    try:
-        return datetime.fromtimestamp(int(ts), tz=UTC) if ts is not None else None
-    except (TypeError, ValueError, OverflowError, OSError):
-        return None
-
-
 def get_user_info(username: str) -> dict:
     """Profile in one user.getInfo call; unknown users raise pylast.WSError (6)."""
     user = _lastfm_json("user.getInfo", user=username)["user"]
@@ -108,19 +93,11 @@ def get_user_info(username: str) -> dict:
     }
 
 
-def get_network() -> pylast.LastFMNetwork:
-    settings = get_settings()
-    return pylast.LastFMNetwork(
-        api_key=settings.lastfm_api_key,
-        api_secret=settings.lastfm_api_secret,
-    )
-
-
 LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
 
 
 def _pick_image(images, sizes=("large", "extralarge", "medium", "small")) -> str | None:
-    """Usable image URL from an extended=1 image list (UI-sized first)."""
+    """Usable image URL from a Last.fm image list (UI-sized first)."""
     if not isinstance(images, list):
         return None
     by_size = {
@@ -132,67 +109,6 @@ def _pick_image(images, sizes=("large", "extralarge", "medium", "small")) -> str
         if by_size.get(size):
             return by_size[size]
     return None
-
-
-def get_recent_tracks_extended(
-    username: str, limit: int = 5, time_from: int | None = None, time_to: int | None = None
-) -> list[dict] | None:
-    """Recents with loved + image per track, or None when unusable.
-
-    One paginated call with extended=1 instead of one call plus per-track
-    lookups. Any unexpected shape or transport error returns None so the
-    caller falls back to the pylast path (never worse than today).
-    """
-    params: dict[str, object] = {
-        "method": "user.getrecenttracks",
-        "user": username,
-        "api_key": get_settings().lastfm_api_key,
-        "format": "json",
-        "limit": min(limit + 1, 200),
-        "extended": 1,
-    }
-    if time_from:
-        params["from"] = time_from
-    if time_to:
-        params["to"] = time_to
-    try:
-        response = httpx.get(LASTFM_API_URL, params=params, timeout=30)
-        response.raise_for_status()
-        nodes = response.json()["recenttracks"]["track"]
-    except Exception:
-        logger.debug("get_recent_tracks_extended: falling back to pylast", exc_info=True)
-        return None
-    if isinstance(nodes, dict):
-        nodes = [nodes]
-    if not isinstance(nodes, list):
-        return None
-    tracks = []
-    for node in nodes:
-        if not isinstance(node, dict):
-            continue
-        if node.get("@attr", {}).get("nowplaying") == "true":
-            continue
-        title = node.get("name")
-        artist = node.get("artist", {})
-        artist_name = artist.get("name") if isinstance(artist, dict) else artist
-        if not title or not artist_name:
-            continue
-        date = node.get("date", {})
-        timestamp = date.get("uts") if isinstance(date, dict) else None
-        track: dict[str, object] = {
-            "title": title,
-            "artist": artist_name,
-            "timestamp": int(timestamp) if timestamp else None,
-        }
-        if "loved" in node:
-            track["userloved"] = node["loved"] == "1"
-        image = _pick_image(node.get("image"))
-        if image:
-            track["image"] = image
-        tracks.append(track)
-        if len(tracks) >= limit:
-            break
-    return tracks
 
 
 def _lastfm_json(method: str, **params: str) -> dict:
@@ -267,8 +183,6 @@ def get_loved_page(username: str, page: int, limit: int) -> tuple[list[tuple[str
     return loved, int(data["@attr"]["totalPages"])
 
 
-
-
 def get_artist_tags(artist: str) -> list[dict]:
     """An artist's top tags with counts from 0 to 100; an unknown artist has none."""
     _throttled_call()
@@ -296,33 +210,6 @@ def get_album_image(artist: str, album: str) -> str | None:
     return None if image is None or NO_IMAGE_HASH in image else image
 
 
-def get_recent_tracks(
-    username: str, limit: int = 5, time_from: int | None = None, time_to: int | None = None
-) -> list[dict]:
-    extended = get_recent_tracks_extended(username, limit, time_from, time_to)
-    if extended is not None:
-        log_activity("lastfm", username, f"{len(extended)} écoutes récentes")
-        return extended
-    network = get_network()
-    user = network.get_user(username)
-    recent = user.get_recent_tracks(limit=limit, time_from=time_from, time_to=time_to)
-    log_activity("lastfm", username, f"{len(recent)} écoutes récentes")
-    return [
-        {
-            "title": t.track.title,
-            "artist": t.track.artist.name if t.track.artist else "Unknown Artist",
-            "timestamp": int(t.timestamp) if t.timestamp else None,
-        }
-        for t in recent
-    ]
-
-
-
-
-
-
-
-
 def _normalize_tags(raw_tags: list[dict]) -> list[dict]:
     if not raw_tags:
         return []
@@ -333,11 +220,5 @@ def _normalize_tags(raw_tags: list[dict]) -> list[dict]:
         {"name": t["name"], "count": round((t["count"] / max_count) * 100)}
         for t in raw_tags
     ]
-
-
-
-
-
-
 
 

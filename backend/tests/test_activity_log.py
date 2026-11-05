@@ -12,7 +12,7 @@ from services.activity_log import (
 )
 
 from .conftest import _unique_email
-from .test_recent_tracks_cache import _register_login_link
+from .test_preview import _register_login_link
 
 
 def test_lines_read_as_validated(activity_lines):
@@ -44,7 +44,5 @@ async def test_a_lastfm_error_logs_its_class_never_its_message(client: AsyncClie
     leak = RuntimeError("Server error for url 'https://ws.audioscrobbler.com/2.0/?api_key=SECRET'")
     with patch("routers.users.get_user_info", side_effect=leak):
         assert (await client.get("/api/info")).status_code == 502
-    with patch("routers.users.get_recent_tracks", side_effect=leak):
-        assert (await client.get("/api/recent-tracks")).status_code == 502
-    assert activity_lines() == ["lastfm recents_user échec : RuntimeError"] * 2
+    assert activity_lines() == ["lastfm preview_user échec : RuntimeError"]
     assert "SECRET" not in caplog.text

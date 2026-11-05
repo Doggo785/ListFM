@@ -217,10 +217,6 @@ class UserInfo(BaseModel):
     image: str | None = None
 
 
-class RecentTracksResponse(BaseModel):
-    tracks: list[Track]
-
-
 class ErrorResponse(BaseModel):
     error: str
 

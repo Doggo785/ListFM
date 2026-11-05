@@ -1,10 +1,9 @@
 import uuid
 from datetime import UTC, datetime
 
-from models.album import Album
 from models.track import Track
 from models.user_track import UserTrack
-from sqlalchemy import delete, desc, func, select, tuple_
+from sqlalchemy import delete, func, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,24 +59,6 @@ async def upsert_user_track(
     result = await db.execute(stmt)
     await db.flush()
     return result.scalar_one()
-
-
-async def get_recent_user_tracks(
-    db: AsyncSession, user_id: str, limit: int
-) -> list[dict]:
-    """Newest plays with track identity, newest first (may be empty)."""
-    result = await db.execute(
-        select(Track.title, Track.artist, Album.title, UserTrack.last_played_at)
-        .join(Track, Track.id == UserTrack.track_id)
-        .outerjoin(Album, Album.id == Track.album_id)
-        .where(UserTrack.user_id == user_id, UserTrack.last_played_at.is_not(None))
-        .order_by(desc(UserTrack.last_played_at))
-        .limit(limit)
-    )
-    return [
-        {"title": title, "artist": artist, "album": album, "played_at": played_at}
-        for title, artist, album, played_at in result.all()
-    ]
 
 
 async def _tracks_by_key(

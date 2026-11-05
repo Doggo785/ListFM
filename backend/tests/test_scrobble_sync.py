@@ -19,6 +19,7 @@ from repositories.scrobbles import (
     store_scrobbles,
     store_track_albums,
 )
+from repositories.user_tracks import get_user_track, upsert_user_track
 from services import scrobble_sync
 from sqlalchemy import func, select
 
@@ -186,6 +187,24 @@ async def test_totals_count_this_users_stored_history(client: AsyncClient):
 
     resp = await client.get("/api/scrobbles/totals")
     assert resp.json() == {"listens": 5, "tracks": 4, "artists": 2, "albums": 2, "complete": False}
+
+
+@pytest.mark.asyncio
+async def test_stored_listens_never_clobber_a_users_stats(client: AsyncClient):
+    await _register_and_login(client, _unique_email())
+    day = datetime(2026, 1, 1, tzinfo=UTC)
+    async with _TestSessionLocal() as db:
+        user = (await db.execute(select(User))).scalars().one()
+        await store_scrobbles(db, user.id, [("A", "X", day)])
+        track = (await db.execute(select(Track).where(Track.title == "A", Track.artist == "X"))).scalar_one()
+        assert track.last_fetched_at is None  # A listen does not mark the track looked up.
+        await upsert_user_track(db, user.id, track.id, user_playcount=500, userloved=True)
+        await store_scrobbles(db, user.id, [("A", "X", day + timedelta(days=1))])
+        await db.commit()
+        row = await get_user_track(db, user.id, track.id)
+    assert row.user_playcount == 500
+    assert row.userloved is True
+    assert row.last_played_at == day + timedelta(days=1)
 
 
 @pytest.mark.asyncio
