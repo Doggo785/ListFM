@@ -22,7 +22,7 @@ mypy_job()      { uvx --python 3.12 mypy@2.3.1 backend --ignore-missing-imports;
 backend_job()   { "$VENV/python" -m pytest backend/tests/ -q --cov=backend --cov-report=xml:coverage.xml &&
                   "$VENV/diff-cover" coverage.xml --compare-branch=origin/main --fail-under=80; }
 # shortcut: reuses existing node_modules instead of `npm ci`; run `npm ci` after lockfile changes.
-fbuild_job()    { (cd frontend && npm run check:fast && npm run build); }
+fbuild_job()    { (cd frontend && npm run check:fast && npm run check:design && npm run build); }
 ftests_job()    { (cd frontend && npx vitest run --coverage --coverage.reporter=cobertura --coverage.reporter=text &&
                   "$VENV/diff-cover" coverage/cobertura-coverage.xml --compare-branch=origin/main --fail-under=80); }
 

@@ -132,6 +132,9 @@ jobs:
       - name: Lint
         working-directory: frontend
         run: npm run check:fast
+      - name: Design anti-patterns
+        working-directory: frontend
+        run: npm run check:design
       - name: Build
         working-directory: frontend
         run: npm run build
