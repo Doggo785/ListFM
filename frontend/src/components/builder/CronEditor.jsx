@@ -17,6 +17,7 @@ const FREQUENCIES = [
   { value: "weekly", label: "Every week" },
   { value: "monthly", label: "Every month" },
   { value: "quarterly", label: "Every 3 months" },
+  { value: "seasonal", label: "Every season" },
   { value: "yearly", label: "Every year" },
   { value: "custom", label: "Custom" },
 ];
@@ -55,7 +56,7 @@ export default function CronEditor({ value, onChange }) {
         {frequency === "yearly" && (
           <CustomSelect label="Month" value={String(schedule.month)} onChange={(v) => set({ month: Number(v) })} options={asOptions(MONTHS, 1)} className="w-40" />
         )}
-        {["monthly", "quarterly", "yearly"].includes(frequency) && (
+        {["monthly", "quarterly", "seasonal", "yearly"].includes(frequency) && (
           <>
             <span className="text-sm text-(--text-muted)">on day</span>
             <CustomSelect label="Day of the month" value={String(schedule.day)} onChange={(v) => set({ day: Number(v) })} options={DAY_OPTIONS} className="w-20" />

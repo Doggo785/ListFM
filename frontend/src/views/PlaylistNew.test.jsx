@@ -109,15 +109,19 @@ describe("creator", () => {
     expect(previewAutomation.mock.calls[1][0].sort).toBe("last_played");
   });
 
-  it("does not rerun the preview for the name or the schedule", async () => {
+  it("previews the first run of a valid schedule, and never sends a half-typed one", async () => {
+    Element.prototype.scrollIntoView = () => {};
     const container = await render();
     await wait(400);
-    previewAutomation.mockClear();
-    const body = () => previewAutomation.mock.calls;
-    await type(container.querySelector('[aria-label="Name"]'), "Mine");
+    await click(button(container, "Seasonal"));
     await wait(400);
-    expect(body().filter((c) => c[0].name !== "Mine")).toEqual([]);
-    expect(body().every((c) => c[0].cron === "")).toBe(true);
+    expect(previewAutomation.mock.lastCall[0].cron).toBe("0 0 1 3,6,9,12 *");
+
+    await click(container.querySelector('[aria-label="How often"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "Custom"));
+    await type(container.querySelector('[aria-label="Cron expression"]'), "0 0");
+    await wait(400);
+    expect(previewAutomation.mock.lastCall[0].cron).toBe("");
   });
 
   it("keeps the last result and says so when a preview fails", async () => {
@@ -142,7 +146,7 @@ describe("creator", () => {
     await type(container.querySelector('[aria-label="Name"]'), "Mine");
     await click(button(container, "Seasonal"));
     await click(button(container, "Create automation"));
-    expect(createAutomation.mock.calls[1][0]).toMatchObject({ name: "Mine", cron: "0 0 1 */3 *", output: { maxSize: 30 } });
+    expect(createAutomation.mock.calls[1][0]).toMatchObject({ name: "Mine", cron: "0 0 1 3,6,9,12 *", output: { maxSize: 30 } });
   });
 
   it("says what creating does: a schedule starts by itself, otherwise it offers to run", async () => {
@@ -152,7 +156,7 @@ describe("creator", () => {
     expect(navigate).toHaveBeenCalledWith("/playlists/a1", { state: { created: "Created.", runNow: true } });
 
     await click(button(container, "Seasonal"));
-    expect(container.textContent).toContain("First playlist in about a minute, then every 3 months, on the 1st, at 00:00.");
+    expect(container.textContent).toContain("First playlist in about a minute, from the last full period, then the 1st of March, June, September and December at 00:00.");
     expect(button(container, "Create and run")).toBeUndefined();
     await click(button(container, "Create automation"));
     expect(navigate.mock.lastCall[1].state.runNow).toBe(false);

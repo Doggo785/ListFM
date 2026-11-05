@@ -64,6 +64,8 @@ export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const isWhole = (part) => /^\d+$/.test(part);
+// Each fire closes a whole season: December to February on 1 March, and so on.
+const SEASON_MONTHS = "3,6,9,12";
 
 /** A cron as what the schedule picker edits. Anything the picker can't draw is "custom". */
 export function readSchedule(expr) {
@@ -81,6 +83,7 @@ export function readSchedule(expr) {
     const dated = { ...time, day: Number(day) };
     if (month === "*") return { frequency: "monthly", ...dated };
     if (month === "*/3") return { frequency: "quarterly", ...dated };
+    if (month === SEASON_MONTHS) return { frequency: "seasonal", ...dated };
     if (isWhole(month)) return { frequency: "yearly", ...dated, month: Number(month) };
   }
   return { frequency: "custom" };
@@ -92,6 +95,7 @@ export function writeSchedule({ frequency, minute = 0, hour = 8, weekday = 1, da
   if (frequency === "weekly") return `${time} * * ${weekday}`;
   if (frequency === "monthly") return `${time} ${day} * *`;
   if (frequency === "quarterly") return `${time} ${day} */3 *`;
+  if (frequency === "seasonal") return `${time} ${day} ${SEASON_MONTHS} *`;
   if (frequency === "yearly") return `${time} ${day} ${month} *`;
   return "";
 }
@@ -100,7 +104,7 @@ export function writeSchedule({ frequency, minute = 0, hour = 8, weekday = 1, da
 export function describeOutcome(cron) {
   if (!cron) return "Nothing runs until you start it.";
   const rhythm = readSchedule(cron).frequency === "custom" ? "on your schedule" : describeCron(cron).replace(/^./, (c) => c.toLowerCase());
-  return `First playlist in about a minute, then ${rhythm}.`;
+  return `First playlist in about a minute, from the last full period, then ${rhythm}.`;
 }
 
 const ordinal = (n) => {
@@ -118,6 +122,7 @@ export function describeCron(expr) {
   if (s.frequency === "weekly") return `Every ${WEEKDAYS[s.weekday]} at ${time}`;
   if (s.frequency === "monthly") return `The ${ordinal(s.day)} of every month at ${time}`;
   if (s.frequency === "quarterly") return `Every 3 months, on the ${ordinal(s.day)}, at ${time}`;
+  if (s.frequency === "seasonal") return `The ${ordinal(s.day)} of March, June, September and December at ${time}`;
   return `Every year, ${MONTHS[s.month - 1]} ${ordinal(s.day)}, at ${time}`;
 }
 
@@ -249,7 +254,7 @@ export const PRESETS = [
   { id: "artists", label: "Top artists", window: month(3), sort: "most_played", cron: "", maxSize: 50, maxPerArtist: 5, rules: [rule("artist_rank", "lte", 10)] },
   { id: "discoveries", label: "Monthly discoveries", window: month(1), sort: "most_played", cron: DEFAULT_CRON, maxSize: 50, rules: [rule("first_played", "within_days", 31)] },
   { id: "rediscoveries", label: "Rediscoveries", window: { length: null, ago: null }, sort: "most_played", cron: "", maxSize: 50, rules: [rule("timestamp", "before", 180), rule("userplaycount", "gte", 5)] },
-  { id: "seasonal", label: "Seasonal", window: month(3), sort: "most_played", cron: "0 0 1 */3 *", maxSize: 30, rules: [] },
+  { id: "seasonal", label: "Seasonal", window: month(3), sort: "most_played", cron: `0 0 1 ${SEASON_MONTHS} *`, maxSize: 30, rules: [] },
 ];
 
 /** The preset's recipe over a draft: name and identity stay the draft's. */

@@ -190,8 +190,8 @@ export default function PlaylistNew() {
   const setOutput = (patch) => setDraft((d) => ({ ...d, output: { ...d.output, ...patch } }));
 
   const payload = toPayload(draft);
-  // The schedule and the name don't change the result, and a half-typed cron must not fail it.
-  const preview = useLivePreview(linked ? { ...payload, name, cron: "", id: undefined, createdAt: undefined, updatedAt: undefined } : null);
+  // The schedule sets the first run's period; a half-typed cron must not fail the preview.
+  const preview = useLivePreview(linked ? { ...payload, name, cron: isValidCron(draft.cron) ? draft.cron : "", id: undefined, createdAt: undefined, updatedAt: undefined } : null);
   const { result } = preview;
 
   const windowIsCustom = customWindow || !windowOption(draft.window);
@@ -226,7 +226,7 @@ export default function PlaylistNew() {
   };
 
   return (
-    <main className="h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-32 text-left md:px-8 lg:pb-8">
+    <main className="h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-40 text-left md:px-8 lg:pb-8">
       <div className="mx-auto max-w-6xl">
         <header data-quiet className="pt-4">
           <h1 className="text-4xl">New automation</h1>

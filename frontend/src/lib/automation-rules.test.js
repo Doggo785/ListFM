@@ -79,6 +79,7 @@ describe("schedule", () => {
     ["0 8 * * 7", "weekly", "Every Sunday at 08:00"],
     ["0 0 1 * *", "monthly", "The 1st of every month at 00:00"],
     ["0 0 22 */3 *", "quarterly", "Every 3 months, on the 22nd, at 00:00"],
+    ["0 0 1 3,6,9,12 *", "seasonal", "The 1st of March, June, September and December at 00:00"],
     ["0 9 2 1 *", "yearly", "Every year, January 2nd, at 09:00"],
   ])("reads %s", (cron, frequency, text) => {
     expect(readSchedule(cron).frequency).toBe(frequency);
@@ -86,7 +87,7 @@ describe("schedule", () => {
   });
 
   it("writes back what it read", () => {
-    for (const cron of ["5 8 * * *", "5 8 * * 3", "5 8 12 * *", "5 8 12 */3 *", "5 8 12 6 *"]) {
+    for (const cron of ["5 8 * * *", "5 8 * * 3", "5 8 12 * *", "5 8 12 */3 *", "5 8 12 3,6,9,12 *", "5 8 12 6 *"]) {
       expect(writeSchedule(readSchedule(cron))).toBe(cron);
     }
   });
@@ -129,7 +130,7 @@ describe("presets and names", () => {
 
   it("gives seasonal its three-month rhythm", () => {
     const seasonal = applyPreset(draft(), PRESETS.find((p) => p.id === "seasonal"));
-    expect(seasonal.cron).toBe("0 0 1 */3 *");
+    expect(seasonal.cron).toBe("0 0 1 3,6,9,12 *");
     expect(windowOption(seasonal.window).value).toBe("3m");
   });
 
