@@ -1,463 +1,269 @@
-import { useState, useRef, useEffect } from "react";
-import {
-  IconPlus,
-  IconTrash,
-  IconSwitch2,
-  IconBolt,
-  IconHeart,
-  IconChartBar,
-  IconTag,
-  IconClock,
-  IconFilter,
-  IconGitBranch,
-  IconListCheck,
-  IconSearch,
-  IconHelp,
-} from "@tabler/icons-react";
+import { useEffect, useRef, useState } from "react";
+import { IconPlus, IconX } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import CustomSelect from "@/components/ui/CustomSelect";
+import { Input, NumberInput } from "@/components/ui/input";
 import {
   FILTER_FIELDS,
   FILTER_OPERATORS,
+  WEEKDAYS,
+  WINDOW_OPTIONS,
+  completeMoment,
   conditionForField,
-  createGroup,
   createCondition,
+  createGroup,
+  windowOption,
 } from "@/lib/automation-rules";
 import { getKnownTags } from "@/lib/api";
-import CustomSelect from "@/components/ui/CustomSelect";
 
-const INPUT_CLASSES =
-  "rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5 text-sm text-white placeholder:text-neutral-600 focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)]/30 transition-all tabular-nums";
+const FIELD_OPTIONS = Object.entries(FILTER_FIELDS).map(([value, def]) => ({ value, label: def.label }));
+const Word = ({ children }) => <span className="text-sm text-(--text-muted)">{children}</span>;
 
-const FIELD_ICONS = {
-  userplaycount: IconBolt,
-  userloved: IconHeart,
-  playcount: IconChartBar,
-  tags: IconTag,
-  timestamp: IconClock,
-};
+const ANY = "any";
+// The server counts days from Monday, 1 to 7.
+const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7].map((day) => ({ value: String(day), label: WEEKDAYS[day % 7] }));
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => ({ value: String(hour), label: `${String(hour).padStart(2, "0")}:00` }));
+const fromSelect = (v) => (v === ANY ? null : Number(v));
+const toSelect = (v) => (v == null ? ANY : String(v));
 
-const FIELD_ENTRIES = Object.entries(FILTER_FIELDS);
+const OWN_WINDOW = "window";
+const DATES = "dates";
+const PERIOD_OPTIONS = [
+  { value: OWN_WINDOW, label: "in this window" },
+  ...WINDOW_OPTIONS.map((o) => ({ value: o.value, label: o.label.replace(/^./, (c) => c.toLowerCase()) })),
+  { value: DATES, label: "between two dates" },
+];
 
-function LogicToggle({ value, onChange }) {
-  return (
-    <div className="flex items-center rounded-xl border border-neutral-700/60 bg-[#111] p-0.5 shrink-0">
-      <button
-        type="button"
-        onClick={() => onChange("AND")}
-        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
-          value === "AND"
-            ? "bg-[var(--ember)]/20 text-[var(--ember)] shadow-[0_0_12px_rgba(255,83,11,0.15)]"
-            : "text-neutral-500 hover:text-neutral-300"
-        }`}
-      >
-        <IconListCheck size={12} />
-        All
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("OR")}
-        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all ${
-          value === "OR"
-            ? "bg-purple-500/20 text-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.15)]"
-            : "text-neutral-500 hover:text-neutral-300"
-        }`}
-      >
-        <IconSwitch2 size={12} />
-        Any
-      </button>
-    </div>
-  );
+function periodValue(period) {
+  if (!period) return OWN_WINDOW;
+  return period.since ? DATES : (windowOption(period)?.value ?? OWN_WINDOW);
 }
 
-function FilterRow({ condition, onChange, onRemove, knownTags }) {
-  const fieldDef = FILTER_FIELDS[condition.field] || { type: "number", description: "" };
-  const operators = FILTER_OPERATORS[fieldDef.type] || FILTER_OPERATORS.number;
-  const FieldIcon = FIELD_ICONS[condition.field] || IconBolt;
-  const isBoolean = fieldDef.type === "boolean";
-  const isText = fieldDef.type === "text";
-  const isDate = fieldDef.type === "date";
-  const needsMax = condition.operator === "between";
+function pickPeriod(value) {
+  if (value === OWN_WINDOW) return null;
+  if (value === DATES) {
+    const today = new Date();
+    const lastYear = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+    return { since: lastYear.toISOString().slice(0, 10), until: today.toISOString().slice(0, 10) };
+  }
+  return WINDOW_OPTIONS.find((o) => o.value === value).window;
+}
 
-  const [tagSearch, setTagSearch] = useState(condition.field === "tags" ? (condition.value || "") : "");
-  const [showTagDropdown, setShowTagDropdown] = useState(false);
-  const tagInputRef = useRef(null);
-
-  const searchLower = tagSearch.toLowerCase();
-  const filteredTags = knownTags.filter(
-    (t) => t.name.includes(searchLower) && t.name !== condition.value
-  ).slice(0, 12);
+function TagPicker({ condition, onChange, knownTags }) {
+  const [search, setSearch] = useState(condition.value || "");
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => {
-      if (tagInputRef.current && !tagInputRef.current.contains(e.target)) {
-        setShowTagDropdown(false);
-      }
+    const close = (e) => {
+      if (!box.current?.contains(e.target)) setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const fieldOptions = FIELD_ENTRIES.map(([key, def]) => ({
-    value: key,
-    label: def.label,
-    icon: FIELD_ICONS[key] || IconBolt,
-  }));
-
-  const operatorOptions = operators.map((op) => ({
-    value: op.value,
-    label: op.label,
-  }));
-
-  const renderValueInput = () => {
-    if (isBoolean) {
-      return (
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onChange({ ...condition, value: true })}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
-              condition.value === true
-                ? "bg-[var(--ember)]/15 text-[var(--ember)] border-[var(--ember)]/30"
-                : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
-            }`}
-          >
-            Loved
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ ...condition, value: false })}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
-              condition.value === false
-                ? "bg-[var(--ember)]/15 text-[var(--ember)] border-[var(--ember)]/30"
-                : "bg-neutral-800/50 text-neutral-500 border-neutral-700/50 hover:border-neutral-600"
-            }`}
-          >
-            Not loved
-          </button>
-        </div>
-      );
-    }
-
-    if (condition.field === "tags") {
-      return (
-        <div className="space-y-2.5">
-          <div className="relative" ref={tagInputRef}>
-            <div className="flex items-center gap-2 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-3.5 py-2.5">
-              <IconSearch size={14} className="text-neutral-500 shrink-0" />
-              <input
-                type="text"
-                value={tagSearch}
-                onChange={(e) => {
-                  setTagSearch(e.target.value);
-                  setShowTagDropdown(true);
-                  onChange({ ...condition, value: e.target.value });
-                }}
-                onFocus={() => setShowTagDropdown(true)}
-                placeholder="Search tags..."
-                className="flex-1 bg-transparent text-sm text-white placeholder:text-neutral-600 focus:outline-none min-w-0"
-              />
-            </div>
-            {showTagDropdown && (
-              <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-neutral-700 bg-[#1a1a1a] shadow-[0_12px_40px_rgba(0,0,0,0.6)] overflow-hidden">
-                <div className="max-h-56 overflow-y-auto p-1">
-                  {knownTags.length === 0 ? (
-                    <div className="px-3 py-2.5 text-sm text-neutral-500">
-                      {tagSearch ? `Use "${tagSearch}"` : "No known tags yet. Type one to use it."}
-                    </div>
-                  ) : filteredTags.length === 0 ? (
-                    <div className="px-3 py-2.5 text-sm text-neutral-500">
-                      {tagSearch ? `Use "${tagSearch}"` : "No matching tags"}
-                    </div>
-                  ) : (
-                    filteredTags.map((tag) => (
-                      <button
-                        key={tag.name}
-                        type="button"
-                        onClick={() => {
-                          onChange({ ...condition, value: tag.name });
-                          setTagSearch(tag.name);
-                          setShowTagDropdown(false);
-                        }}
-                        className={`flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors text-left ${
-                          condition.value === tag.name
-                            ? "bg-[var(--ember)]/15 text-[var(--ember)]"
-                            : "text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                        }`}
-                      >
-                        <IconTag size={12} className="shrink-0 text-neutral-500" />
-                        <span className="flex-1 truncate">{tag.name}</span>
-                        <span className="text-xs font-mono tabular-nums shrink-0 text-neutral-500">
-                          {tag.artists} artist{tag.artists === 1 ? "" : "s"}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-neutral-600 text-xs">Min tag strength:</span>
-            <span className="group/tooltip relative flex items-center">
-              <IconHelp size={12} className="text-neutral-600 hover:text-neutral-400 transition-colors cursor-help" />
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg border border-neutral-700 bg-[#1a1a1a] px-3 py-2 text-xs text-neutral-300 leading-relaxed shadow-[0_8px_24px_rgba(0,0,0,0.5)] opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto transition-opacity z-50">
-                How strongly Last.fm listeners link this tag to the artist. The artist&apos;s top tag is always 100. Leave at 0 to accept any strength.
-                <span className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-[#1a1a1a]" />
-              </span>
-            </span>
-            <input
-              type="number"
-              value={condition.countMin ?? 0}
-              onChange={(e) => onChange({ ...condition, countMin: Number(e.target.value) })}
-              min="0"
-              max="100"
-              placeholder="0"
-              className="w-16 rounded-lg border border-neutral-700/80 bg-[#1c1c1c] px-2.5 py-2 text-sm text-white focus:border-[var(--ember)] focus:outline-none focus:ring-1 focus:ring-[var(--ember)]/30 transition-all tabular-nums"
-            />
-            <span className="text-neutral-600 text-xs">/ 100</span>
-          </div>
-        </div>
-      );
-    }
-
-    if (isDate) {
-      return (
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <input
-              type="number"
-              value={condition.value ?? ""}
-              onChange={(e) => onChange({ ...condition, value: e.target.value === "" ? "" : Number(e.target.value) })}
-              placeholder="e.g. 30"
-              min="0"
-              className={`w-full ${INPUT_CLASSES}`}
-            />
-          </div>
-          <span className="text-neutral-500 text-sm font-medium shrink-0">days ago</span>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type={isText ? "text" : "number"}
-          value={condition.value ?? ""}
-          onChange={(e) => onChange({ ...condition, value: isText ? e.target.value : (e.target.value === "" ? "" : Number(e.target.value)) })}
-          placeholder={needsMax ? "Min" : "Number"}
-          className={`flex-1 ${INPUT_CLASSES}`}
-        />
-        {needsMax && (
-          <>
-            <span className="text-neutral-600 text-xs font-medium">to</span>
-            <input
-              type="number"
-              value={condition.valueMax ?? ""}
-              onChange={(e) => onChange({ ...condition, valueMax: e.target.value === "" ? null : Number(e.target.value) })}
-              placeholder="Max"
-              className={`flex-1 ${INPUT_CLASSES}`}
-            />
-          </>
-        )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all">
-      <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
-        <div className="rounded-lg bg-neutral-800/60 p-2 shrink-0">
-          <FieldIcon size={14} className="text-neutral-400 group-hover/row:text-[var(--ember)] transition-colors" />
-        </div>
-
-        <CustomSelect
-          label="Filter field"
-          value={condition.field}
-          onChange={(newField) => {
-            setTagSearch("");
-            setShowTagDropdown(false);
-            onChange(conditionForField(condition, newField));
-          }}
-          options={fieldOptions}
-          className="w-auto flex-1 min-w-40"
-        />
-
-        {operatorOptions.length > 1 && (
-          <CustomSelect
-            label="Filter operator"
-            value={condition.operator}
-            onChange={(op) => onChange({ ...condition, operator: op })}
-            options={operatorOptions}
-            className="w-32 shrink-0"
-          />
-        )}
-
-        <button
-          type="button"
-          onClick={onRemove}
-          className="ml-auto shrink-0 rounded-lg p-2 text-neutral-700 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/row:opacity-100"
-        >
-          <IconTrash size={14} />
-        </button>
-      </div>
-
-      <div className="px-4 pb-3.5 pt-0">
-        <p className="text-xs mb-2.5 leading-relaxed text-neutral-600">{fieldDef.description}</p>
-        {renderValueInput()}
-      </div>
-    </div>
-  );
-}
-
-function FilterGroup({ group, onChange, onRemove, depth = 0, knownTags }) {
-  const [showAddMenu, setShowAddMenu] = useState(false);
-  const menuRef = useRef(null);
-  const subGroups = group.groups || [];
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setShowAddMenu(false);
-    };
-    if (showAddMenu) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [showAddMenu]);
-
-  const updateCondition = (idx, newCondition) => {
-    const conditions = [...group.conditions];
-    conditions[idx] = newCondition;
-    onChange({ ...group, conditions });
-  };
-
-  const removeCondition = (idx) => {
-    onChange({ ...group, conditions: group.conditions.filter((_, i) => i !== idx) });
-  };
-
-  const addCondition = () => {
-    onChange({
-      ...group,
-      conditions: [...group.conditions, createCondition()],
-    });
-    setShowAddMenu(false);
-  };
-
-  const addSubGroup = () => {
-    onChange({
-      ...group,
-      groups: [...subGroups, createGroup()],
-    });
-    setShowAddMenu(false);
-  };
-
-  const updateSubGroup = (idx, newGroup) => {
-    const updated = [...subGroups];
-    updated[idx] = newGroup;
-    onChange({ ...group, groups: updated });
-  };
-
-  const removeSubGroup = (idx) => {
-    onChange({ ...group, groups: subGroups.filter((_, i) => i !== idx) });
-  };
-
-  const logicLabel = group.logic === "AND" ? "all" : "any";
-  const isNested = depth > 0;
+  const wanted = search.toLowerCase();
+  const matches = knownTags.filter((t) => t.name.includes(wanted) && t.name !== condition.value).slice(0, 12);
 
   return (
     <div
-      className={`rounded-2xl transition-all ${
-        isNested
-          ? "border border-purple-500/20 bg-[#131316] shadow-[inset_3px_0_0_rgba(168,85,247,0.4)]"
-          : "border border-neutral-800/80 bg-[#1a1a1a] shadow-[0_4px_24px_rgba(0,0,0,0.3)]"
-      }`}
+      className="relative min-w-40 flex-1"
+      ref={box}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") setOpen(false);
+      }}
     >
-      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-neutral-800/50">
-        <LogicToggle value={group.logic} onChange={(val) => onChange({ ...group, logic: val })} />
-
-        <span className="text-xs text-neutral-500 flex-1">
-          Match tracks where{" "}
-          <span className={`font-semibold ${group.logic === "AND" ? "text-[var(--ember)]/70" : "text-purple-400/70"}`}>
-            {logicLabel}
-          </span>{" "}
-          of these conditions are met
-        </span>
-
-        {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded-lg p-2 text-neutral-700 hover:text-red-400 hover:bg-red-400/10 transition-all"
-            title="Remove group"
-          >
-            <IconTrash size={14} />
-          </button>
-        )}
-      </div>
-
-      <div className="p-4 space-y-3">
-        {group.conditions.length === 0 && subGroups.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="rounded-2xl bg-neutral-800/30 p-3 mb-3">
-              <IconFilter size={20} className="text-neutral-600" />
-            </div>
-            <p className="text-sm text-neutral-500 font-medium">No conditions yet</p>
-            <p className="text-xs text-neutral-600 mt-1">
-              Click the button below to add your first filter
-            </p>
-          </div>
-        )}
-
-        {group.conditions.map((cond, i) => (
-          <FilterRow
-            key={cond.id}
-            condition={cond}
-            onChange={(c) => updateCondition(i, c)}
-            onRemove={() => removeCondition(i)}
-            knownTags={knownTags}
-          />
-        ))}
-
-        {subGroups.map((sub, i) => (
-          <FilterGroup
-            key={sub.id}
-            group={sub}
-            onChange={(g) => updateSubGroup(i, g)}
-            onRemove={() => removeSubGroup(i)}
-            depth={depth + 1}
-            knownTags={knownTags}
-          />
-        ))}
-      </div>
-
-      <div className="px-4 pb-4 relative" ref={menuRef}>
-        {showAddMenu ? (
-          <div className="flex items-center gap-2">
+      <Input
+        type="text"
+        aria-label="Tag"
+        value={search}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setOpen(true);
+          onChange({ ...condition, value: e.target.value });
+        }}
+        onFocus={() => setOpen(true)}
+        placeholder="Search tags"
+        className="w-full"
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute z-50 mt-1 max-h-56 w-full min-w-64 overflow-y-auto border-2 border-(--ember) bg-(--ground)">
+          {matches.map((tag) => (
             <button
+              key={tag.name}
               type="button"
-              onClick={addCondition}
-              className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-[var(--ember)]/30 bg-[var(--ember)]/10 px-4 py-3 text-sm font-medium text-[var(--ember)] hover:bg-[var(--ember)]/15 transition-all"
+              onClick={() => {
+                onChange({ ...condition, value: tag.name });
+                setSearch(tag.name);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none hover:bg-(--ember-1) focus-visible:bg-(--ember-1)"
             >
-              <IconPlus size={14} />
-              Add condition
+              <span className="flex-1 truncate">{tag.name}</span>
+              <span className="shrink-0 text-(--text-muted) tabular-nums">
+                {tag.artists} artist{tag.artists === 1 ? "" : "s"}
+              </span>
             </button>
-            {/* Same bound as the API: a group and its sub-groups, no deeper. */}
-            {!isNested && (
-              <button
-                type="button"
-                onClick={addSubGroup}
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3 text-sm font-medium text-purple-400 hover:bg-purple-500/15 transition-all"
-              >
-                <IconGitBranch size={14} />
-                Add sub-group
-              </button>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setShowAddMenu(true)}
-            className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700/60 bg-transparent px-4 py-3 text-sm text-neutral-500 hover:border-[var(--ember)]/40 hover:text-[var(--ember)] hover:bg-[var(--ember)]/5 transition-all w-full"
-          >
-            <IconPlus size={14} />
-            Add
-          </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MomentPicker({ moment, onChange }) {
+  const set = (patch) => onChange(completeMoment({ ...moment, ...patch }));
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2">
+      <CustomSelect label="From day" value={toSelect(moment.fromDay)} onChange={(v) => set({ fromDay: fromSelect(v) })} options={[{ value: ANY, label: "Any day" }, ...DAY_OPTIONS]} className="w-36" />
+      {moment.fromDay != null && (
+        <>
+          <Word>to</Word>
+          <CustomSelect label="To day" value={String(moment.toDay)} onChange={(v) => set({ toDay: Number(v) })} options={DAY_OPTIONS} className="w-36" />
+        </>
+      )}
+      <Word>from</Word>
+      <CustomSelect label="From hour" value={toSelect(moment.fromHour)} onChange={(v) => set({ fromHour: fromSelect(v) })} options={[{ value: ANY, label: "Any hour" }, ...HOUR_OPTIONS]} className="w-32" />
+      {moment.fromHour != null && (
+        <>
+          <Word>to</Word>
+          <CustomSelect label="To hour" value={String(moment.toHour)} onChange={(v) => set({ toHour: Number(v) })} options={HOUR_OPTIONS} className="w-28" />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ConditionValue({ condition, onChange, knownTags }) {
+  const type = FILTER_FIELDS[condition.field]?.type ?? "number";
+  const setValue = (value) => onChange({ ...condition, value: value ?? "" });
+
+  if (type === "boolean") {
+    return (
+      <div className="flex gap-2">
+        {[[true, "Loved"], [false, "Not loved"]].map(([value, label]) => (
+          <Button key={label} size="default" variant={condition.value === value ? "default" : "outline"} aria-pressed={condition.value === value} onClick={() => setValue(value)}>
+            {label}
+          </Button>
+        ))}
+      </div>
+    );
+  }
+  if (type === "text") {
+    return (
+      <>
+        <TagPicker key={condition.id} condition={condition} onChange={onChange} knownTags={knownTags} />
+        <Word>strength</Word>
+        <NumberInput aria-label="Minimum tag strength, 0 to 100" min={0} max={100} value={condition.countMin ?? 0} onChange={(countMin) => onChange({ ...condition, countMin: countMin ?? 0 })} />
+      </>
+    );
+  }
+  const between = condition.operator === "between";
+  return (
+    <>
+      <NumberInput aria-label={between ? "Minimum" : "Value"} min={0} value={condition.value === "" ? null : condition.value} onChange={setValue} />
+      {between && (
+        <>
+          <Word>and</Word>
+          <NumberInput aria-label="Maximum" min={0} value={condition.valueMax} onChange={(valueMax) => onChange({ ...condition, valueMax })} />
+        </>
+      )}
+      {type === "date" && <Word>days ago</Word>}
+      {type === "moment" && <Word>listens</Word>}
+      {type === "rank" && (
+        <CustomSelect label="Ranked over" value={periodValue(condition.period)} onChange={(v) => onChange({ ...condition, period: pickPeriod(v) })} options={PERIOD_OPTIONS} className="w-52" />
+      )}
+      {condition.period?.since && (
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <Input type="date" aria-label="Since" value={condition.period.since} onChange={(e) => e.target.value && onChange({ ...condition, period: { ...condition.period, since: e.target.value } })} />
+          <Word>to</Word>
+          <Input type="date" aria-label="Until" value={condition.period.until} onChange={(e) => e.target.value && onChange({ ...condition, period: { ...condition.period, until: e.target.value } })} />
+        </div>
+      )}
+      {type === "moment" && <MomentPicker moment={condition.moment} onChange={(moment) => onChange({ ...condition, moment })} />}
+    </>
+  );
+}
+
+function ConditionRow({ condition, onChange, onRemove, knownTags }) {
+  const type = FILTER_FIELDS[condition.field]?.type ?? "number";
+  const operators = FILTER_OPERATORS[type];
+  return (
+    <li className="flex items-start gap-2 py-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <CustomSelect label="Filter field" value={condition.field} onChange={(field) => onChange(conditionForField(condition, field))} options={FIELD_OPTIONS} className="w-52" />
+        {operators.length > 1 && (
+          <CustomSelect label="Filter operator" value={condition.operator} onChange={(operator) => onChange({ ...condition, operator })} options={operators} className="w-40" />
+        )}
+        <ConditionValue condition={condition} onChange={onChange} knownTags={knownTags} />
+      </div>
+      <Button variant="outline" aria-label="Remove rule" onClick={onRemove} className="w-10 px-0">
+        <IconX size={16} />
+      </Button>
+    </li>
+  );
+}
+
+function FilterGroup({ group, onChange, onRemove, advanced, nested, knownTags }) {
+  const subGroups = group.groups ?? [];
+  const replaceAt = (list, i, item) => list.map((old, j) => (j === i ? item : old));
+  const ruleCount = group.conditions.length + subGroups.length;
+
+  return (
+    <div className={nested ? "border-l border-(--line) pl-3" : ""}>
+      {ruleCount > 1 && (
+        <div className="flex flex-wrap items-center gap-2 pb-1">
+          <Word>Keep tracks matching</Word>
+          <CustomSelect
+            label="Match all or any"
+            value={group.logic}
+            onChange={(logic) => onChange({ ...group, logic })}
+            options={[{ value: "AND", label: "all" }, { value: "OR", label: "any" }]}
+            className="w-20"
+          />
+          <Word>of these</Word>
+        </div>
+      )}
+      {group.conditions.length > 0 && (
+        <ul className="divide-y divide-(--line)">
+          {group.conditions.map((condition, i) => (
+            <ConditionRow
+              key={condition.id}
+              condition={condition}
+              knownTags={knownTags}
+              onChange={(next) => onChange({ ...group, conditions: replaceAt(group.conditions, i, next) })}
+              onRemove={() => onChange({ ...group, conditions: group.conditions.filter((_, j) => j !== i) })}
+            />
+          ))}
+        </ul>
+      )}
+      {subGroups.map((sub, i) => (
+        <div key={sub.id} className="py-2">
+          <FilterGroup
+            group={sub}
+            nested
+            advanced={advanced}
+            knownTags={knownTags}
+            onChange={(next) => onChange({ ...group, groups: replaceAt(subGroups, i, next) })}
+            onRemove={() => onChange({ ...group, groups: subGroups.filter((_, j) => j !== i) })}
+          />
+        </div>
+      ))}
+      <div className="flex flex-wrap gap-2 pt-2">
+        <Button variant="outline" size="sm" onClick={() => onChange({ ...group, conditions: [...group.conditions, createCondition()] })}>
+          <IconPlus size={14} />
+          Add rule
+        </Button>
+        {/* Same bound as the API: a group and its sub-groups, no deeper. */}
+        {advanced && !nested && (
+          <Button variant="outline" size="sm" onClick={() => onChange({ ...group, groups: [...subGroups, createGroup()] })}>
+            Add sub-group
+          </Button>
+        )}
+        {onRemove && (
+          <Button variant="outline" size="sm" onClick={onRemove}>
+            Remove group
+          </Button>
         )}
       </div>
     </div>
@@ -465,8 +271,10 @@ function FilterGroup({ group, onChange, onRemove, depth = 0, knownTags }) {
 }
 
 export default function FilterBuilder({ value, onChange }) {
-  const groups = value || [];
+  const groups = value ?? [];
   const [knownTags, setKnownTags] = useState([]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advanced = advancedOpen || groups.length > 1 || groups.some((g) => g.groups?.length > 0);
 
   useEffect(() => {
     let stale = false;
@@ -481,48 +289,29 @@ export default function FilterBuilder({ value, onChange }) {
     };
   }, []);
 
-  const updateGroup = (idx, newGroup) => {
-    const updated = [...groups];
-    updated[idx] = newGroup;
-    onChange(updated);
-  };
-
-  const removeGroup = (idx) => {
-    onChange(groups.filter((_, i) => i !== idx));
-  };
-
-  const addGroup = () => {
-    onChange([...groups, createGroup()]);
-  };
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {groups.map((group, i) => (
-        <div key={group.id}>
-          {i > 0 && (
-            <div className="flex items-center gap-3 justify-center py-2 mb-4">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-neutral-700 to-transparent" />
-              <span className="text-xs text-neutral-600 uppercase font-bold px-2">OR</span>
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-neutral-700 to-transparent" />
-            </div>
-          )}
+        <div key={group.id} className="space-y-3">
+          {i > 0 && <Word>or</Word>}
           <FilterGroup
             group={group}
-            onChange={(g) => updateGroup(i, g)}
-            onRemove={groups.length > 1 ? () => removeGroup(i) : undefined}
+            advanced={advanced}
             knownTags={knownTags}
+            onChange={(next) => onChange(groups.map((g, j) => (j === i ? next : g)))}
+            onRemove={groups.length > 1 ? () => onChange(groups.filter((_, j) => j !== i)) : undefined}
           />
         </div>
       ))}
-
-      <button
-        type="button"
-        onClick={addGroup}
-        className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-700/60 bg-transparent px-4 py-3 text-sm text-neutral-500 hover:border-purple-500/40 hover:text-purple-400 hover:bg-purple-500/5 transition-all w-full"
-      >
-        <IconPlus size={14} />
-        Add filter group
-      </button>
+      {advanced ? (
+        <Button variant="outline" size="sm" onClick={() => onChange([...groups, createGroup()])}>
+          Add group
+        </Button>
+      ) : (
+        <button type="button" onClick={() => setAdvancedOpen(true)} className="text-sm text-(--text-muted) underline underline-offset-4 outline-none hover:text-(--text) focus-visible:text-(--ember)">
+          Advanced
+        </button>
+      )}
     </div>
   );
 }

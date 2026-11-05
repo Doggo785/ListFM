@@ -5,6 +5,9 @@ const MAX_QUIET = 12;
 const COLUMNS = 12;
 const OPENING_SECONDS = 0.42;
 const LOADER_PULL = 0.9;
+const SOFT_EDGE = 0.15;
+const CHAIN_FILL = 0.85; // Of the band: the wavy edge stays inside it.
+const CHAIN_FLOOR = 0.12;
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
 const SCENES = {
@@ -64,12 +67,23 @@ export function openingRect(from, to, k) {
   return { left, top, width, height, bottom: top + height };
 }
 
+/**
+ * The ribbon's half-widths for an automation's chain, from 0 to 1, one equal stretch per stage.
+ * Log scale, so 50 out of 8 000 still reads; nothing left means no ribbon, an empty run is visible.
+ */
+export function chainShape(counts) {
+  const first = counts[0];
+  if (!first) return Array(COLUMNS).fill(0.4 * CHAIN_FILL);
+  const stage = (n) => (n > 0 ? CHAIN_FLOOR + (1 - CHAIN_FLOOR) * (Math.log1p(n) / Math.log1p(first)) : 0);
+  return Array.from({ length: COLUMNS }, (_, i) => stage(counts[Math.floor((i * counts.length) / COLUMNS)]) * CHAIN_FILL);
+}
+
 const VERTEX = `#version 300 es
 in vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
 
 const FRAGMENT = `#version 300 es
 precision highp float;
-uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull;uniform vec2 uPoint;
+uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull,uCalm,uEdge;uniform vec2 uPoint,uBand;
 uniform float uCols[${COLUMNS}];uniform vec3 uRamp[4];uniform vec4 uQuiet[${MAX_QUIET}];uniform int uN;
 out vec4 o;
 float b2(vec2 a){a=floor(a);return fract(a.x/2.+a.y*a.y*.75);}
@@ -78,26 +92,27 @@ float b8(vec2 a){return b4(.5*a)*.25+b2(a);}
 void main(){
   vec2 cell=floor(gl_FragCoord.xy);
   vec2 uv=(cell+.5)/uRes;float asp=uRes.x/uRes.y;
-  float th=uAngle+.22*sin(uWander*.09);
+  float loose=1.-uCalm;float th=uAngle+loose*.22*sin(uWander*.09);
   float cs=cos(th),sn=sin(th);mat2 R=mat2(cs,-sn,sn,cs);
   vec2 q=R*vec2((uv.x-.5)*asp,uv.y-.5);
   vec2 g=R*vec2((uPoint.x-.5)*asp,uPoint.y-.5);
   float s=clamp(q.x/asp+.5,0.,1.);
   float xs=s*${(COLUMNS - 1).toFixed(1)};int i=int(clamp(floor(xs),0.,${(COLUMNS - 2).toFixed(1)}));
   float hw=mix(uCols[i],uCols[i+1],smoothstep(0.,1.,xs-float(i)));
-  hw+=.012*(sin(s*9.+uT*.5)*.5+sin(s*17.-uT*.35+1.3)*.25);
-  float c=uOff+.2*sin(uWander*.13)+.09*sin(q.x*3.+uWander*.21)+.045*sin(q.x*7.-uWander*.31);
+  hw+=loose*.012*(sin(s*9.+uT*.5)*.5+sin(s*17.-uT*.35+1.3)*.25);
+  float c=uOff+loose*(.2*sin(uWander*.13)+.09*sin(q.x*3.+uWander*.21)+.045*sin(q.x*7.-uWander*.31));
   c=mix(c,g.y,uPull*exp(-pow((q.x-g.x)/.42,2.)));
-  float v=clamp((hw-abs(q.y-c))/.15,0.,1.);
+  float v=clamp((hw-abs(q.y-c))/uEdge,0.,1.);
   float m=1.;
   for(int k=0;k<uN;k++){vec4 r=uQuiet[k];vec2 d=abs(cell+.5-r.xy)-r.zw;float e=length(max(d,0.))+min(max(d.x,d.y),0.);m=min(m,smoothstep(0.,${(130 / CELL).toFixed(1)},e));}
+  if(cell.y>=uBand.x&&cell.y<=uBand.y)m=1.;
   v*=m;
   float idx=floor(v*4.+b8(cell));
   if(idx<1.){o=vec4(0.);return;}
   o=vec4(uRamp[int(min(idx,4.))-1],1.);
 }`;
 
-const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uPoint", "uCols", "uRamp", "uQuiet", "uN"];
+const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN"];
 
 function compile(gl) {
   const shader = (type, source) => {
@@ -139,9 +154,10 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     return INERT;
   }
 
-  const target = { cols: Array(COLUMNS).fill(0.08), ramp: rampFor(0, palette), angle: 0, off: -0.3, px: 0.5, py: 0.5, pull: 0 };
+  const target = { cols: Array(COLUMNS).fill(0.08), ramp: rampFor(0, palette), angle: 0, off: -0.3, px: 0.5, py: 0.5, pull: 0, calm: 0, edge: SOFT_EDGE };
   const now = { ...target, cols: [...target.cols], ramp: [...target.ramp] };
   let started = false;
+  let scene = { cols: target.cols, angle: target.angle, off: target.off };
 
   const resize = () => {
     canvas.width = Math.ceil(window.innerWidth / CELL);
@@ -186,6 +202,22 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
       t += dt;
       wander += dt;
     }
+    // A chain on the page pulls the ribbon straight into its band, and its counts set the width.
+    const chain = document.querySelector("[data-chain]");
+    const band = chain?.getBoundingClientRect();
+    if (band) {
+      const half = band.height / 2 / window.innerHeight;
+      const counts = chain.dataset.chain.split(",").filter(Boolean).map(Number);
+      Object.assign(target, {
+        cols: chainShape(counts).map((w) => w * half),
+        angle: 0,
+        off: 0.5 - (band.top + band.height / 2) / window.innerHeight,
+        calm: 1,
+        edge: half,
+      });
+    } else {
+      Object.assign(target, scene, { calm: 0, edge: SOFT_EDGE });
+    }
     const ease = (rate) => (reducedMotion ? 1 : 1 - Math.exp(-dt * rate));
     const shape = ease(4.5);
     const glow = ease(3);
@@ -193,6 +225,8 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     now.ramp = now.ramp.map((v, i) => v + (target.ramp[i] - v) * glow);
     now.angle += (target.angle - now.angle) * shape;
     now.off += (target.off - now.off) * shape;
+    now.calm += (target.calm - now.calm) * shape;
+    now.edge += (target.edge - now.edge) * shape;
     now.px += (target.px - now.px) * glow;
     now.py += (target.py - now.py) * glow;
     now.pull += (target.pull - now.pull) * glow;
@@ -218,7 +252,14 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
     gl.uniform1f(uniforms.uWander, wander);
     gl.uniform1f(uniforms.uAngle, now.angle);
     gl.uniform1f(uniforms.uOff, now.off);
-    gl.uniform1f(uniforms.uPull, now.pull);
+    gl.uniform1f(uniforms.uCalm, now.calm);
+    gl.uniform1f(uniforms.uEdge, now.edge);
+    gl.uniform1f(uniforms.uPull, now.pull * (1 - now.calm));
+    gl.uniform2f(
+      uniforms.uBand,
+      band ? (window.innerHeight - band.bottom) / CELL : -1,
+      band ? (window.innerHeight - band.top) / CELL : -1,
+    );
     gl.uniform2f(uniforms.uPoint, now.px, now.py);
     gl.uniform1fv(uniforms.uCols, now.cols);
     gl.uniform3fv(uniforms.uRamp, now.ramp);
@@ -230,11 +271,9 @@ export function createRibbon(canvas, { palette, reducedMotion = false }) {
   frameId = window.requestAnimationFrame(frame);
 
   return {
-    setScene(scene) {
-      target.cols = scene.shape;
-      target.ramp = rampFor(scene.heat, palette);
-      target.angle = scene.angle;
-      target.off = scene.offset;
+    setScene(next) {
+      scene = { cols: next.shape, angle: next.angle, off: next.offset };
+      Object.assign(target, scene, { ramp: rampFor(next.heat, palette) });
       // The first scene appears in place; only later ones travel.
       if (!started) {
         Object.assign(now, { cols: [...target.cols], ramp: [...target.ramp], angle: target.angle, off: target.off });

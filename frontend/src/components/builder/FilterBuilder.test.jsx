@@ -77,28 +77,25 @@ afterEach(async () => {
 });
 
 describe("FilterBuilder", () => {
-  it("offers neither rank nor the removed operators", async () => {
+  it("offers none of the removed operators", async () => {
     const container = await render({ field: "playcount", value: 3 });
     await click(button(container, "at least"));
     const labels = options().map((o) => o.textContent.trim());
     expect(labels).toEqual(expect.arrayContaining(["at most", "exactly", "between"]));
     expect(labels).not.toContain("≠");
     await click(option("at least"));
-    await click(button(container, "Your plays (window)"));
-    expect(options().length).toBeGreaterThan(0);
-    expect(document.body.textContent).not.toContain("Rank");
   });
 
   it("keeps the operator select at its own width beside the field", async () => {
     const container = await render({ field: "playcount", value: 3 });
     const operator = container.querySelector('[aria-label="Filter operator"]');
-    expect(operator.classList.contains("w-32")).toBe(true);
+    expect(operator.classList.contains("w-40")).toBe(true);
     expect(operator.classList.contains("w-full")).toBe(false);
   });
 
   it("starts a loved filter on Loved with no operator to choose", async () => {
     const container = await render({ field: "playcount", value: 3 });
-    await pickField(container, "Your plays (window)", "Loved");
+    await pickField(container, "Your plays (window)", "Loved or not");
     expect(condition()).toMatchObject({ field: "userloved", operator: "is", value: true });
     expect(button(container, "is")).toBeUndefined();
     await click(button(container, "Not loved"));
@@ -125,13 +122,36 @@ describe("FilterBuilder", () => {
     expect(condition().value).toBe("");
   });
 
-  it("does not offer a sub-group inside a sub-group", async () => {
+  it("folds groups away until Advanced, and offers no sub-group inside a sub-group", async () => {
     const container = await render({ field: "playcount", value: 3 });
-    await click(button(container, "Add"));
-    await click(button(container, "Add sub-group"));
-    const addButtons = [...container.querySelectorAll("button")].filter((b) => b.textContent.trim() === "Add");
-    await click(addButtons[0]);
-    expect(button(container, "Add condition")).toBeDefined();
     expect(button(container, "Add sub-group")).toBeUndefined();
+    await click(button(container, "Advanced"));
+    await click(button(container, "Add sub-group"));
+    expect(seen.groups[0].groups).toHaveLength(1);
+    expect([...container.querySelectorAll("button")].filter((b) => b.textContent.trim() === "Add sub-group")).toHaveLength(1);
+    expect(button(container, "Advanced")).toBeUndefined();
+  });
+
+  it("removes a rule from a button that is always there", async () => {
+    const container = await render({ field: "playcount", value: 3 });
+    await click(container.querySelector('[aria-label="Remove rule"]'));
+    expect(seen.groups[0].conditions).toEqual([]);
+  });
+
+  it("starts top artists on a working rank over the window", async () => {
+    const container = await render({ field: "playcount", value: 3 });
+    await pickField(container, "Your plays (window)", "Top artists");
+    expect(condition()).toMatchObject({ field: "artist_rank", operator: "lte", value: 10, period: null });
+    await pickField(container, "in this window", "between two dates");
+    expect(condition().period).toEqual({ since: expect.any(String), until: expect.any(String) });
+    expect(condition().period.since < condition().period.until).toBe(true);
+  });
+
+  it("starts a listening moment on a moment the server accepts", async () => {
+    const container = await render({ field: "playcount", value: 3 });
+    await pickField(container, "Your plays (window)", "Listening moment");
+    expect(condition()).toMatchObject({ value: 1, moment: { fromHour: 18, toHour: 23 } });
+    await pickField(container, "18:00", "Any hour");
+    expect(condition().moment).toEqual({ fromDay: 1, toDay: 7, fromHour: null, toHour: null });
   });
 });

@@ -20,4 +20,4 @@ FIRST VIEWPORT: Top bar with logo, links and a sliding dotted marker, account on
 
 FORM: Owner-pinned pixel dither over the roll, validated on a playable prototype. Signature move: the ribbon morphs instead of remounting. seed: 5cbda9a77c3edb33
 
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md (written from the Creator), and every shipping raster carrying its provenance
