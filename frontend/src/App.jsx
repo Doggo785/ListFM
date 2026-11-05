@@ -1,24 +1,38 @@
+import { Suspense, lazy, useEffect } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import "./App.css";
 import TopNav from "./components/ui/TopNav";
 import PixelRibbon from "./components/ui/PixelRibbon";
 import ScrollToTop from "./components/elements/ScrollToTop";
-import Landing from "./views/Landing";
-import Login from "./views/Login";
-import Register from "./views/Register";
-import Dashboard from "./views/Dashboard";
-import AuthCallback from "./views/AuthCallback";
-import LinkLastfm from "./views/LinkLastfm";
-import PlaylistNew from "./views/PlaylistNew";
-import PlaylistDetail from "./views/PlaylistDetail";
-import Playlists from "./views/Playlists";
 import AuthGuard from "./components/AuthGuard";
+
+// Each page in its own file, all fetched just after the first one: a later change of page waits for nothing.
+const pageLoaders = [];
+const page = (load) => {
+  pageLoaders.push(load);
+  return lazy(load);
+};
+const Landing = page(() => import("./views/Landing"));
+const Login = page(() => import("./views/Login"));
+const Register = page(() => import("./views/Register"));
+const Dashboard = page(() => import("./views/Dashboard"));
+const AuthCallback = page(() => import("./views/AuthCallback"));
+const LinkLastfm = page(() => import("./views/LinkLastfm"));
+const PlaylistNew = page(() => import("./views/PlaylistNew"));
+const PlaylistDetail = page(() => import("./views/PlaylistDetail"));
+const Playlists = page(() => import("./views/Playlists"));
 
 const NO_NAV_PATHS = ["/", "/login", "/register", "/auth/callback", "/link-lastfm"];
 
 function App() {
   const location = useLocation();
   const showNav = !NO_NAV_PATHS.includes(location.pathname);
+
+  useEffect(() => {
+    // A failed fetch only costs the head start: the page retries when it is opened.
+    const timer = setTimeout(() => pageLoaders.forEach((load) => load().catch(() => {})), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="app-container">
@@ -29,6 +43,7 @@ function App() {
         <div className="min-w-0 flex-1">
           {/* The new page is there at once: nothing waits for the old one to leave. */}
           <div key={location.pathname} className="page-enter h-full">
+            <Suspense fallback={null}>
             <Routes location={location}>
               <Route path="/" element={<Landing />} />
               <Route
@@ -75,6 +90,7 @@ function App() {
                 }
               />
             </Routes>
+            </Suspense>
           </div>
         </div>
       </div>
