@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import {
   IconArrowLeft,
@@ -144,6 +144,10 @@ const savedSignature = (automation) => JSON.stringify({ ...automation, updatedAt
 export default function PlaylistDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // What the Creator sent: read once, then cleared so a reload neither repeats the run nor the message.
+  const [arrival] = useState(location.state);
+  const arrivalRun = useRef(arrival?.runNow);
   const { user } = useAuth();
   const username = user?.lastfm_username;
 
@@ -342,6 +346,17 @@ export default function PlaylistDetail() {
     }
   };
 
+  useEffect(() => {
+    if (location.state) navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
+
+  // Checked on every render, it fires once: as soon as the automation is there.
+  useEffect(() => {
+    if (!automation || !arrivalRun.current) return;
+    arrivalRun.current = false;
+    handleRunNow();
+  });
+
   const toggleEntry = async (entry) => {
     if (expandedId === entry.id) {
       setExpandedId(null);
@@ -476,7 +491,7 @@ export default function PlaylistDetail() {
 
 
   return (
-    <div className="page-enter h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
+    <main className="page-enter h-full w-full min-w-0 flex-1 overflow-y-auto p-5 md:p-10">
       <div className="mx-auto max-w-[1400px]" data-quiet>
         <motion.header
           className="mb-8"
@@ -501,6 +516,7 @@ export default function PlaylistDetail() {
               <p className="mt-2 text-neutral-400 text-sm">
                 {describeAutomation(automation)}
               </p>
+              {arrival?.created && <p className="mt-2 text-sm text-(--ember)" role="status">{arrival.created}</p>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Button
@@ -948,6 +964,6 @@ export default function PlaylistDetail() {
         </Modal>
 
       </div>
-    </div>
+    </main>
   );
 }

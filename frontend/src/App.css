@@ -400,6 +400,11 @@ html, body, #root {
   animation: page-enter var(--duration-enter) step-end backwards;
 }
 
+.preview-row {
+  animation: page-enter var(--duration-enter) step-end backwards;
+  animation-delay: calc(var(--row) * 16ms);
+}
+
 @keyframes page-enter {
   0% {
     mask-image: var(--dither-1);
@@ -492,7 +497,8 @@ html, body, #root {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-enter {
+  .page-enter,
+  .preview-row {
     animation: none;
   }
 

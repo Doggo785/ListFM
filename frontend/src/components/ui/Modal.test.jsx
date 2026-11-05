@@ -31,7 +31,8 @@ describe("Modal", () => {
     await open(vi.fn());
     expect(document.activeElement).not.toBe(opener);
     await act(async () => root.render(<Modal open={false} onClose={vi.fn()} title="t" description="d" />));
-    expect(document.activeElement).toBe(opener);
+    // Radix hands focus back on a zero timeout after closing.
+    await vi.waitFor(() => expect(document.activeElement).toBe(opener));
     opener.remove();
   });
 

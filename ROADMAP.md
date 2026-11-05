@@ -1,7 +1,7 @@
 # ListFM — Roadmap
 
 Seul endroit où le statut est écrit. Le cap est dans `VISION.md`, la barre qualité dans `CONSTRAINTS.md`.
-Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert de l'owner.
+Dans l'ordre, en regroupant les points dans une même PR dès que possible. Ce qui n'est pas listé ici attend le feu vert de l'owner.
 
 ## Versions
 
@@ -18,7 +18,7 @@ Une PR par point, dans l'ordre. Ce qui n'est pas listé ici attend le feu vert d
 
 ## Maintenant
 
-Phase A, dans l'ordre, une PR par point. Le vocabulaire est dans `GLOSSARY.md`, les décisions structurantes dans `docs/adr/`. La PR de release ouverte par release-please se merge quand l'owner le dit, une release par phase finie et testée en vrai (0.3.0 après A, 0.4.0 après B, 0.5.0 après C).
+Phase A, dans l'ordre. Le vocabulaire est dans `GLOSSARY.md`, les décisions structurantes dans `docs/adr/`. La PR de release ouverte par release-please se merge quand l'owner le dit, une release par phase finie et testée en vrai (0.3.0 après A, 0.4.0 après B, 0.5.0 après C).
 
 ## Avant v1.0.0
 
@@ -53,17 +53,27 @@ But : une seule DA sur tout le site, animée partout, avec un style qui évolue 
 
 Garde-fou : le mode `live` d'Impeccable seulement avec `IMPECCABLE_LIVE_COPY_AGENT=chat` (sinon il relance un agent sans permissions).
 
-### Phase C : écrans réécrits, une PR par écran
+### Phase C : écrans réécrits
 
 Chaque PR passe `impeccable critique` et `audit` avant le merge, branche le ruban sur les vraies données de l'écran et supprime l'ancien code qu'elle remplace. Le Créateur vient en premier : `DESIGN.md` s'écrit à sa fin, depuis le résultat construit (pas `document`, qui décrirait l'ancien style).
 
-1. **Créateur** : le but est une liberté quasi infinie dans une UI soignée, intuitive et jamais chargée (réglages avancés repliés par défaut). Une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Filtres : remplacer les blocs par une liste qui se lit comme une phrase, groupes repliés dans « Avancé », et ajouter à l'écran première écoute, top artistes et moment d'écoute. Le ruban dessine les compteurs de la chaîne.
-2. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran, son titre glissant de la liste à la page. Les cartes qui présentent les automations sont refaites en style pixel.
-3. **Historique** : états « nouvel essai prévu », « échec définitif », run vide, « 32/50 ». Le bouton Re-run passe par la route de retry de T5.
-4. **Dashboard**.
-5. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` s'il ne sert plus.
-6. **Page d'accueil** : refaite à 100 % avant le login, avec une présentation propre de ListFM.
-7. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
+1. *(fait, sauf `sortCounts` par moment, le choix du fuseau et les libellés de `PlaylistDetail`)* **Créateur** : le but est une liberté quasi infinie dans une UI soignée, intuitive et jamais chargée (réglages avancés repliés par défaut). Une seule page, réglages et aperçu Live côte à côte (relance seule ~0,4 s après chaque changement), chaque étage avec son compteur, filtres et planning repliés dans « Affiner » et « Planifier ». Nom proposé depuis les réglages, modifiable. 7 presets : Top tracks, Récents, Aimés, Top artistes, Découvertes du mois, Redécouvertes, Saisonnier (tous les 3 mois, les X plus écoutés des 3 mois précédents). Planning : même logique (`CronEditor`, fuseau de #92), UI/UX fortement améliorée. Filtres : remplacer les blocs par une liste qui se lit comme une phrase, groupes repliés dans « Avancé », et ajouter à l'écran première écoute, top artistes et moment d'écoute. Le ruban dessine les compteurs de la chaîne.
+2. **Finition du Créateur**, avant de passer à l'écran suivant. Les constats de la critique et de l'audit qui restent après #129 :
+   - Presets : annuler ou prévenir quand un preset efface des règles ou des limites ; dire ce que fait chacun, et un intitulé pour qui découvre (« New automation »).
+   - Aperçu : état périmé pendant un aperçu lent, libellé de la colonne d'écoutes.
+   - Règles : dupliquer une règle ou un groupe, « or » entre groupes modifiable.
+   - Planning : valider vraiment un cron personnalisé (aujourd'hui seules les cinq parties, le reste au serveur), afficher le prochain run, et revenir au sélecteur quand un preset remplace un cron personnalisé.
+   - Fenêtre : ne plus écrire « ending 0 years ago ».
+   - Ruban : passage sous le logo et le compte au scroll (contournement par `uBand`, non reproduit), contenu coupé sous la barre, effilement aligné sur les étapes.
+   - Lisibilité et cibles : Tiny5 sur 6, 8, 9 ; cibles sous 44px ; alignement de More limits ; champ description ; `sortCounts`.
+   - Chiffres : les pixels d'un nombre qui grandit arrivent d'un coup à gauche.
+   - Détecteur : `repeating-stripes-gradient` ressemble à un faux positif.
+3. **Playlists** : l'onglet montre les playlists générées, pas les automations ; une playlist s'ouvre en plein écran, son titre glissant de la liste à la page. Les cartes qui présentent les automations sont refaites en style pixel.
+4. **Historique** : états « nouvel essai prévu », « échec définitif », run vide, « 32/50 ». Le bouton Re-run passe par la route de retry de T5.
+5. **Dashboard**.
+6. **Connexion et réglages**, y compris les fonds `Grainient` et `BorderGlow`, à retirer avec `ogl` s'il ne sert plus.
+7. **Page d'accueil** : refaite à 100 % avant le login, avec une présentation propre de ListFM.
+8. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
 
 ### Phase D : finition
 
@@ -72,6 +82,8 @@ Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impecca
 ## Plus tard (feu vert owner requis)
 
 Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
+
+**Noms qui se mettent à jour** (idée de l'owner, utile surtout une fois les playlists envoyées sur les apps de streaming) : un nom d'automation peut contenir des variables résolues à chaque run, par exemple `Seasonal {season} {year}` donne « Seasonal Winter 2026 ». À trancher : la liste des variables, l'hémisphère pour les saisons, et l'année d'un hiver à cheval sur deux ans.
 
 ## Leçons Last.fm
 

@@ -60,13 +60,13 @@ const AUTOMATION = {
   filterGroups: [],
 };
 
-async function renderDetail() {
+async function renderDetail(entry = "/playlists/a1") {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => {
     root.render(
-      <MemoryRouter initialEntries={["/playlists/a1"]}>
+      <MemoryRouter initialEntries={[entry]}>
         <AuthProvider>
           <Routes>
             <Route path="/playlists/:id" element={<PlaylistDetail />} />
@@ -173,6 +173,23 @@ describe("PlaylistDetail listens", () => {
 });
 
 describe("PlaylistDetail progress", () => {
+  it("runs once on arrival from the Creator, says so, and forgets it", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    runAutomationNow.mockClear();
+    runAutomationNow.mockRejectedValue(new Error("API 409: Your listening history is still loading. Run this when it finishes."));
+    pollProgress.mockImplementation(async () => null);
+
+    const { container, root } = await renderDetail({ pathname: "/playlists/a1", state: { created: "Created.", runNow: true } });
+    try {
+      await waitForText(container, "still loading");
+      expect(container.textContent).toContain("Created.");
+      expect(runAutomationNow).toHaveBeenCalledTimes(1);
+    } finally {
+      await teardown(container, root);
+    }
+  });
+
   it("shows a done summary after Run now", async () => {
     getAutomation.mockResolvedValue(AUTOMATION);
     getAutomationHistory

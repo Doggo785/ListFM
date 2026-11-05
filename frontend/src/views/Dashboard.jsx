@@ -5,7 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { motion } from "motion/react";
 import Loader from "../components/elements/Loader";
 import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
-import CountUp from "../components/elements/CountUp";
+import PixelNumber from "../components/elements/PixelNumber";
 import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
 import { getAutomations, getListeningTotals, getRecentTracks } from "@/lib/api";
 import { describeAutomationWithSchedule } from "@/lib/automation-rules";
@@ -28,7 +28,7 @@ function StatBlock({ value, label, color }) {
   return (
     <motion.div variants={fadeUp} className="text-center">
       <div className="font-heading text-3xl md:text-5xl whitespace-nowrap" style={{ color }}>
-        <CountUp to={value} separator=" " />
+        <PixelNumber value={value} separator=" " />
       </div>
       <p className="text-xs text-neutral-500 mt-2 uppercase tracking-wider font-medium">
         {label}

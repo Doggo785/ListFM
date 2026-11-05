@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CELL, createRibbon, hexToRgb, openingRect, quietRects, rampFor, sceneFor } from "./pixelRibbon";
+import { CELL, chainShape, createRibbon, hexToRgb, openingRect, quietRects, rampFor, sceneFor } from "./pixelRibbon";
 
 const PALETTE = ["#000000", "#010101", "#020202", "#030303", "#040404", "#050505", "#060606", "#070707", "#080808"];
 
@@ -216,8 +216,27 @@ describe("createRibbon", () => {
     tick(32);
     expect(lastPull(gl)).toBe(0);
     // The time uniform is the first float of each frame: it must not advance.
-    const times = gl.calls.uniform1f.filter((_, i) => i % 5 === 0).map(([, v]) => v);
+    const times = gl.calls.uniform1f.filter((_, i) => i % 7 === 0).map(([, v]) => v);
     expect(new Set(times)).toEqual(new Set([0]));
+  });
+
+  it("lies straight in a chain's band, and returns to the page's scene without it", () => {
+    const band = document.createElement("div");
+    band.dataset.chain = "800,60,1";
+    band.getBoundingClientRect = () => ({ top: window.innerHeight / 2 - 40, bottom: window.innerHeight / 2 + 40, height: 80, width: 100, left: 0 });
+    document.body.append(band);
+    const gl = fakeGl();
+    const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE, reducedMotion: true });
+    ribbon.setScene(sceneFor("/dashboard"));
+    tick(16);
+    const half = 40 / window.innerHeight;
+    const cols = lastCall(gl, "uniform1fv")[1];
+    chainShape([800, 60, 1]).forEach((w, i) => expect(cols[i]).toBeCloseTo(w * half));
+    expect(lastPull(gl)).toBe(0);
+
+    band.remove();
+    tick(32);
+    expect(lastCall(gl, "uniform1fv")[1][0]).toBeCloseTo(sceneFor("/dashboard").shape[0]);
   });
 
   it("stops the loop and listeners on destroy", () => {
@@ -234,3 +253,23 @@ describe("createRibbon", () => {
 function lastPull(gl) {
   return gl.calls.uniform1f.at(-1)[1];
 }
+
+describe("chainShape", () => {
+  const stages = (shape) => [shape[0], shape[4], shape[8]];
+
+  it("narrows stage by stage", () => {
+    const [window, kept, playlist] = stages(chainShape([8000, 600, 50]));
+    expect(window).toBeGreaterThan(kept);
+    expect(kept).toBeGreaterThan(playlist);
+    expect(playlist).toBeGreaterThan(0);
+    expect(window).toBeLessThan(1);
+  });
+
+  it("draws no ribbon after the stage where nothing is left", () => {
+    expect(stages(chainShape([300, 0, 0]))).toEqual([expect.any(Number), 0, 0]);
+  });
+
+  it("stays a plain even line without counts or listens", () => {
+    for (const counts of [[], [0, 0, 0]]) expect(new Set(chainShape(counts)).size).toBe(1);
+  });
+});
