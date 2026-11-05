@@ -16,7 +16,7 @@ Lire avant d'agir :
 - Commits et PR en anglais : titre `type(scope): summary`, corps `Summary` / `Changes` / `Test plan` comme les PR mergées. Aucun lien de session ni ligne d'attribution.
 - `scripts/ci-local.sh` passe vert avant chaque push, même pour une PR de docs.
 - Merge seulement sur « go merge #N » citant la PR (détail dans `CONSTRAINTS.md`).
-- Suivre seulement les jobs GitHub Actions d'une PR ; Codacy n'est pas un check requis, ne pas l'attendre.
+- Suivre les jobs GitHub Actions d'une PR et `Codacy Static Code Analysis` : l'attendre, et regarder ses alertes avant d'annoncer une PR prête. Une alerte se corrige ou se montre à l'owner, jamais en silence.
 
 ## Pièges backend
 
