@@ -190,7 +190,7 @@ export default function Playlist() {
             Back to playlists
           </Link>
           <div className="flex gap-4 lg:block">
-            <PlaylistCover seed={playlist.id} className="aspect-square w-[96px] shrink-0 md:w-[128px] lg:w-[320px]" style={{ viewTransitionName: "playlist-cover" }} />
+            <PlaylistCover images={playlist.cover_images} className="aspect-square w-[96px] shrink-0 md:w-[128px] lg:w-[320px]" style={{ viewTransitionName: "playlist-cover" }} />
             <div className="min-w-0 lg:pt-4">
               <h1 ref={title} tabIndex={-1} className="w-fit max-w-full text-2xl break-words outline-none md:text-4xl" style={{ viewTransitionName: "playlist-title" }}>{name}</h1>
               <p className="w-fit pt-1 text-base" style={{ viewTransitionName: "playlist-period" }}>{describeCoverage(playlist)}</p>

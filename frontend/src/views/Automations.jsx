@@ -14,7 +14,7 @@ const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset
 export default function Automations() {
   const { user } = useAuth();
   const username = user?.lastfm_username;
-  const { automations, counts, isLoading, error, playlistsFailed, refetch } = useAutomations(username);
+  const { automations, generatedPlaylists, counts, isLoading, error, playlistsFailed, refetch } = useAutomations(username);
 
   useEffect(() => {
     document.title = "Automations - ListFM";
@@ -57,7 +57,7 @@ export default function Automations() {
                   to={`/automations/${automation.id}`}
                   className={`group flex h-full gap-4 border-2 border-(--line) p-3 transition-colors duration-(--duration-quick) hover:border-(--ember) ${FOCUS}`}
                 >
-                  <PlaylistCover seed={automation.id} className="size-[96px] shrink-0" />
+                  <PlaylistCover images={generatedPlaylists.find((playlist) => playlist.automation_id === automation.id)?.cover_images} className="size-[96px] shrink-0" />
                   <span className="min-w-0">
                     <span className="block text-lg break-words group-hover:text-(--ember)">{automation.name || "Untitled"}</span>
                     <span className="block text-sm text-(--text-muted)">{describeAutomation(automation)}</span>

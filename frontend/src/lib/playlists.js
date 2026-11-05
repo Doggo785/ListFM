@@ -34,13 +34,4 @@ export function shelvesOf(playlists, automations) {
   return [...shelves.values()];
 }
 
-/** For the ribbon: it narrows from the biggest of the latest playlists to the smallest. */
-export function chainOf(playlists) {
-  return playlists
-    .slice(0, 12)
-    .map((playlist) => playlist.track_count)
-    .sort((a, b) => b - a)
-    .join(",");
-}
-
 export const tracksAsText = (tracks) => tracks.map((track) => `${track.artist} - ${track.title}`).join("\n");

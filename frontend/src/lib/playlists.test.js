@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainOf, describeCoverage, shelvesOf, tracksAsText } from "./playlists";
+import { describeCoverage, shelvesOf, tracksAsText } from "./playlists";
 
 describe("describeCoverage", () => {
   it("says the dates a playlist covers", () => {
@@ -55,16 +55,6 @@ describe("shelf cadence", () => {
     expect(seasonal.cadence).toBe("Every season");
     const [odd] = shelvesOf([{ id: "1", automation_id: "s" }], [{ id: "s", name: "S", cron: "not a cron" }]);
     expect(odd.cadence).toBe("not a cron");
-  });
-});
-
-describe("chainOf", () => {
-  it("goes from the biggest of the latest twelve to the smallest", () => {
-    const playlists = [...Array(13).keys()].map((i) => ({ track_count: i + 1 }));
-    const chain = chainOf(playlists).split(",").map(Number);
-    expect(chain).toHaveLength(12);
-    expect(chain[0]).toBe(12);
-    expect(chain.at(-1)).toBe(1);
   });
 });
 

@@ -12,7 +12,7 @@ vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { lastfm_user
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const AUTOMATION = { id: "a1", name: "Seasonal", cron: "0 0 1 3,6,9,12 *", enabled: true, sort: "most_played", window: { length: { amount: 3, unit: "month" } }, filterGroups: [] };
-const LOADED = { automations: [AUTOMATION], counts: new Map([["a1", 2]]), isLoading: false, error: null, refetch: vi.fn() };
+const LOADED = { generatedPlaylists: [{ automation_id: "a1", cover_images: ["https://img/a.png"] }], automations: [AUTOMATION], counts: new Map([["a1", 2]]), isLoading: false, error: null, refetch: vi.fn() };
 
 describe("Automations", () => {
   let host;
@@ -37,6 +37,7 @@ describe("Automations", () => {
     expect(card.textContent).toContain("Seasonal");
     expect(card.textContent).toContain("Every season");
     expect(card.textContent).toContain("2 playlists");
+    expect(card.querySelector("img").getAttribute("src")).toBe("https://img/a.png");
   });
 
   it("says when an automation is paused", async () => {

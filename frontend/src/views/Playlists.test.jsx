@@ -12,7 +12,7 @@ vi.mock("@/lib/glide", () => ({ glide: (go) => go(), glideArrived: () => {} }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const SEASON = { id: "p1", automation_id: "a1", name: "Seasonal", track_count: 30, period_start: "2026-06-01", period_end: "2026-08-31", generated_at: "2026-09-01T00:00:00Z" };
+const SEASON = { id: "p1", automation_id: "a1", name: "Seasonal", track_count: 30, period_start: "2026-06-01", period_end: "2026-08-31", generated_at: "2026-09-01T00:00:00Z", cover_images: ["https://img/a.png"] };
 const LOADED = { automations: [{ id: "a1", name: "Seasonal", cron: "0 0 1 3,6,9,12 *" }], generatedPlaylists: [SEASON], isLoading: false, error: null, playlistsFailed: false, refetch: vi.fn() };
 
 function Opened() {
@@ -53,7 +53,8 @@ describe("Playlists", () => {
     expect(host.querySelector("section").getAttribute("aria-labelledby")).toBe(host.querySelector("h2").id);
     expect(host.textContent).toContain("Jun 1 to Aug 31, 2026");
     expect(host.textContent).toContain("30 tracks");
-    expect(host.querySelector("[data-chain]").dataset.chain).toBe("30");
+    expect(host.querySelector("[data-chain]")).toBe(null);
+    expect(host.querySelector("li img").getAttribute("src")).toBe("https://img/a.png");
   });
 
   it("opens a playlist on its own page, carrying what the page shows first", async () => {

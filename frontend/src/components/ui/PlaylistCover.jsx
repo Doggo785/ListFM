@@ -1,18 +1,27 @@
-import { useMemo } from "react";
-import { COVER_CELLS, coverPaths } from "@/lib/playlistCover";
+const MOSAIC = 4;
 
-/** Size it in px, in a multiple of 16: the rem scale would leave cells of uneven width. */
-export default function PlaylistCover({ seed, className, style }) {
-  const paths = useMemo(() => coverPaths(seed), [seed]);
+/** A playlist's album art: four covers when it has them, or the first alone. Enlarged on purpose, so its pixels show. */
+export default function PlaylistCover({ images = [], className, style }) {
+  const shown = images.length >= MOSAIC ? images.slice(0, MOSAIC) : images.slice(0, 1);
   return (
-    <svg
-      viewBox={`0 0 ${COVER_CELLS} ${COVER_CELLS}`}
-      shapeRendering="crispEdges"
+    <div
       aria-hidden="true"
-      className={`block bg-(--ember-1) ${className ?? ""}`}
+      className={`grid aspect-square overflow-hidden bg-(--ember-1) ${shown.length > 1 ? "grid-cols-2 grid-rows-2" : ""} ${className ?? ""}`}
       style={style}
     >
-      {paths.map((d, tone) => d && <path key={tone} d={d} fill={`var(--ember-${tone + 1})`} />)}
-    </svg>
+      {shown.map((src) => (
+        <img
+          key={src}
+          src={src}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="size-full min-h-0 object-cover [image-rendering:pixelated]"
+          onError={(event) => {
+            event.currentTarget.style.visibility = "hidden";
+          }}
+        />
+      ))}
+    </div>
   );
 }

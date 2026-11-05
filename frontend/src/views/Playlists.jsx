@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/buttonVariants";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
 import { glide, glideArrived } from "@/lib/glide";
-import { chainOf, describeCoverage, plural, shelvesOf } from "@/lib/playlists";
+import { describeCoverage, plural, shelvesOf } from "@/lib/playlists";
 
 const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9)";
 
@@ -19,7 +19,7 @@ function Shelf({ shelf, opening, cameFrom, returnTo, onOpen }) {
   const heading = useId();
   const open = shelf.playlists.some((playlist) => playlist.id === opening);
   return (
-    <section data-quiet aria-labelledby={heading} className="min-w-0 pb-8">
+    <section data-quiet aria-labelledby={heading} className="w-fit max-w-full min-w-0 pb-8">
       <div className="flex flex-wrap items-baseline gap-x-4 pb-3">
         <h2 id={heading} className="w-fit text-2xl" style={open ? { viewTransitionName: "playlist-title" } : undefined}>{shelf.name}</h2>
         {shelf.cadence && <p className="text-sm text-(--text-muted)">{shelf.cadence}</p>}
@@ -36,7 +36,7 @@ function Shelf({ shelf, opening, cameFrom, returnTo, onOpen }) {
                 className={`group block ${FOCUS}`}
               >
                 <PlaylistCover
-                  seed={playlist.id}
+                  images={playlist.cover_images}
                   className="aspect-square w-full outline-2 outline-transparent transition-[outline-color] duration-(--duration-quick) group-hover:outline-(--ember)"
                   style={active ? { viewTransitionName: "playlist-cover" } : undefined}
                 />
@@ -93,7 +93,7 @@ export default function Playlists() {
   return (
     <main className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-8 text-left md:px-8">
       <div className="mx-auto max-w-6xl">
-        <header data-quiet className="w-fit pt-4">
+        <header data-quiet className="w-fit pt-4 pb-8">
           <h1 className="text-4xl">Playlists</h1>
           {shelves.length > 0 && (
             <p className="pt-1 text-base text-(--text-muted)">
@@ -101,9 +101,6 @@ export default function Playlists() {
             </p>
           )}
         </header>
-
-        {/* The ribbon runs through this gap and narrows from the biggest of the latest playlists to the smallest. */}
-        <div data-chain={chainOf(generatedPlaylists)} aria-hidden="true" className="h-14" />
 
         {!username && (
           <p data-quiet className="text-base text-(--text-muted)">
