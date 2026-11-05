@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { IconChevronDown } from "@tabler/icons-react";
+import { AnimatePresence, motion } from "motion/react";
 import CronEditor from "@/components/builder/CronEditor";
 import FilterBuilder from "@/components/builder/FilterBuilder";
+import PixelNumber from "@/components/elements/PixelNumber";
 import { Button } from "@/components/ui/button";
 import CustomSelect from "@/components/ui/CustomSelect";
 import { Input, NumberInput } from "@/components/ui/input";
@@ -28,15 +30,19 @@ const CUSTOM = "custom";
 const WINDOW_CHOICES = [...WINDOW_OPTIONS, { value: CUSTOM, label: "Custom" }];
 const UNITS = ["day", "week", "month", "year"].map((value) => ({ value, label: `${value}s` }));
 const Muted = ({ children }) => <span className="text-sm text-(--text-muted)">{children}</span>;
+// A kept track slides to its new rank; a new one dithers in from the top, and a dropped one steps out.
+const ROW_MOVE = { layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] } };
+const ROW_EXIT = { opacity: 0, transition: { duration: 0.12, ease: (t) => Math.ceil(t * 3) / 3 } };
+const ROW_STAGGER_LIMIT = 14; // Past the visible rows, waiting would only delay what's off-screen.
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_auto]";
+const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_9rem]";
 
 function Count({ value, unit }) {
   if (value == null) return <span className="sm:order-last" />;
   return (
     <span className="text-right whitespace-nowrap sm:order-last">
-      <span className="font-heading text-2xl tabular-nums">{value.toLocaleString("en-US")}</span> <Muted>{unit}</Muted>
+      <span className="font-heading text-2xl tabular-nums"><PixelNumber value={value} /></span> <Muted>{unit}</Muted>
     </span>
   );
 }
@@ -129,18 +135,27 @@ function Preview({ preview, draft, linked }) {
       )}
       {result?.total === 0 && <p className="py-3 text-sm text-(--text-muted)">No track fits. Try a wider window or fewer rules.</p>}
       {result && result.total > 0 && (
-        <ol className="min-h-0 flex-1 divide-y divide-(--line) overflow-y-auto">
-          {result.tracks.map((track, i) => (
-            <li key={`${track.artist}-${track.title}`} className="flex items-center gap-3 py-2 pr-2">
-              <span className="w-8 shrink-0 text-right text-sm text-(--text-muted) tabular-nums">{i + 1}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-base">{track.title}</span>
-                <span className="block truncate text-sm text-(--text-muted)">{track.artist}</span>
-              </span>
-              {track.playcount != null && <span className="shrink-0 text-sm text-(--text-muted) tabular-nums" title="Plays" aria-label={plural(track.playcount, "play")}>{track.playcount}</span>}
-            </li>
-          ))}
-        </ol>
+        <motion.ol layoutScroll className="relative min-h-0 flex-1 divide-y divide-(--line) overflow-y-auto">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {result.tracks.map((track, i) => (
+              <motion.li
+                key={`${track.artist}-${track.title}`}
+                layout="position"
+                transition={ROW_MOVE}
+                exit={ROW_EXIT}
+                className="preview-row flex items-center gap-3 py-2 pr-2"
+                style={{ "--row": Math.min(i, ROW_STAGGER_LIMIT) }}
+              >
+                <span className="w-8 shrink-0 text-right text-sm text-(--text-muted) tabular-nums">{i + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base">{track.title}</span>
+                  <span className="block truncate text-sm text-(--text-muted)">{track.artist}</span>
+                </span>
+                {track.playcount != null && <span className="shrink-0 text-sm text-(--text-muted) tabular-nums" title="Plays" aria-label={plural(track.playcount, "play")}>{track.playcount}</span>}
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </motion.ol>
       )}
     </>
   );
@@ -221,7 +236,9 @@ export default function PlaylistNew() {
         {/* The ribbon runs through this gap and narrows with the chain's counts. */}
         <div data-chain={result ? [result.before_filter, result.after_filter, result.total].join(",") : ""} aria-hidden="true" className="h-14" />
 
-        <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-rows-[auto_1fr]">
+        <div className="grid items-start gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+          {/* Below lg the three blocks stack as settings, preview, actions. */}
+          <div className="min-w-0 max-lg:contents lg:space-y-4">
           <div data-quiet className="min-w-0 divide-y divide-(--line)">
             <Stage label="Window" count={<Count value={result?.before_filter} unit="tracks" />} below={windowIsCustom && <CustomWindow window={draft.window} onChange={(window) => update({ window })} />}>
               <CustomSelect label="Window" value={windowIsCustom ? CUSTOM : windowOption(draft.window).value} onChange={pickWindow} options={WINDOW_CHOICES} />
@@ -259,11 +276,8 @@ export default function PlaylistNew() {
             </Stage>
           </div>
 
-          <aside data-quiet className="flex min-h-0 min-w-0 flex-col lg:sticky lg:top-4 lg:row-span-2 lg:max-h-[calc(100vh-7rem)] lg:self-start">
-            <Preview preview={preview} draft={draft} linked={linked} />
-          </aside>
 
-          <div data-quiet className="flex flex-wrap items-center gap-3">
+          <div data-quiet className="flex flex-wrap items-center gap-3 max-lg:order-last">
             <Button size="lg" onClick={create} disabled={creating || !linked}>
               {creating ? "Creating" : "Create automation"}
             </Button>
@@ -272,6 +286,11 @@ export default function PlaylistNew() {
             </Button>
             {createError && <p className="w-full text-sm text-(--ember)" role="alert">{createError}</p>}
           </div>
+          </div>
+
+          <aside data-quiet className="flex min-h-0 min-w-0 flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:self-start">
+            <Preview preview={preview} draft={draft} linked={linked} />
+          </aside>
         </div>
       </div>
     </div>

@@ -56,6 +56,7 @@ const type = (input, value) =>
   });
 
 beforeEach(() => {
+  HTMLCanvasElement.prototype.getContext = () => null;
   vi.useFakeTimers();
   vi.clearAllMocks();
   auth.user = { lastfm_username: "u" };

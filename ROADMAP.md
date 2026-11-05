@@ -73,6 +73,8 @@ Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impecca
 
 Export Spotify/YouTube, social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), stats au-delà des 50 recents, domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
 
+**Noms qui se mettent à jour** (idée de l'owner, utile surtout une fois les playlists envoyées sur les apps de streaming) : un nom d'automation peut contenir des variables résolues à chaque run, par exemple `Seasonal {season} {year}` donne « Seasonal Winter 2026 ». À trancher : la liste des variables, l'hémisphère pour les saisons, et l'année d'un hiver à cheval sur deux ans.
+
 ## Leçons Last.fm
 
 - Pas de quota public, la doc demande d'être raisonnable : chaque changement vise **moins d'appels**, pas des appels plus rapides.

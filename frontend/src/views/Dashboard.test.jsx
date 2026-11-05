@@ -24,7 +24,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 // The real counter animates once in view, which never happens in jsdom.
-vi.mock("@/components/elements/CountUp", () => ({ default: ({ to }) => <span>{to}</span> }));
+vi.mock("../components/elements/PixelNumber", () => ({ default: ({ value }) => <span>{value}</span> }));
 
 // jsdom cannot read image pixels; return a fixed palette for the avatar ring.
 vi.mock("@/lib/color-extract", async (importOriginal) => ({
