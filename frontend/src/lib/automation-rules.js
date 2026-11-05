@@ -96,6 +96,13 @@ export function writeSchedule({ frequency, minute = 0, hour = 8, weekday = 1, da
   return "";
 }
 
+/** What happens once the automation exists. The sweep passes every minute, and a never-run automation is due at once. */
+export function describeOutcome(cron) {
+  if (!cron) return "Nothing runs until you start it.";
+  const rhythm = readSchedule(cron).frequency === "custom" ? "on your schedule" : describeCron(cron).replace(/^./, (c) => c.toLowerCase());
+  return `First playlist in about a minute, then ${rhythm}.`;
+}
+
 const ordinal = (n) => {
   const v = n % 100;
   return `${n}${SUFFIXES[(v - 20) % 10] || SUFFIXES[v] || SUFFIXES[0]}`;
@@ -114,15 +121,16 @@ export function describeCron(expr) {
   return `Every year, ${MONTHS[s.month - 1]} ${ordinal(s.day)}, at ${time}`;
 }
 
+// Hints mirror services/filter_engine.py and the pipeline: reword them if the rule changes.
 export const FILTER_FIELDS = {
-  userplaycount: { label: "Your plays (all time)", type: "number" },
-  playcount: { label: "Your plays (window)", type: "number" },
-  userloved: { label: "Loved or not", type: "boolean" },
-  tags: { label: "Tag", type: "text" },
-  timestamp: { label: "Last listen", type: "date" },
-  first_played: { label: "First listen", type: "date" },
-  artist_rank: { label: "Top artists", type: "rank" },
-  listening_moment: { label: "Listening moment", type: "moment" },
+  userplaycount: { label: "Your plays (all time)", type: "number", hint: "How many times you played the track, across all your listens." },
+  playcount: { label: "Your plays (window)", type: "number", hint: "How many times you played the track inside the window." },
+  userloved: { label: "Loved or not", type: "boolean", hint: "Whether you loved the track on Last.fm." },
+  tags: { label: "Tag", type: "text", hint: "Tags come from the artist. Strength is how much Last.fm ties the tag to them: their top tag is 100, so a higher minimum keeps fewer artists. Artists whose tags aren't fetched yet never match." },
+  timestamp: { label: "Last listen", type: "date", hint: "The last time you played the track inside the window, counted back from the day the playlist is made." },
+  first_played: { label: "First listen", type: "date", hint: "The very first time you played the track, counted back from the day the playlist is made." },
+  artist_rank: { label: "Top artists", type: "rank", hint: "The artist's place among those you played most over this period. Artists outside that ranking don't match." },
+  listening_moment: { label: "Listening moment", type: "moment", hint: "How many times you played the track at that moment, in your timezone. A night past midnight belongs to the day it began." },
 };
 
 export const FILTER_OPERATORS = {
@@ -206,19 +214,22 @@ export function conditionForField(condition, field) {
 }
 
 // Same rule as the server (services/filter_engine.py): without its value a condition is ignored.
-function isCompleteCondition({ operator, value, valueMax }) {
+export function isCompleteCondition({ operator, value, valueMax }) {
   if (value == null || String(value).trim() === "") return false;
   return operator !== "between" || (valueMax != null && valueMax !== "");
 }
 
-export function countActiveConditions(filterGroups) {
+function countConditions(filterGroups, test) {
   let count = 0;
   for (const group of filterGroups ?? []) {
-    count += (group.conditions ?? []).filter(isCompleteCondition).length;
-    count += countActiveConditions(group.groups);
+    count += (group.conditions ?? []).filter(test).length;
+    count += countConditions(group.groups, test);
   }
   return count;
 }
+
+export const countActiveConditions = (filterGroups) => countConditions(filterGroups, isCompleteCondition);
+export const countIncompleteConditions = (filterGroups) => countConditions(filterGroups, (c) => !isCompleteCondition(c));
 
 export function usesTagFilter(filterGroups) {
   return (filterGroups ?? []).some(

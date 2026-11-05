@@ -12,7 +12,7 @@ import {
 } from "@/lib/automation-rules";
 
 const FREQUENCIES = [
-  { value: "none", label: "Only when I run it" },
+  { value: "none", label: "Only when you run it" },
   { value: "daily", label: "Every day" },
   { value: "weekly", label: "Every week" },
   { value: "monthly", label: "Every month" },
@@ -31,6 +31,7 @@ export default function CronEditor({ value, onChange }) {
   const schedule = readSchedule(value);
   const frequency = custom ? "custom" : schedule.frequency;
   const description = describeCron(value);
+  const invalid = Boolean(value) && !isValidCron(value);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const set = (patch) => onChange(writeSchedule({ ...schedule, ...patch }));
@@ -69,7 +70,7 @@ export default function CronEditor({ value, onChange }) {
         {frequency === "custom" && (
           <Input
             aria-label="Cron expression"
-            aria-invalid={!isValidCron(value)}
+            aria-invalid={invalid}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="minute hour day month weekday"
@@ -77,6 +78,9 @@ export default function CronEditor({ value, onChange }) {
           />
         )}
       </div>
+      {frequency === "custom" && invalid && (
+        <p className="text-sm text-(--ember)">Use five parts: minute hour day month weekday.</p>
+      )}
       {description && (
         <p className="text-sm text-(--text-muted)">
           {description} ({timezone})

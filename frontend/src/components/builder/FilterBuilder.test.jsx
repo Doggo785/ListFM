@@ -106,14 +106,62 @@ describe("FilterBuilder", () => {
     const container = await render({ field: "playcount", value: 3 });
     await pickField(container, "Your plays (window)", "Tag");
     expect(condition()).toMatchObject({ field: "tags", operator: "contains", value: "" });
-    const input = container.querySelector('input[type="text"]');
+    const input = container.querySelector('input[role="combobox"]');
     expect(input.value).toBe("");
 
     await type(input, "ra");
     expect(container.textContent).toContain("120 artists");
     expect(container.textContent).toContain("1 artist");
-    await click([...container.querySelectorAll("button")].find((b) => b.textContent.startsWith("rap")));
+    await click(options().find((o) => o.textContent.startsWith("rap")));
     expect(condition().value).toBe("rap");
+  });
+
+  it("applies a tag on a pick, Enter or leaving the box, not on each letter", async () => {
+    const container = await render({ field: "tags", operator: "contains", value: "" });
+    const input = container.querySelector('input[role="combobox"]');
+    const key = (k) => act(async () => input.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true })));
+    seen.groups = null;
+
+    await type(input, "ra");
+    expect(seen.groups).toBeNull();
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+
+    await key("ArrowDown");
+    await key("ArrowDown");
+    const active = document.getElementById(input.getAttribute("aria-activedescendant"));
+    expect(active.textContent).toContain("french rap");
+    expect(active.getAttribute("aria-selected")).toBe("true");
+    await key("Escape");
+    expect(input.getAttribute("aria-expanded")).toBe("false");
+    expect(seen.groups).toBeNull();
+
+    await key("ArrowUp");
+    await key("Enter");
+    expect(condition().value).toBe("french rap");
+
+    await type(input, "jazz ");
+    await act(async () => input.dispatchEvent(new FocusEvent("focusout", { bubbles: true })));
+    expect(condition().value).toBe("jazz");
+  });
+
+  it("explains each rule, says when one is not applied, and keeps the grammar", async () => {
+    const container = await render({ field: "tags", operator: "contains", value: "" });
+    expect(container.textContent).toContain("their top tag is 100");
+    expect(container.textContent).toContain("Not applied until it has a value.");
+    await pickField(container, "Tag", "Listening moment");
+    expect(container.textContent).toContain("listen");
+    expect(container.textContent).not.toContain("listens");
+    expect(container.textContent).not.toContain("Not applied");
+  });
+
+  it("reads as sentences once there are several groups", async () => {
+    const container = await render({ field: "playcount", value: 3 });
+    expect(container.textContent).not.toContain("Keep tracks matching");
+    await click(button(container, "Advanced"));
+    await click(button(container, "Add alternative group"));
+    expect(container.textContent).toContain("Keep tracks matching this");
+    expect(container.textContent).toContain("Empty, so it is ignored.");
+    expect(button(container, "or")).toBeUndefined();
   });
 
   it("empties the condition when the tag box is emptied", async () => {

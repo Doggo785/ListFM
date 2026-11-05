@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { IconPlus, IconX } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import CustomSelect from "@/components/ui/CustomSelect";
@@ -12,12 +12,15 @@ import {
   conditionForField,
   createCondition,
   createGroup,
+  isCompleteCondition,
   windowOption,
 } from "@/lib/automation-rules";
 import { getKnownTags } from "@/lib/api";
 
 const FIELD_OPTIONS = Object.entries(FILTER_FIELDS).map(([value, def]) => ({ value, label: def.label }));
 const Word = ({ children }) => <span className="text-sm text-(--text-muted)">{children}</span>;
+// A control and what reads with it: the row wraps between clauses before it wraps inside one.
+const Clause = ({ className = "", children }) => <div className={`flex flex-wrap items-center gap-2 ${className}`}>{children}</div>;
 
 const ANY = "any";
 // The server counts days from Monday, 1 to 7.
@@ -49,63 +52,95 @@ function pickPeriod(value) {
   return WINDOW_OPTIONS.find((o) => o.value === value).window;
 }
 
+/** Applied on a pick, Enter, leaving the box or emptying it: half a word must not refilter the list. */
 function TagPicker({ condition, onChange, knownTags }) {
   const [search, setSearch] = useState(condition.value || "");
   const [open, setOpen] = useState(false);
-  const box = useRef(null);
-
-  useEffect(() => {
-    const close = (e) => {
-      if (!box.current?.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
+  const [active, setActive] = useState(-1);
+  const listId = useId();
+  const list = useRef(null);
 
   const wanted = search.toLowerCase();
   const matches = knownTags.filter((t) => t.name.includes(wanted) && t.name !== condition.value).slice(0, 12);
+  const showing = open && matches.length > 0;
+
+  useEffect(() => {
+    if (active >= 0) list.current?.children[active]?.scrollIntoView({ block: "nearest" });
+  }, [active]);
+
+  const commit = (value) => {
+    if (value !== condition.value) onChange({ ...condition, value });
+  };
+  const close = () => {
+    setOpen(false);
+    setActive(-1);
+  };
+  const pick = (name) => {
+    setSearch(name);
+    close();
+    commit(name);
+  };
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setOpen(true);
+      if (matches.length > 0) setActive((i) => (e.key === "ArrowDown" ? (i + 1) % matches.length : i <= 0 ? matches.length - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      if (showing && active >= 0) pick(matches[active].name);
+      else {
+        close();
+        commit(search.trim());
+      }
+    } else if (e.key === "Escape") {
+      close();
+    }
+  };
 
   return (
-    <div
-      className="relative min-w-40 flex-1"
-      ref={box}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") setOpen(false);
-      }}
-    >
+    <div className="relative min-w-40 flex-1">
       <Input
         type="text"
+        role="combobox"
         aria-label="Tag"
+        aria-autocomplete="list"
+        aria-expanded={showing}
+        aria-controls={listId}
+        aria-activedescendant={showing && active >= 0 ? `${listId}-${active}` : undefined}
         value={search}
         onChange={(e) => {
           setSearch(e.target.value);
           setOpen(true);
-          onChange({ ...condition, value: e.target.value });
+          setActive(-1);
+          if (!e.target.value) commit("");
         }}
         onFocus={() => setOpen(true)}
+        onBlur={() => {
+          close();
+          commit(search.trim());
+        }}
+        onKeyDown={onKeyDown}
         placeholder="Search tags"
         className="w-full"
       />
-      {open && matches.length > 0 && (
-        <div className="absolute z-50 mt-1 max-h-56 w-full min-w-64 overflow-y-auto border-2 border-(--ember) bg-(--ground)">
-          {matches.map((tag) => (
-            <button
+      {showing && (
+        // Pressing the list must not blur the box, or the blur would apply the half-typed word first.
+        <ul id={listId} ref={list} role="listbox" aria-label="Tags" onMouseDown={(e) => e.preventDefault()} className="absolute z-50 mt-1 max-h-56 w-full min-w-64 overflow-y-auto border-2 border-(--ember) bg-(--ground)">
+          {matches.map((tag, i) => (
+            <li
               key={tag.name}
-              type="button"
-              onClick={() => {
-                onChange({ ...condition, value: tag.name });
-                setSearch(tag.name);
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm outline-none hover:bg-(--ember-1) focus-visible:bg-(--ember-1)"
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              onClick={() => pick(tag.name)}
+              className={`flex cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm hover:bg-(--ember-1) ${i === active ? "bg-(--ember-1)" : ""}`}
             >
               <span className="flex-1 truncate">{tag.name}</span>
               <span className="shrink-0 text-(--text-muted) tabular-nums">
                 {tag.artists} artist{tag.artists === 1 ? "" : "s"}
               </span>
-            </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
@@ -134,7 +169,7 @@ function MomentPicker({ moment, onChange }) {
   );
 }
 
-function ConditionValue({ condition, onChange, knownTags }) {
+function ConditionValue({ condition, onChange, knownTags, operator }) {
   const type = FILTER_FIELDS[condition.field]?.type ?? "number";
   const setValue = (value) => onChange({ ...condition, value: value ?? "" });
 
@@ -152,24 +187,33 @@ function ConditionValue({ condition, onChange, knownTags }) {
   if (type === "text") {
     return (
       <>
-        <TagPicker key={condition.id} condition={condition} onChange={onChange} knownTags={knownTags} />
-        <Word>strength</Word>
-        <NumberInput aria-label="Minimum tag strength, 0 to 100" min={0} max={100} value={condition.countMin ?? 0} onChange={(countMin) => onChange({ ...condition, countMin: countMin ?? 0 })} />
+        <Clause className="max-w-full min-w-0 flex-[1_1_20rem]">
+          {operator}
+          <TagPicker key={condition.id} condition={condition} onChange={onChange} knownTags={knownTags} />
+        </Clause>
+        <Clause>
+          <Word>strength at least</Word>
+          <NumberInput aria-label="Minimum tag strength, 0 to 100" min={0} max={100} value={condition.countMin ?? 0} onChange={(countMin) => onChange({ ...condition, countMin: countMin ?? 0 })} />
+        </Clause>
       </>
     );
   }
   const between = condition.operator === "between";
+  const one = Number(between ? condition.valueMax : condition.value) === 1;
   return (
     <>
-      <NumberInput aria-label={between ? "Minimum" : "Value"} min={0} value={condition.value === "" ? null : condition.value} onChange={setValue} />
-      {between && (
-        <>
-          <Word>and</Word>
-          <NumberInput aria-label="Maximum" min={0} value={condition.valueMax} onChange={(valueMax) => onChange({ ...condition, valueMax })} />
-        </>
-      )}
-      {type === "date" && <Word>days ago</Word>}
-      {type === "moment" && <Word>listens</Word>}
+      <Clause>
+        {operator}
+        <NumberInput aria-label={between ? "Minimum" : "Value"} min={0} value={condition.value === "" ? null : condition.value} onChange={setValue} />
+        {between && (
+          <>
+            <Word>and</Word>
+            <NumberInput aria-label="Maximum" min={0} value={condition.valueMax} onChange={(valueMax) => onChange({ ...condition, valueMax })} />
+          </>
+        )}
+        {type === "date" && <Word>{one ? "day ago" : "days ago"}</Word>}
+        {type === "moment" && <Word>{one ? "listen" : "listens"}</Word>}
+      </Clause>
       {type === "rank" && (
         <CustomSelect label="Ranked over" value={periodValue(condition.period)} onChange={(v) => onChange({ ...condition, period: pickPeriod(v) })} options={PERIOD_OPTIONS} className="w-52" />
       )}
@@ -186,16 +230,20 @@ function ConditionValue({ condition, onChange, knownTags }) {
 }
 
 function ConditionRow({ condition, onChange, onRemove, knownTags }) {
-  const type = FILTER_FIELDS[condition.field]?.type ?? "number";
+  const { type = "number", hint } = FILTER_FIELDS[condition.field] ?? {};
   const operators = FILTER_OPERATORS[type];
   return (
     <li className="flex items-start gap-2 py-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         <CustomSelect label="Filter field" value={condition.field} onChange={(field) => onChange(conditionForField(condition, field))} options={FIELD_OPTIONS} className="w-52" />
-        {operators.length > 1 && (
-          <CustomSelect label="Filter operator" value={condition.operator} onChange={(operator) => onChange({ ...condition, operator })} options={operators} className="w-40" />
-        )}
-        <ConditionValue condition={condition} onChange={onChange} knownTags={knownTags} />
+        <ConditionValue
+          condition={condition}
+          onChange={onChange}
+          knownTags={knownTags}
+          operator={operators.length > 1 && <CustomSelect label="Filter operator" value={condition.operator} onChange={(operator) => onChange({ ...condition, operator })} options={operators} className="w-40" />}
+        />
+        {hint && <p className="w-full text-sm text-(--text-muted)">{hint}</p>}
+        {!isCompleteCondition(condition) && <p className="w-full text-sm text-(--ember)">Not applied until it has a value.</p>}
       </div>
       <Button variant="outline" aria-label="Remove rule" onClick={onRemove} className="w-10 px-0">
         <IconX size={16} />
@@ -204,16 +252,23 @@ function ConditionRow({ condition, onChange, onRemove, knownTags }) {
   );
 }
 
-function FilterGroup({ group, onChange, onRemove, advanced, nested, knownTags }) {
+function FilterGroup({ group, onChange, onRemove, advanced, nested, boxed, knownTags }) {
   const subGroups = group.groups ?? [];
   const replaceAt = (list, i, item) => list.map((old, j) => (j === i ? item : old));
   const ruleCount = group.conditions.length + subGroups.length;
+  const opening = nested ? "Matching" : "Keep tracks matching";
 
   return (
-    <div className={nested ? "border-l border-(--line) pl-3" : ""}>
+    <div className={nested ? "border-l-2 border-(--line) pl-3" : boxed ? "border-l-2 border-(--control) pl-3" : ""}>
+      {ruleCount === 0 && (
+        <p className="text-sm text-(--text-muted)">
+          {nested || boxed ? "Empty, so it is ignored." : "No rules yet, so every track in the window stays."}
+        </p>
+      )}
+      {ruleCount === 1 && (nested || boxed) && <Word>{opening} this</Word>}
       {ruleCount > 1 && (
         <div className="flex flex-wrap items-center gap-2 pb-1">
-          <Word>Keep tracks matching</Word>
+          <Word>{opening}</Word>
           <CustomSelect
             label="Match all or any"
             value={group.logic}
@@ -293,9 +348,16 @@ export default function FilterBuilder({ value, onChange }) {
     <div className="space-y-3">
       {groups.map((group, i) => (
         <div key={group.id} className="space-y-3">
-          {i > 0 && <Word>or</Word>}
+          {i > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="h-0.5 flex-1 bg-(--line)" />
+              <Word>or</Word>
+              <span className="h-0.5 flex-1 bg-(--line)" />
+            </div>
+          )}
           <FilterGroup
             group={group}
+            boxed={groups.length > 1}
             advanced={advanced}
             knownTags={knownTags}
             onChange={(next) => onChange(groups.map((g, j) => (j === i ? next : g)))}
@@ -305,7 +367,7 @@ export default function FilterBuilder({ value, onChange }) {
       ))}
       {advanced ? (
         <Button variant="outline" size="sm" onClick={() => onChange([...groups, createGroup()])}>
-          Add group
+          Add alternative group
         </Button>
       ) : (
         <button type="button" onClick={() => setAdvancedOpen(true)} className="text-sm text-(--text-muted) underline underline-offset-4 outline-none hover:text-(--text) focus-visible:text-(--ember)">
