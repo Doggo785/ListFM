@@ -88,8 +88,9 @@ describe("PixelNumber", () => {
   it("leaves the pixels where they are when the number's box moves", async () => {
     const container = await show(<PixelNumber value={5689} />);
     await wait(400);
-    Element.prototype.getBoundingClientRect.mockReturnValue({ width: 80, height: 40, left: 40 });
     await act(async () => root.render(<PixelNumber value={21} />));
+    // The box only moves at the swap, once the pixels have covered the old number.
+    Element.prototype.getBoundingClientRect.mockReturnValue({ width: 80, height: 40, left: 40 });
     await wait(250);
     expect(container.textContent).toBe("21");
     // 40px at 4px a cell: the old pixels now sit 10 cells left of the box.
