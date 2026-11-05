@@ -25,6 +25,8 @@ RATE_LIMIT_RETRIES = 3
 # What a failed Last.fm call raises: an error body, a transport or HTTP error,
 # or an unexpected payload shape.
 PAGE_ERRORS = (pylast.WSError, httpx.HTTPError, KeyError, TypeError, ValueError)
+# The grey star Last.fm serves for an album with no cover.
+NO_IMAGE_HASH = "2a96cbd8b46e442fc41c2b86b821562f"
 # Last.fm returns up to 100 tags per artist, the long tail being noise.
 ARTIST_TAGS_KEPT = 10
 
@@ -117,7 +119,7 @@ def get_network() -> pylast.LastFMNetwork:
 LASTFM_API_URL = "https://ws.audioscrobbler.com/2.0/"
 
 
-def _pick_image(images) -> str | None:
+def _pick_image(images, sizes=("large", "extralarge", "medium", "small")) -> str | None:
     """Usable image URL from an extended=1 image list (UI-sized first)."""
     if not isinstance(images, list):
         return None
@@ -126,7 +128,7 @@ def _pick_image(images) -> str | None:
         for img in images
         if isinstance(img, dict) and img.get("#text")
     }
-    for size in ("large", "extralarge", "medium", "small"):
+    for size in sizes:
         if by_size.get(size):
             return by_size[size]
     return None
@@ -279,6 +281,19 @@ def get_artist_tags(artist: str) -> list[dict]:
     return _normalize_tags(
         [{"name": t["name"], "count": int(t["count"])} for t in _as_list(data.get("tag"))[:ARTIST_TAGS_KEPT]]
     )
+
+
+def get_album_image(artist: str, album: str) -> str | None:
+    """An album's small cover: the screen enlarges it into visible pixels. An unknown album or a placeholder has none."""
+    _throttled_call()
+    try:
+        data = _lastfm_json("album.getInfo", artist=artist, album=album)["album"]
+    except pylast.WSError as exc:
+        if str(exc.status) == "6":
+            return None
+        raise
+    image = _pick_image(data.get("image"), ("small", "medium", "large", "extralarge"))
+    return None if image is None or NO_IMAGE_HASH in image else image
 
 
 def get_recent_tracks(

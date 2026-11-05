@@ -4,10 +4,12 @@ from models.user import User
 from repositories.generated_playlists import (
     delete_generated_playlist,
     get_generated_playlists,
+    get_playlist_covers,
     get_playlist_tracks,
 )
 from routers.deps import get_current_active_user, get_current_user_lastfm_username
 from schemas import GeneratedPlaylistRead, PlaylistTrackItem
+from services.album_covers import start_album_covers
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +22,14 @@ async def list_generated_playlists(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_generated_playlists(db, current_user.id)
+    playlists = await get_generated_playlists(db, current_user.id)
+    covers = await get_playlist_covers(db, current_user.id)
+    # shortcut: covers arrive on the next visit, make the page poll if waiting for them becomes annoying.
+    start_album_covers(current_user.id, username)
+    return [
+        GeneratedPlaylistRead.model_validate(playlist).model_copy(update={"cover_images": covers.get(playlist.id, [])})
+        for playlist in playlists
+    ]
 
 
 @router.get(

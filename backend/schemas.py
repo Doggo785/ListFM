@@ -427,6 +427,7 @@ class GeneratedPlaylistRead(BaseModel):
     filter_groups: list[dict] | None = None
     period_start: date | None = None
     period_end: date | None = None
+    cover_images: list[str] = []
     generated_at: datetime
     created_at: datetime
 
