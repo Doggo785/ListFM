@@ -26,7 +26,7 @@ beforeEach(() => {
     measureText: () => ({}),
     getImageData: (x, y, width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
   });
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ width: 80, height: 40 });
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({ width: 80, height: 40, left: 0 });
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -83,6 +83,17 @@ describe("PixelNumber", () => {
     };
     await show(<PixelNumber value={1} />);
     expect(fonts.some((font) => font.startsWith("32px"))).toBe(true);
+  });
+
+  it("leaves the pixels where they are when the number's box moves", async () => {
+    const container = await show(<PixelNumber value={5689} />);
+    await wait(400);
+    Element.prototype.getBoundingClientRect.mockReturnValue({ width: 80, height: 40, left: 40 });
+    await act(async () => root.render(<PixelNumber value={21} />));
+    await wait(250);
+    expect(container.textContent).toBe("21");
+    // 40px at 4px a cell: the old pixels now sit 10 cells left of the box.
+    expect(parseFloat(container.querySelector("canvas").style.left)).toBe(-40);
   });
 
   it("stops drawing once revealed", async () => {

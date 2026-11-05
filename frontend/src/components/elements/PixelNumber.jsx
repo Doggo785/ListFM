@@ -45,7 +45,7 @@ export default function PixelNumber({ value, separator = "," }) {
   const [shown, setShown] = useState(text);
   const box = useRef(null);
   const canvas = useRef(null);
-  const run = useRef({ frame: 0, covering: false, filled: 0, order: [], own: [], colors: [] });
+  const run = useRef({ frame: 0, covering: false, filled: 0, order: [], own: [], colors: [], left: 0, originX: -MARGIN });
   const latest = useRef(text);
 
   const animate = useCallback(() => {
@@ -57,7 +57,7 @@ export default function PixelNumber({ value, separator = "," }) {
       ctx.clearRect(0, 0, canvas.current.width, canvas.current.height);
       for (let i = 0; i < Math.floor(state.filled); i += 1) {
         ctx.fillStyle = state.colors[i % state.colors.length];
-        ctx.fillRect(state.order[i][0] + MARGIN, state.order[i][1] + MARGIN, 1, 1);
+        ctx.fillRect(state.order[i][0] - state.originX, state.order[i][1] + MARGIN, 1, 1);
       }
     };
     // Now, not on the next frame: resizing just emptied the canvas, and the new digits would flash.
@@ -89,15 +89,18 @@ export default function PixelNumber({ value, separator = "," }) {
   useLayoutEffect(() => {
     const state = run.current;
     if (reducedMotion || !canvas.current) return undefined;
-    const { width, height } = box.current.getBoundingClientRect();
+    const { width, height, left } = box.current.getBoundingClientRect();
     const styles = getComputedStyle(box.current);
     const cell = Math.max(2, parseFloat(styles.fontSize) / FONT_GRID);
     const cols = Math.ceil(width / cell);
     const rows = Math.ceil(height / cell);
+    // Set from the size and family: the computed `font` shorthand is empty once tabular numerals are on.
     state.own = coverCells(inkedCells(shown, `${styles.fontSize} ${styles.fontFamily}`, width, height, cell), cols, rows);
-    // The old number's pixels stay for the reveal too: dropping them at the swap would pop.
+    // The box moves when the number's width changes. The pixels already out stay where they are on screen.
+    const moved = Math.round((state.left - left) / cell);
+    state.left = left;
     const seen = new Set();
-    const cells = [...state.order, ...state.own].filter(([x, y]) => {
+    const cells = [...state.order.map(([x, y]) => [x + moved, y]), ...state.own].filter(([x, y]) => {
       const key = `${x},${y}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -106,10 +109,11 @@ export default function PixelNumber({ value, separator = "," }) {
     state.order = shuffled(cells);
     state.filled = state.order.length;
     state.covering = false;
-    const across = Math.max(cols, ...cells.map(([x]) => x + 1)) + 2 * MARGIN;
+    state.originX = Math.min(-MARGIN, ...cells.map(([x]) => x));
+    const across = Math.max(cols, ...cells.map(([x]) => x + 1)) - state.originX + MARGIN;
     const down = Math.max(rows, ...cells.map(([, y]) => y + 1)) + 2 * MARGIN;
     Object.assign(canvas.current, { width: across, height: down });
-    Object.assign(canvas.current.style, { width: `${across * cell}px`, height: `${down * cell}px`, left: `${-MARGIN * cell}px`, top: `${-MARGIN * cell}px` });
+    Object.assign(canvas.current.style, { width: `${across * cell}px`, height: `${down * cell}px`, left: `${state.originX * cell}px`, top: `${-MARGIN * cell}px` });
     const root = getComputedStyle(document.documentElement);
     state.colors = EMBERS.map((n) => root.getPropertyValue(`--ember-${n}`));
     animate();
@@ -120,7 +124,11 @@ export default function PixelNumber({ value, separator = "," }) {
     if (reducedMotion || text === shown) return;
     const state = run.current;
     // From rest, cover only this number; mid-reveal, the cloud still out just fills back in.
-    if (state.filled === 0) state.order = shuffled(state.own);
+    if (state.filled === 0) {
+      state.order = shuffled(state.own);
+      // The page may have reflowed since the last reveal: only moves during the swap count.
+      state.left = box.current.getBoundingClientRect().left;
+    }
     state.covering = true;
     animate();
   }, [text, shown, reducedMotion, animate]);
