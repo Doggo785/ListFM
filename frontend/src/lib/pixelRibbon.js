@@ -1,6 +1,6 @@
 /** The ember ribbon behind every page: one WebGL2 canvas that morphs instead of remounting. */
 
-import { burstEmber, createEmberLayer, stepEmbers } from "@/lib/ribbonEmbers";
+import { burstEmber, createEmberLayer, linkProgram, stepEmbers } from "@/lib/ribbonEmbers";
 import { monthAt, smoothstep } from "@/lib/ribbonTrack";
 
 export const CELL = 4; // CSS pixels per ribbon pixel: rendering one fragment per cell keeps it cheap.
@@ -210,17 +210,7 @@ void main(){
 const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN", "uHot", "uMap", "uWave", "uDrum", "uDrumB", "uSeries", "uHoles", "uCut", "uBurn", "uEdges", "uInk", "uFade"];
 
 function compile(gl) {
-  const shader = (type, source) => {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, source);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-    return s;
-  };
-  const program = gl.createProgram();
-  gl.attachShader(program, shader(gl.VERTEX_SHADER, VERTEX));
-  gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAGMENT));
-  gl.linkProgram(program);
+  const program = linkProgram(gl, VERTEX, FRAGMENT);
   gl.useProgram(program);
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
@@ -293,8 +283,12 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
   const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
   if (!gl) return INERT;
   let main;
+  let emberLayer;
   try {
     main = compile(gl);
+    emberLayer = createEmberLayer(gl, [8, 7, 6, 4, 2, 1].map((i) => hexToRgb(palette[i])));
+    gl.useProgram(main.program);
+    gl.bindVertexArray(main.vao);
   } catch (error) {
     console.error("Ribbon shader failed to compile", error);
     return INERT;
@@ -305,9 +299,6 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
   const seriesTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, seriesTexture);
   gl.uniform1i(uniforms.uSeries, 0);
-  const emberLayer = createEmberLayer(gl, [8, 7, 6, 4, 2, 1].map((i) => hexToRgb(palette[i])));
-  gl.useProgram(main.program);
-  gl.bindVertexArray(main.vao);
   let embers = [];
   let shownSeries = null;
   let lastTrack = null;

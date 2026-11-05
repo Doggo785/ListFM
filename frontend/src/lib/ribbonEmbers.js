@@ -70,17 +70,24 @@ export function emberTone(ember, tones) {
   return tones[Math.min(tones.length - 1, Math.floor(share * tones.length))];
 }
 
-export function createEmberLayer(gl, tones) {
+/** Compiles and links a shader pair. Throws what the driver says when a shader does not compile. */
+export function linkProgram(gl, vertex, fragment) {
   const shader = (type, source) => {
     const s = gl.createShader(type);
     gl.shaderSource(s, source);
     gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
     return s;
   };
   const program = gl.createProgram();
-  gl.attachShader(program, shader(gl.VERTEX_SHADER, VERTEX));
-  gl.attachShader(program, shader(gl.FRAGMENT_SHADER, FRAGMENT));
+  gl.attachShader(program, shader(gl.VERTEX_SHADER, vertex));
+  gl.attachShader(program, shader(gl.FRAGMENT_SHADER, fragment));
   gl.linkProgram(program);
+  return program;
+}
+
+export function createEmberLayer(gl, tones) {
+  const program = linkProgram(gl, VERTEX, FRAGMENT);
   const res = gl.getUniformLocation(program, "uRes");
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
