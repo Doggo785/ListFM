@@ -759,6 +759,82 @@ async def test_run_now_starts_fresh_chain(client: AsyncClient):
     finally:
         await _cleanup_user_with_automations(client, email)
 
+SEASONS = "0 0 1 3,6,9,12 *"
+
+
+def test_last_fire_time_finds_the_season_that_just_ended():
+    from zoneinfo import ZoneInfo
+
+    from services.automation_runner import last_fire_time, window_bounds
+
+    paris = ZoneInfo("Europe/Paris")
+    fire = last_fire_time(SEASONS, datetime(2026, 12, 15, 12, 0, tzinfo=UTC), "Europe/Paris")
+    assert fire == datetime(2026, 12, 1, tzinfo=paris)
+    # Read back from the database in UTC, a retry still covers the same months.
+    start, end = window_bounds({"length": {"amount": 3, "unit": "month"}, "ago": None}, fire.astimezone(UTC).astimezone(paris))
+    assert (start, end) == (datetime(2026, 9, 1, tzinfo=paris), datetime(2026, 12, 1, tzinfo=paris))
+
+
+def test_last_fire_time_reaches_rare_and_frequent_schedules():
+    from services.automation_runner import last_fire_time
+
+    now = datetime(2026, 11, 5, 10, 30, tzinfo=UTC)
+    assert last_fire_time("* * * * *", now, "UTC") == datetime(2026, 11, 5, 10, 30, tzinfo=UTC)
+    assert last_fire_time("0 0 1 1 *", now, "UTC") == datetime(2026, 1, 1, tzinfo=UTC)
+    assert last_fire_time("0 0 29 2 *", now, "UTC") == datetime(2024, 2, 29, tzinfo=UTC)
+    assert last_fire_time("not a cron", now, "UTC") is None
+
+
+@pytest.mark.asyncio
+async def test_first_scheduled_run_covers_the_last_complete_period(client: AsyncClient):
+    """Created mid-season, it makes the season that ended, not a window straddling two."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json={**_create_body(), "cron": SEASONS})
+        assert created.status_code == 201
+        automation_id = created.json()["id"]
+
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+        with patch("services.automation_runner.get_window_tracks", return_value=tracks) as window_tracks:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        rows = await _history_rows(automation_id)
+        assert len(rows) == 1
+        scheduled = rows[0].scheduled_for
+        assert (scheduled.month, scheduled.day) in [(3, 1), (6, 1), (9, 1), (12, 1)]
+        start, end = window_tracks.call_args.args[2:4]
+        assert end == scheduled
+        assert (end.year * 12 + end.month) - (start.year * 12 + start.month) == 3
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_retry_delay_counts_from_the_attempt_not_the_period(client: AsyncClient):
+    """A first run covers an old period: its failure must still wait its backoff."""
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        created = await client.post("/api/automations", json=_create_body())
+        automation_id = created.json()["id"]
+        await _insert_failed_run(
+            automation_id,
+            attempt=1,
+            scheduled_for=datetime.now(UTC) - timedelta(days=60),
+            started_at=datetime.now(UTC) - timedelta(minutes=1),
+        )
+
+        tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+        p1, p2 = _sweep_patches(tracks)
+        with p1, p2:
+            await run_due_automations(session_factory=_TestSessionLocal)
+
+        assert len(await _history_rows(automation_id)) == 1
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
 def test_is_due_reads_cron_in_owner_timezone():
     """08:00 means 08:00 on the owner's clock, not 08:00 UTC."""
     from types import SimpleNamespace

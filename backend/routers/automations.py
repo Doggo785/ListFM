@@ -30,6 +30,7 @@ from schemas import (
 )
 from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.automation_runner import (
+    last_fire_time,
     run_automation,
     run_automation_pipeline_cached,
 )
@@ -72,6 +73,11 @@ async def preview_automation(
     if progress_key is not None:
         progress_store.start(progress_key)
 
+    # A draft shows its first scheduled run. A saved automation shows what Run now makes, which starts from now.
+    at = None
+    if body.automation_id is None and automation.cron:
+        at = last_fire_time(automation.cron, datetime.now(UTC), current_user.timezone or "UTC")
+
     started = time.monotonic()
     result = await run_automation_pipeline_cached(
         db,
@@ -86,6 +92,7 @@ async def preview_automation(
         max_per_album=automation.output.maxPerAlbum,
         no_repeat_playlists=automation.output.noRepeatPlaylists,
         automation_id=body.automation_id,
+        at=at,
         progress_key=progress_key,
     )
     log_activity("aperçu", automation_label(automation.name), pipeline_summary(result, time.monotonic() - started))

@@ -220,9 +220,10 @@ async def run_automation_pipeline_cached(
     change (ADR 0003). A track whose artist has no stored tags yet matches no
     tag filter.
     """
-    at = at or datetime.now(UTC)
-    start, end = window_bounds(window, at)
     timezone = await db.scalar(select(User.timezone).where(User.id == user_id)) or "UTC"
+    # On the owner's clock: 1 March 00:00 in Paris is 28 February in UTC, and three months before that is not 1 December.
+    at = (at or datetime.now(UTC)).astimezone(ZoneInfo(timezone))
+    start, end = window_bounds(window, at)
     moments = {
         condition_id: ListeningMoment.model_validate(moment)
         for condition_id, moment in conditions_on(filter_groups, "listening_moment", "moment")
@@ -312,6 +313,31 @@ def is_due(
         return True
     next_run = trigger.get_next_fire_time(last_run, now)
     return next_run is not None and next_run <= now
+
+
+# Widening steps: a frequent schedule is found in the first, without walking a year minute by minute.
+_LAST_FIRE_LOOKBACKS = tuple(timedelta(days=days) for days in (1 / 24, 1, 32, 366, 1462))
+
+
+def last_fire_time(cron: str, now: datetime, timezone: str) -> datetime | None:
+    """When the schedule last fired, at or before ``now`` (None without a usable schedule).
+
+    A scheduled run covers the period ending there, however late it starts: a
+    seasonal playlist stays on its season after downtime or a mid-season creation.
+    """
+    try:
+        trigger = cron_trigger(cron, ZoneInfo(timezone))
+    except (ValueError, ZoneInfoNotFoundError):
+        return None
+    for lookback in _LAST_FIRE_LOOKBACKS:
+        last = None
+        fire = trigger.get_next_fire_time(None, now - lookback)
+        while fire is not None and fire <= now:
+            last = fire
+            fire = trigger.get_next_fire_time(None, fire + timedelta(seconds=1))
+        if last is not None:
+            return last
+    return None
 
 
 def _filter_groups_to_json(filter_groups):
@@ -534,7 +560,8 @@ async def get_retryable_failures(
     return [
         row
         for row in result.scalars().all()
-        if row.scheduled_for + RETRY_DELAYS[row.attempt] <= now
+        # From the attempt, not the period it covers: that one can be months old.
+        if row.started_at + RETRY_DELAYS[row.attempt] <= now
     ]
 
 
@@ -625,7 +652,7 @@ async def run_due_automations(session_factory=async_session) -> None:
             ).all()
         )
         due_jobs = [
-            (a.id, now, 1)
+            (a.id, last_fire_time(a.cron, now, zones.get(a.user_id, "UTC")) or now, 1)
             for a in automations
             if is_due(a, now, zones.get(a.user_id, "UTC"))
         ]
