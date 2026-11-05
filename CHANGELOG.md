@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/Doggo785/ListFM/compare/v0.3.0...v0.4.0) (2026-11-05)
+
+
+### Features
+
+* **creator:** finish the screen after its critique ([#131](https://github.com/Doggo785/ListFM/issues/131)) ([2f4e59d](https://github.com/Doggo785/ListFM/commit/2f4e59d8a72acfae5f8f1f0f41437edf26232e5d))
+* **creator:** rebuild the creator as one page with a live preview ([#129](https://github.com/Doggo785/ListFM/issues/129)) ([ff48b0e](https://github.com/Doggo785/ListFM/commit/ff48b0ef055ca635a1cdfa1d1e29a67fb067f3d1))
+* **ui:** lay the foundation of the pixel Braise identity ([#121](https://github.com/Doggo785/ListFM/issues/121)) ([61811c4](https://github.com/Doggo785/ListFM/commit/61811c436bcf6517a613d0e90e1ca5671988d9ab))
+* **ui:** rebuild the base components on the Braise tokens ([#125](https://github.com/Doggo785/ListFM/issues/125)) ([7257281](https://github.com/Doggo785/ListFM/commit/72572817504d4bcff9fb99d33d13fee90ed36b08))
+* **ui:** replace the page loader with a transformation into the page ([#124](https://github.com/Doggo785/ListFM/issues/124)) ([2598c53](https://github.com/Doggo785/ListFM/commit/2598c53d74fe7fcc0f43cceadcb3eb7e8bbbf9ca))
+* **ui:** replace the sync banner with a background task indicator ([#126](https://github.com/Doggo785/ListFM/issues/126)) ([dd6b525](https://github.com/Doggo785/ListFM/commit/dd6b525eb8f5a9b9908c3f9705227feae7149b23))
+* **ui:** set Tiny5 and Jersey 20 as the site's fonts ([#123](https://github.com/Doggo785/ListFM/issues/123)) ([39640d2](https://github.com/Doggo785/ListFM/commit/39640d2f6823006ae9cdee0a3a5baf3caa25e163))
+
+
+### Bug Fixes
+
+* **automations:** run weekly schedules on the day they show ([#130](https://github.com/Doggo785/ListFM/issues/130)) ([154ab75](https://github.com/Doggo785/ListFM/commit/154ab759f9f9d3b9f56e482cb667b7bd75e45333))
+* **dashboard:** make the totals finish counting quickly ([#127](https://github.com/Doggo785/ListFM/issues/127)) ([80c97f4](https://github.com/Doggo785/ListFM/commit/80c97f433374fda2e483e336476c013082be35fa))
+
 ## [0.3.0](https://github.com/Doggo785/ListFM/compare/v0.2.1...v0.3.0) (2026-11-04)
 
 
