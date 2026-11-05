@@ -11,7 +11,7 @@ import { createAutomation, previewAutomation } from "@/lib/api";
 
 vi.mock("@/lib/api", () => ({
   previewAutomation: vi.fn(),
-  createAutomation: vi.fn(async () => ({})),
+  createAutomation: vi.fn(async () => ({ id: "a1" })),
   getKnownTags: vi.fn(async () => []),
 }));
 const auth = vi.hoisted(() => ({ user: { lastfm_username: "u" } }));
@@ -135,9 +135,9 @@ describe("creator", () => {
 
   it("creates under the suggested name, then under a typed one", async () => {
     const container = await render();
-    await click(button(container, "Create automation"));
+    await click(button(container, "Create only"));
     expect(createAutomation.mock.calls[0][0]).toMatchObject({ name: "Top tracks", cron: "", sort: "most_played" });
-    expect(navigate).toHaveBeenCalledWith("/playlists");
+    expect(navigate).toHaveBeenCalledWith("/playlists/a1", { state: { created: "Created. Nothing runs until you start it.", runNow: false } });
 
     await type(container.querySelector('[aria-label="Name"]'), "Mine");
     await click(button(container, "Seasonal"));
@@ -145,12 +145,57 @@ describe("creator", () => {
     expect(createAutomation.mock.calls[1][0]).toMatchObject({ name: "Mine", cron: "0 0 1 */3 *", output: { maxSize: 30 } });
   });
 
+  it("says what creating does: a schedule starts by itself, otherwise it offers to run", async () => {
+    const container = await render();
+    expect(container.textContent).toContain("Nothing runs until you start it.");
+    await click(button(container, "Create and run"));
+    expect(navigate).toHaveBeenCalledWith("/playlists/a1", { state: { created: "Created.", runNow: true } });
+
+    await click(button(container, "Seasonal"));
+    expect(container.textContent).toContain("First playlist in about a minute, then every 3 months, on the 1st, at 00:00.");
+    expect(button(container, "Create and run")).toBeUndefined();
+    await click(button(container, "Create automation"));
+    expect(navigate.mock.lastCall[1].state.runNow).toBe(false);
+  });
+
+  it("blocks creating on a malformed schedule and says where to look", async () => {
+    Element.prototype.scrollIntoView = () => {};
+    const container = await render();
+    await click(container.querySelector('[aria-label="How often"]'));
+    await click([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent.trim() === "Custom"));
+    await type(container.querySelector('[aria-label="Cron expression"]'), "0 0");
+    expect(container.textContent).toContain("Use five parts");
+    expect(container.textContent).toContain("Fix the schedule");
+    expect(button(container, "Create automation").disabled).toBe(true);
+  });
+
+  it("offers every preview row on a phone from one button", async () => {
+    const tracks = Array.from({ length: 9 }, (_, i) => ({ title: `Song ${i}`, artist: "Band", playcount: 1 }));
+    previewAutomation.mockImplementation(async () => result({ tracks, total: 9 }));
+    const container = await render();
+    await wait(400);
+    expect(container.querySelector("ol").className).toContain("nth-child(n+9)");
+    await click(button(container, "Show all 9"));
+    expect(container.querySelector("ol").className).not.toContain("nth-child");
+    expect(button(container, "Show all 9")).toBeUndefined();
+  });
+
+  it("counts a rule without a value as not applied", async () => {
+    const container = await render();
+    await click(button(container, "Add rule"));
+    expect(container.textContent).toContain("No rules, 1 not applied yet");
+    expect(container.textContent).toContain("Not applied until it has a value.");
+  });
+
   it("shows why creating failed and stays on the page", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const container = await render();
-    createAutomation.mockRejectedValueOnce(new Error("Invalid cron expression"));
-    await click(button(container, "Create automation"));
-    expect(container.querySelector('[role="alert"]').textContent).toContain("Invalid cron");
+    createAutomation.mockRejectedValueOnce(new Error("API 422: Invalid cron expression: bad minute"));
+    await click(button(container, "Create only"));
+    expect(container.querySelector('[role="alert"]').textContent).toBe("That schedule isn't valid. Check each part: minute hour day month weekday.");
+    createAutomation.mockRejectedValueOnce(new Error("API 500: Server down"));
+    await click(button(container, "Create only"));
+    expect(container.querySelector('[role="alert"]').textContent).toBe("Server down");
     expect(navigate).not.toHaveBeenCalled();
     error.mockRestore();
   });
@@ -185,6 +230,6 @@ describe("creator", () => {
     await wait(400);
     expect(previewAutomation).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Link your Last.fm account");
-    expect(button(container, "Create automation").disabled).toBe(true);
+    expect(button(container, "Create and run").disabled).toBe(true);
   });
 });

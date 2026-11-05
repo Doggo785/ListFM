@@ -16,8 +16,10 @@ import {
   WINDOW_OPTIONS,
   applyPreset,
   countActiveConditions,
+  countIncompleteConditions,
   createDefaultAutomation,
-  describeCron,
+  describeOutcome,
+  isValidCron,
   matchingPreset,
   suggestName,
   toPayload,
@@ -34,6 +36,7 @@ const Muted = ({ children }) => <span className="text-sm text-(--text-muted)">{c
 const ROW_MOVE = { layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] } };
 const ROW_EXIT = { opacity: 0, transition: { duration: 0.12, ease: (t) => Math.ceil(t * 3) / 3 } };
 const ROW_STAGGER_LIMIT = 14; // Past the visible rows, waiting would only delay what's off-screen.
+const MOBILE_ROWS = 8; // Keep in step with the nth-child below: the page must not end after 200 rows on a phone.
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_9rem]";
@@ -104,6 +107,7 @@ function LimitField({ label, value, onChange, max }) {
 
 function Preview({ preview, draft, linked }) {
   const { result, loading, failed } = preview;
+  const [showAll, setShowAll] = useState(false);
   const wanted = draft.output.maxSize ?? 50;
 
   if (!linked) {
@@ -135,7 +139,7 @@ function Preview({ preview, draft, linked }) {
       )}
       {result?.total === 0 && <p className="py-3 text-sm text-(--text-muted)">No track fits. Try a wider window or fewer rules.</p>}
       {result && result.total > 0 && (
-        <motion.ol layoutScroll className="relative min-h-0 flex-1 divide-y divide-(--line) overflow-y-auto">
+        <motion.ol layoutScroll className={`relative min-h-0 flex-1 divide-y divide-(--line) overflow-y-auto ${showAll ? "" : "max-lg:[&>li:nth-child(n+9)]:hidden"}`}>
           <AnimatePresence mode="popLayout" initial={false}>
             {result.tracks.map((track, i) => (
               <motion.li
@@ -156,6 +160,11 @@ function Preview({ preview, draft, linked }) {
             ))}
           </AnimatePresence>
         </motion.ol>
+      )}
+      {!showAll && result && result.tracks.length > MOBILE_ROWS && (
+        <Button variant="outline" size="sm" onClick={() => setShowAll(true)} className="mt-2 self-start lg:hidden">
+          Show all {result.tracks.length}
+        </Button>
       )}
     </>
   );
@@ -193,25 +202,31 @@ export default function PlaylistNew() {
 
   const ruleCount = countActiveConditions(draft.filterGroups);
   const limitCount = ["maxPerArtist", "maxPerAlbum", "noRepeatPlaylists"].filter((k) => draft.output[k]).length;
+  const incompleteCount = countIncompleteConditions(draft.filterGroups);
+  const ruleState = [ruleCount ? plural(ruleCount, "rule") : "No rules", incompleteCount > 0 && `${incompleteCount} not applied yet`].filter(Boolean).join(", ");
   const selected = matchingPreset(draft)?.id;
+  const badSchedule = Boolean(draft.cron) && !isValidCron(draft.cron);
+  const outcome = badSchedule ? "Fix the schedule to create this automation." : describeOutcome(draft.cron);
 
-  const create = async () => {
+  const create = async ({ run = false } = {}) => {
     if (creating) return;
     setCreating(true);
     setCreateError(null);
     try {
-      await createAutomation({ ...payload, name });
-      navigate("/playlists");
+      const created = await createAutomation({ ...payload, name });
+      // The detail page runs it: its progress and its "history still loading" answer already live there.
+      navigate(`/playlists/${created.id}`, { state: { created: run ? "Created." : `Created. ${outcome}`, runNow: run } });
     } catch (err) {
       console.error("Failed to create automation:", err);
-      setCreateError(err.message || "The automation could not be created. Try again.");
+      const reason = (err.message || "The automation could not be created. Try again.").replace(/^API \d+: /, "");
+      setCreateError(reason.startsWith("Invalid cron") ? "That schedule isn't valid. Check each part: minute hour day month weekday." : reason);
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <div className="h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-8 text-left md:px-8">
+    <main className="h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-32 text-left md:px-8 lg:pb-8">
       <div className="mx-auto max-w-6xl">
         <header data-quiet className="pt-4">
           <h1 className="text-4xl">New automation</h1>
@@ -244,7 +259,7 @@ export default function PlaylistNew() {
               <CustomSelect label="Window" value={windowIsCustom ? CUSTOM : windowOption(draft.window).value} onChange={pickWindow} options={WINDOW_CHOICES} />
             </Stage>
 
-            <FoldedStage label="Refine" state={ruleCount ? plural(ruleCount, "rule") : "No rules"} count={<Count value={result?.after_filter} unit="kept" />}>
+            <FoldedStage label="Refine" state={ruleState} count={<Count value={result?.after_filter} unit="kept" />}>
               <FilterBuilder value={draft.filterGroups} onChange={(filterGroups) => update({ filterGroups })} />
             </FoldedStage>
 
@@ -267,9 +282,9 @@ export default function PlaylistNew() {
               </div>
             </FoldedStage>
 
-            <FoldedStage label="Schedule" state={describeCron(draft.cron) ?? "Only when you run it"}>
+            <Stage label="Schedule">
               <CronEditor value={draft.cron} onChange={(cron) => update({ cron })} />
-            </FoldedStage>
+            </Stage>
 
             <Stage label="Name">
               <Input aria-label="Name" value={typedName ?? suggestion} placeholder={suggestion} onChange={(e) => setTypedName(e.target.value)} className="w-full" />
@@ -277,14 +292,32 @@ export default function PlaylistNew() {
           </div>
 
 
-          <div data-quiet className="flex flex-wrap items-center gap-3 max-lg:order-last">
-            <Button size="lg" onClick={create} disabled={creating || !linked}>
-              {creating ? "Creating" : "Create automation"}
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate("/playlists")}>
-              Cancel
-            </Button>
-            {createError && <p className="w-full text-sm text-(--ember)" role="alert">{createError}</p>}
+          {/* Below lg the actions stay pinned: the settings and the preview are a long scroll. */}
+          <div data-quiet className="space-y-2 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:border-t-2 max-lg:border-(--line) max-lg:bg-(--ground) max-lg:px-4 max-lg:py-2">
+            <p className={`text-sm ${badSchedule ? "text-(--ember)" : "text-(--text-muted)"}`}>
+              {result && <span className="lg:hidden">{plural(result.total, "track")}. </span>}
+              {outcome}
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              {draft.cron ? (
+                <Button size="lg" onClick={() => create()} disabled={creating || !linked || badSchedule}>
+                  {creating ? "Creating" : "Create automation"}
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" onClick={() => create({ run: true })} disabled={creating || !linked}>
+                    {creating ? "Creating" : "Create and run"}
+                  </Button>
+                  <Button size="lg" variant="outline" onClick={() => create()} disabled={creating || !linked}>
+                    Create only
+                  </Button>
+                </>
+              )}
+              <Button size="lg" variant="outline" onClick={() => navigate("/playlists")} className="max-lg:hidden">
+                Cancel
+              </Button>
+            </div>
+            {createError && <p className="text-sm text-(--ember)" role="alert">{createError}</p>}
           </div>
           </div>
 
@@ -293,6 +326,6 @@ export default function PlaylistNew() {
           </aside>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
