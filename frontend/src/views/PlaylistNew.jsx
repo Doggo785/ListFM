@@ -10,6 +10,7 @@ import CustomSelect from "@/components/ui/CustomSelect";
 import { Input, NumberInput } from "@/components/ui/input";
 import { useLivePreview } from "@/hooks/useLivePreview";
 import { createAutomation } from "@/lib/api";
+import { plural } from "@/lib/playlists";
 import {
   PRESETS,
   SORT_OPTIONS,
@@ -43,7 +44,6 @@ const ROW_MOVE = { layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] } };
 const ROW_EXIT = { opacity: 0, transition: { duration: 0.12, ease: (t) => Math.ceil(t * 3) / 3 } };
 const ROW_STAGGER_LIMIT = 14; // Past the visible rows, waiting would only delay what's off-screen.
 const MOBILE_ROWS = 8; // Keep in step with the nth-child below: the page must not end after 200 rows on a phone.
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_9rem]";
 
@@ -251,7 +251,7 @@ export default function PlaylistNew() {
     try {
       const created = await createAutomation({ ...payload, name });
       // The detail page runs it: its progress and its "history still loading" answer already live there.
-      navigate(`/playlists/${created.id}`, { state: { created: run ? "Created." : `Created. ${describeWaiting(draft.cron, result ?? undefined)}`, runNow: run } });
+      navigate(`/automations/${created.id}`, { state: { created: run ? "Created." : `Created. ${describeWaiting(draft.cron, result ?? undefined)}`, runNow: run } });
     } catch (err) {
       console.error("Failed to create automation:", err);
       const reason = (err.message || "The automation could not be created. Try again.").replace(/^API \d+: /, "");
@@ -367,7 +367,7 @@ export default function PlaylistNew() {
               <Button size="lg" variant="outline" onClick={() => create()} disabled={creating || !linked || badSchedule}>
                 Create only
               </Button>
-              <Button size="lg" variant="outline" onClick={() => navigate("/playlists")} className="max-lg:hidden">
+              <Button size="lg" variant="outline" onClick={() => navigate("/automations")} className="max-lg:hidden">
                 Cancel
               </Button>
             </div>

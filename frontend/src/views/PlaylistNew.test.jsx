@@ -230,7 +230,7 @@ describe("creator", () => {
     const container = await render();
     await click(button(container, "Create only"));
     expect(createAutomation.mock.calls[0][0]).toMatchObject({ name: "Top tracks", cron: "", sort: "most_played" });
-    expect(navigate).toHaveBeenCalledWith("/playlists/a1", { state: { created: "Created. Nothing runs until you start it.", runNow: false } });
+    expect(navigate).toHaveBeenCalledWith("/automations/a1", { state: { created: "Created. Nothing runs until you start it.", runNow: false } });
 
     await type(container.querySelector('[aria-label="Name"]'), "Mine");
     await click(button(container, "Seasonal"));
@@ -245,7 +245,7 @@ describe("creator", () => {
     expect(container.textContent).toContain("Nothing runs until you start it.");
     expect(container.textContent).not.toContain("Covers");
     await click(button(container, "Create and run"));
-    expect(navigate).toHaveBeenCalledWith("/playlists/a1", { state: { created: "Created.", runNow: true } });
+    expect(navigate).toHaveBeenCalledWith("/automations/a1", { state: { created: "Created.", runNow: true } });
 
     await click(button(container, "Seasonal"));
     expect(container.textContent).toContain("Create and run makes the last full period now. Create only starts on the next date.");
@@ -253,7 +253,7 @@ describe("creator", () => {
     expect(container.textContent).toContain("Covers Jun 1 to Aug 31, 2026.");
     expect(container.textContent).toContain("Create and run makes Jun 1 to Aug 31, 2026 now. Create only starts on Dec 1, 2026.");
     await click(button(container, "Create only"));
-    expect(navigate).toHaveBeenLastCalledWith("/playlists/a1", { state: { created: "Created. First playlist on Dec 1, 2026.", runNow: false } });
+    expect(navigate).toHaveBeenLastCalledWith("/automations/a1", { state: { created: "Created. First playlist on Dec 1, 2026.", runNow: false } });
   });
 
   it("blocks creating on a malformed schedule and says where to look", async () => {

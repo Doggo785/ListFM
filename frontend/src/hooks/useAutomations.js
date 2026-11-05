@@ -11,12 +11,23 @@ export function countByAutomation(generatedPlaylists = []) {
   return counts;
 }
 
+// The last lists read, per account: coming back to a page shows them at once and refreshes behind.
+let seen = null;
+
+/** A deleted playlist must not come back from the lists kept in memory. */
+export function forgetPlaylist(id) {
+  if (!seen) return;
+  seen = { ...seen, generatedPlaylists: seen.generatedPlaylists.filter((playlist) => playlist.id !== id) };
+}
+
 export function useAutomations(username) {
-  const [automations, setAutomations] = useState([]);
-  const [generatedPlaylists, setGeneratedPlaylists] = useState([]);
-  const [counts, setCounts] = useState(() => new Map());
-  const [isLoading, setIsLoading] = useState(Boolean(username));
+  const kept = username && seen?.username === username ? seen : null;
+  const [automations, setAutomations] = useState(kept?.automations ?? []);
+  const [generatedPlaylists, setGeneratedPlaylists] = useState(kept?.generatedPlaylists ?? []);
+  const [counts, setCounts] = useState(() => countByAutomation(kept?.generatedPlaylists));
+  const [isLoading, setIsLoading] = useState(Boolean(username) && !kept);
   const [error, setError] = useState(null);
+  const [playlistsFailed, setPlaylistsFailed] = useState(false);
 
   const refetch = useCallback(
     async ({ initial = false } = {}) => {
@@ -37,6 +48,9 @@ export function useAutomations(username) {
           Array.isArray(generatedResult.value)
             ? generatedResult.value
             : [];
+        const generatedFailed = generatedResult.status === "rejected";
+        if (!generatedFailed) seen = { username, automations: autoList, generatedPlaylists: generatedList };
+        setPlaylistsFailed(generatedFailed);
         setAutomations(autoList);
         setGeneratedPlaylists(generatedList);
         setCounts(countByAutomation(generatedList));
@@ -61,8 +75,8 @@ export function useAutomations(username) {
       setIsLoading(false);
       return;
     }
-    refetch({ initial: true });
+    refetch({ initial: seen?.username !== username });
   }, [username, refetch]);
 
-  return { automations, generatedPlaylists, counts, isLoading, error, refetch };
+  return { automations, generatedPlaylists, counts, isLoading, error, playlistsFailed, refetch };
 }

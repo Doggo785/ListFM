@@ -60,7 +60,7 @@ const AUTOMATION = {
   filterGroups: [],
 };
 
-async function renderDetail(entry = "/playlists/a1") {
+async function renderDetail(entry = "/automations/a1") {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -69,7 +69,7 @@ async function renderDetail(entry = "/playlists/a1") {
       <MemoryRouter initialEntries={[entry]}>
         <AuthProvider>
           <Routes>
-            <Route path="/playlists/:id" element={<PlaylistDetail />} />
+            <Route path="/automations/:id" element={<PlaylistDetail />} />
           </Routes>
         </AuthProvider>
       </MemoryRouter>
@@ -180,7 +180,7 @@ describe("PlaylistDetail progress", () => {
     runAutomationNow.mockRejectedValue(new Error("API 409: Your listening history is still loading. Run this when it finishes."));
     pollProgress.mockImplementation(async () => null);
 
-    const { container, root } = await renderDetail({ pathname: "/playlists/a1", state: { created: "Created.", runNow: true } });
+    const { container, root } = await renderDetail({ pathname: "/automations/a1", state: { created: "Created.", runNow: true } });
     try {
       await waitForText(container, "still loading");
       expect(container.textContent).toContain("Created.");

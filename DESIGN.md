@@ -96,6 +96,10 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - Folded sections are native `details`, and the closed row still states what it holds ("4 rules").
 - `PixelNumber`: every Tiny5 number. Random ember pixels gather on the digits, never in a box, with a few loose ones around. It swaps under them and they leave one by one, in under half a second. It swaps at once under reduced motion.
 - Live lists: a kept row slides to its new place, a new one dithers in, and a dropped one steps out. The list never empties while it updates.
+- `PlaylistCover`: a square of 16 cells, a dithered ember band drawn from the playlist's id. Sized in px in multiples of 16, since the rem scale would make uneven cells.
+- Shelf: one per automation, covers in a row that scrolls sideways, each with the period it covers under it. The period is what tells apart the playlists of one automation.
+- Playlist glide: opening a playlist and going back slides its cover, name and period with a view transition, and the rest of the page swaps at once. Without browser support or under reduced motion, it all swaps at once.
+- Automation card: the only bordered card, a whole link holding a cover and a few lines. Its border turns amber on hover.
 - Ribbon band: an empty `data-chain` element pulls the ribbon straight into it, with the widths set by its counts. Text never sits in it.
 
 ## Do's and Don'ts
@@ -103,6 +107,6 @@ Square corners everywhere, 2px borders on controls, 1px hairlines between rows.
 - Do tell the truth about the result: short runs, empty runs and unknown tags are stated in the preview.
 - Do keep anything the server can do within reach, folded when it is advanced.
 - Do keep motion to state changes, and keep a complete experience under reduced motion.
-- Don't add cards, rounded corners, gradients, glow or a second ornament.
+- Don't add other cards, rounded corners, gradients, glow or a second ornament.
 - Don't set text over the ribbon. Mark content blocks `data-quiet` (12 at most on screen).
 - Don't use the ember ramp for interface text or controls.
