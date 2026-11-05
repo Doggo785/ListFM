@@ -264,12 +264,13 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
 
   return (
     <div className="group/row rounded-xl border border-neutral-800/80 bg-[#141414] hover:border-neutral-600/80 transition-all">
-      <div className="flex items-center gap-3 px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3.5">
         <div className="rounded-lg bg-neutral-800/60 p-2 shrink-0">
           <FieldIcon size={14} className="text-neutral-400 group-hover/row:text-[var(--ember)] transition-colors" />
         </div>
 
         <CustomSelect
+          label="Filter field"
           value={condition.field}
           onChange={(newField) => {
             setTagSearch("");
@@ -277,11 +278,12 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
             onChange(conditionForField(condition, newField));
           }}
           options={fieldOptions}
-          className="flex-1 min-w-0"
+          className="w-auto flex-1 min-w-40"
         />
 
         {operatorOptions.length > 1 && (
           <CustomSelect
+            label="Filter operator"
             value={condition.operator}
             onChange={(op) => onChange({ ...condition, operator: op })}
             options={operatorOptions}
@@ -292,7 +294,7 @@ function FilterRow({ condition, onChange, onRemove, knownTags }) {
         <button
           type="button"
           onClick={onRemove}
-          className="shrink-0 rounded-lg p-2 text-neutral-700 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/row:opacity-100"
+          className="ml-auto shrink-0 rounded-lg p-2 text-neutral-700 hover:text-red-400 hover:bg-red-400/10 transition-all opacity-0 group-hover/row:opacity-100"
         >
           <IconTrash size={14} />
         </button>

@@ -7,6 +7,7 @@ import TopNav from "./TopNav";
 
 const auth = vi.hoisted(() => ({ user: { lastfm_username: "doggo" }, avatar: null, logout: vi.fn() }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => auth }));
+vi.mock("@/components/elements/BackgroundTasks", () => ({ default: () => null }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 

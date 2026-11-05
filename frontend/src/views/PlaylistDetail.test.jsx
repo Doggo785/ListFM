@@ -17,6 +17,7 @@ import {
   pollProgress,
   previewAutomation,
   runAutomationNow,
+  deleteAutomation,
   updateAutomation,
 } from "@/lib/api";
 import PlaylistDetail from "@/views/PlaylistDetail";
@@ -105,6 +106,51 @@ async function teardown(container, root) {
   vi.clearAllMocks();
 }
 
+describe("PlaylistDetail delete", () => {
+  const dialog = () => document.querySelector('[role="dialog"]');
+  const inDialog = (label) => [...dialog().querySelectorAll("button")].find((b) => b.textContent.trim() === label);
+  const press = (button) => act(async () => button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+  it("asks first, can back out, then deletes", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    deleteAutomation.mockResolvedValue(undefined);
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Edit");
+      await clickButton(container, "Delete");
+      expect(dialog().textContent).toContain("Test automation");
+      await press(inDialog("Cancel"));
+      expect(dialog()).toBeNull();
+      expect(deleteAutomation).not.toHaveBeenCalled();
+
+      await clickButton(container, "Delete");
+      await press(inDialog("Delete"));
+      expect(deleteAutomation).toHaveBeenCalledWith("a1");
+    } finally {
+      await teardown(container, root);
+    }
+  });
+
+  it("closes the dialog to show a failed delete", async () => {
+    getAutomation.mockResolvedValue(AUTOMATION);
+    getAutomationHistory.mockResolvedValue([]);
+    deleteAutomation.mockRejectedValue(new Error("Could not delete"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { container, root } = await renderDetail();
+    try {
+      await waitForText(container, "Edit");
+      await clickButton(container, "Delete");
+      await press(inDialog("Delete"));
+      expect(dialog()).toBeNull();
+      await waitForText(container, "Could not delete");
+    } finally {
+      vi.restoreAllMocks();
+      await teardown(container, root);
+    }
+  });
+});
+
 describe("PlaylistDetail listens", () => {
   it("changes the sort and the window", async () => {
     getAutomation.mockResolvedValue(AUTOMATION);
@@ -114,11 +160,11 @@ describe("PlaylistDetail listens", () => {
       await waitForText(container, "Recently played · Last 3 months");
       await clickButton(container, "Most played");
       await waitForText(container, "Most played · Last 3 months");
-      const select = [...container.querySelectorAll("select")].find((s) => s.value === "3m");
-      await act(async () => {
-        select.value = "all";
-        select.dispatchEvent(new Event("change", { bubbles: true }));
-      });
+      // jsdom has no layout, and the select scrolls its current option into view.
+      Element.prototype.scrollIntoView = () => {};
+      const pick = (el) => act(async () => el.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+      await pick(container.querySelector('[aria-label="Time window"]'));
+      await pick([...document.querySelectorAll('[role="option"]')].find((o) => o.textContent === "All time"));
       await waitForText(container, "Most played · All time");
     } finally {
       await teardown(container, root);
