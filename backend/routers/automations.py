@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -34,7 +34,6 @@ from services.automation_runner import (
     next_fire_time,
     run_automation,
     run_automation_pipeline_cached,
-    window_bounds,
 )
 from services.progress import store as progress_store
 from services.scrobble_sync import start_scrobble_sync
@@ -101,13 +100,9 @@ async def preview_automation(
     if progress_key is not None:
         progress_store.finish(progress_key)
     result["cancelled"] = False
-    if at is not None:
-        start, end = window_bounds(automation.window.model_dump(), at)
-        # end is exclusive: 1 September 00:00 means up to 31 August.
-        result["period"] = {
-            "start": start.date().isoformat() if start else None,
-            "end": (end - timedelta(microseconds=1)).date().isoformat(),
-        }
+    if at is None:
+        # Without a schedule the window moves with every run: there is no period to announce yet.
+        del result["period"]
     if automation.cron and (next_run := next_fire_time(automation.cron, now, zone)):
         result["next_run"] = next_run.date().isoformat()
     return result

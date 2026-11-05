@@ -21,12 +21,12 @@ function fakeGl(overrides = {}) {
 
 describe("sceneFor", () => {
   it("gives each page its own scene", () => {
-    const scenes = ["/dashboard", "/playlists/new", "/playlists", "/playlists/abc", "/login"].map(sceneFor);
-    expect(new Set(scenes).size).toBe(5);
+    const scenes = ["/dashboard", "/automations/new", "/automations", "/automations/abc", "/playlists", "/playlists/abc", "/login"].map(sceneFor);
+    expect(new Set(scenes).size).toBe(7);
   });
 
   it("gets hotter from the dashboard to the automations", () => {
-    expect(sceneFor("/playlists").heat).toBeGreaterThan(sceneFor("/dashboard").heat);
+    expect(sceneFor("/automations").heat).toBeGreaterThan(sceneFor("/dashboard").heat);
   });
 });
 
@@ -122,11 +122,11 @@ describe("createRibbon", () => {
     tick(16);
     expect(lastCall(gl, "uniform1fv")[1][0]).toBeCloseTo(sceneFor("/dashboard").shape[0]);
 
-    ribbon.setScene(sceneFor("/playlists"));
+    ribbon.setScene(sceneFor("/automations"));
     tick(32);
     const shape = lastCall(gl, "uniform1fv")[1][0];
     expect(shape).toBeLessThan(sceneFor("/dashboard").shape[0]);
-    expect(shape).toBeGreaterThan(sceneFor("/playlists").shape[0]);
+    expect(shape).toBeGreaterThan(sceneFor("/automations").shape[0]);
   });
 
   it("keeps away from content marked as quiet", () => {
@@ -202,7 +202,7 @@ describe("createRibbon", () => {
     const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE });
     ribbon.setScene(sceneFor("/dashboard"));
     tick(16);
-    ribbon.setScene(sceneFor("/playlists"));
+    ribbon.setScene(sceneFor("/automations"));
     tick(-100000);
     expect(lastCall(gl, "uniform1fv")[1][0]).toBeCloseTo(sceneFor("/dashboard").shape[0]);
   });

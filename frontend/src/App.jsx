@@ -1,5 +1,5 @@
-import { Suspense, lazy, useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import "./App.css";
 import TopNav from "./components/ui/TopNav";
 import PixelRibbon from "./components/ui/PixelRibbon";
@@ -9,8 +9,15 @@ import AuthGuard from "./components/AuthGuard";
 // Each page in its own file, all fetched just after the first one: a later change of page waits for nothing.
 const pageLoaders = [];
 const page = (load) => {
-  pageLoaders.push(load);
-  return lazy(load);
+  const Waiting = lazy(load);
+  let Ready = null;
+  pageLoaders.push(() => load().then((module) => { Ready = module.default; }));
+  // Fetched is not enough for lazy(): its first render still suspends, and a page's glide can't wait for that.
+  return function Page() {
+    // Chosen once: switching while the page is open would remount it and lose what's typed.
+    const [Chosen] = useState(() => Ready ?? Waiting);
+    return <Chosen />;
+  };
 };
 const Landing = page(() => import("./views/Landing"));
 const Login = page(() => import("./views/Login"));
@@ -20,7 +27,9 @@ const AuthCallback = page(() => import("./views/AuthCallback"));
 const LinkLastfm = page(() => import("./views/LinkLastfm"));
 const PlaylistNew = page(() => import("./views/PlaylistNew"));
 const PlaylistDetail = page(() => import("./views/PlaylistDetail"));
+const Automations = page(() => import("./views/Automations"));
 const Playlists = page(() => import("./views/Playlists"));
+const Playlist = page(() => import("./views/Playlist"));
 
 const NO_NAV_PATHS = ["/", "/login", "/register", "/auth/callback", "/link-lastfm"];
 
@@ -62,8 +71,25 @@ function App() {
                   </AuthGuard>
                 }
               />
+              <Route path="/playlists/new" element={<Navigate to="/automations/new" replace />} />
               <Route
-                path="/playlists/new"
+                path="/playlists/:id"
+                element={
+                  <AuthGuard>
+                    <Playlist />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/automations"
+                element={
+                  <AuthGuard>
+                    <Automations />
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/automations/new"
                 element={
                   <AuthGuard>
                     <PlaylistNew />
@@ -71,7 +97,7 @@ function App() {
                 }
               />
               <Route
-                path="/playlists/:id"
+                path="/automations/:id"
                 element={
                   <AuthGuard>
                     <PlaylistDetail />

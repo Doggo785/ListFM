@@ -15,14 +15,18 @@ const SCENES = {
   creator: { shape: [0.16, 0.16, 0.16, 0.16, 0.13, 0.13, 0.13, 0.13, 0.1, 0.1, 0.1, 0.1], angle: 0.1, offset: -0.33, heat: 1 },
   automations: { shape: [0.09, 0.09, 0.1, 0.1, 0.11, 0.12, 0.12, 0.13, 0.15, 0.16, 0.18, 0.2], angle: -0.22, offset: -0.2, heat: 2 },
   detail: { shape: [0.2, 0.19, 0.17, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0.1, 0.09, 0.09], angle: 1.2, offset: 0.42, heat: 2 },
+  playlists: { shape: [0.1, 0.11, 0.12, 0.14, 0.16, 0.18, 0.18, 0.16, 0.14, 0.12, 0.11, 0.1], angle: -0.06, offset: -0.3, heat: 2 },
+  playlist: { shape: [0.08, 0.09, 0.1, 0.12, 0.14, 0.17, 0.2, 0.22, 0.2, 0.17, 0.14, 0.12], angle: 1.45, offset: 0.46, heat: 3 },
   other: { shape: [0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14], angle: -0.3, offset: -0.28, heat: 0 },
 };
 
 export function sceneFor(pathname) {
   if (pathname.startsWith("/dashboard")) return SCENES.dashboard;
-  if (pathname === "/playlists/new") return SCENES.creator;
-  if (pathname === "/playlists") return SCENES.automations;
-  if (pathname.startsWith("/playlists/")) return SCENES.detail;
+  if (pathname === "/automations/new") return SCENES.creator;
+  if (pathname === "/automations") return SCENES.automations;
+  if (pathname.startsWith("/automations/")) return SCENES.detail;
+  if (pathname === "/playlists") return SCENES.playlists;
+  if (pathname.startsWith("/playlists/")) return SCENES.playlist;
   return SCENES.other;
 }
 

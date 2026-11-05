@@ -5,7 +5,8 @@ import BackgroundTasks from "@/components/elements/BackgroundTasks";
 
 const LINKS = [
   { label: "Dashboard", to: "/dashboard" },
-  { label: "Automations", to: "/playlists" },
+  { label: "Automations", to: "/automations" },
+  { label: "Playlists", to: "/playlists" },
 ];
 
 /** The site's navigation: the marker slides to the current page as soon as it changes. */

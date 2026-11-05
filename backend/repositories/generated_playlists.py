@@ -1,13 +1,16 @@
 import uuid
 from datetime import UTC, datetime
 
+from models.album import Album
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from models.track import Track
 from repositories.tracks import get_or_create_track
 from schemas import GeneratedPlaylistCreate
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+COVERS_PER_PLAYLIST = 4
 
 
 async def get_generated_playlists(db: AsyncSession, user_id: str) -> list[GeneratedPlaylist]:
@@ -21,6 +24,46 @@ async def get_generated_playlists(db: AsyncSession, user_id: str) -> list[Genera
         .order_by(GeneratedPlaylist.generated_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_playlist_covers(db: AsyncSession, user_id: str) -> dict[str, list[str]]:
+    """Up to COVERS_PER_PLAYLIST different album covers per playlist, in track order."""
+    rows = await db.execute(
+        select(PlaylistTrack.playlist_id, Album.image_url)
+        .join(GeneratedPlaylist, GeneratedPlaylist.id == PlaylistTrack.playlist_id)
+        .join(Track, Track.id == PlaylistTrack.track_id)
+        .join(Album, Album.id == Track.album_id)
+        .where(
+            GeneratedPlaylist.user_id == user_id,
+            GeneratedPlaylist.deleted_at.is_(None),
+            Album.image_url.is_not(None),
+        )
+        .order_by(PlaylistTrack.playlist_id, PlaylistTrack.position)
+    )
+    covers: dict[str, list[str]] = {}
+    for playlist_id, image_url in rows:
+        kept = covers.setdefault(playlist_id, [])
+        if len(kept) < COVERS_PER_PLAYLIST and image_url not in kept:
+            kept.append(image_url)
+    return covers
+
+
+async def get_albums_missing_cover(db: AsyncSession, user_id: str) -> list[tuple[str, str, str]]:
+    """(id, title, artist) of the albums in this user's playlists never looked up, newest playlists first."""
+    rows = await db.execute(
+        select(Album.id, Album.title, Album.artist)
+        .join(Track, Track.album_id == Album.id)
+        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .join(GeneratedPlaylist, GeneratedPlaylist.id == PlaylistTrack.playlist_id)
+        .where(
+            GeneratedPlaylist.user_id == user_id,
+            GeneratedPlaylist.deleted_at.is_(None),
+            Album.image_fetched_at.is_(None),
+        )
+        .group_by(Album.id, Album.title, Album.artist)
+        .order_by(func.max(GeneratedPlaylist.generated_at).desc(), Album.id)
+    )
+    return [(row.id, row.title, row.artist) for row in rows]
 
 
 async def get_generated_playlist(db: AsyncSession, playlist_id: str, user_id: str) -> GeneratedPlaylist | None:
@@ -60,6 +103,8 @@ async def create_generated_playlist(
         description=data.description,
         track_count=data.track_count,
         filter_groups=data.filter_groups,
+        period_start=data.period_start,
+        period_end=data.period_end,
         generated_at=now,
     )
     db.add(playlist)

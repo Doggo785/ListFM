@@ -257,7 +257,7 @@ function Dashboard() {
                   <div
                     key={auto.id}
                     className={`shrink-0 ${isUserAutomation ? "cursor-pointer" : ""}`}
-                    onClick={isUserAutomation ? () => navigate(`/playlists/${auto.id}`) : undefined}
+                    onClick={isUserAutomation ? () => navigate(`/automations/${auto.id}`) : undefined}
                     role={isUserAutomation ? "button" : undefined}
                     tabIndex={isUserAutomation ? 0 : undefined}
                     onKeyDown={
@@ -265,7 +265,7 @@ function Dashboard() {
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              navigate(`/playlists/${auto.id}`);
+                              navigate(`/automations/${auto.id}`);
                             }
                           }
                         : undefined
@@ -283,7 +283,7 @@ function Dashboard() {
                 );
               })}
 
-              <NewPlaylistCard onClick={() => navigate("/playlists/new")} />
+              <NewPlaylistCard onClick={() => navigate("/automations/new")} />
             </div>
           </motion.section>
 

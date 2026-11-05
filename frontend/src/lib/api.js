@@ -145,6 +145,10 @@ export async function getGeneratedPlaylistTracks(playlistId) {
   return request(`/api/generated-playlists/${playlistId}/tracks`);
 }
 
+export async function deleteGeneratedPlaylist(id) {
+  return request(`/api/generated-playlists/${id}`, { method: "DELETE" });
+}
+
 export async function getGeneratedPlaylists() {
   return request("/api/generated-playlists");
 }

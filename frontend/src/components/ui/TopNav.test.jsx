@@ -42,9 +42,14 @@ describe("TopNav", () => {
   });
 
   it("marks the current page, including the pages under it", async () => {
-    await show("/playlists/abc");
+    await show("/automations/abc");
     expect(current()).toBe("Automations");
     expect(host.querySelector(".top-nav__marker").style.opacity).toBe("1");
+  });
+
+  it("tells the playlists from the automations", async () => {
+    await show("/playlists/abc");
+    expect(current()).toBe("Playlists");
   });
 
   it("hides the marker on a page outside the navigation", async () => {

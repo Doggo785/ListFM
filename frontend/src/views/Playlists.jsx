@@ -1,154 +1,136 @@
-import { useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
-import { useAuth } from "../contexts/AuthContext";
-import Loader from "../components/elements/Loader";
-import AccountLinkPrompt from "../components/elements/AccountLinkPrompt";
-import TiltedCard, { NewPlaylistCard } from "../components/ui/PlaylistCard";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { Link, useLocation, useNavigate, useNavigationType } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useAutomations } from "@/hooks/useAutomations";
-import {
-  describeAutomation,
-  describeCron,
-  isValidCron,
-} from "@/lib/automation-rules";
-import { CARD_DEFAULTS, buildAutomationCardBase } from "@/lib/playlist-cards";
-import { fadeUp, stagger } from "@/lib/animation";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/buttonVariants";
+import PlaylistCover from "@/components/ui/PlaylistCover";
+import Loader from "@/components/elements/Loader";
+import { glide, glideArrived } from "@/lib/glide";
+import { describeCoverage, plural, shelvesOf } from "@/lib/playlists";
 
-function buildSchedule(auto) {
-  if (isValidCron(auto.cron)) {
-    return describeCron(auto.cron) || auto.cron;
-  }
-  if (auto.cron) return auto.cron;
-  return "No schedule";
+const FOCUS = "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9)";
+
+// Browser Back carries no state: this is how the shelves still find the playlist that was open.
+let lastOpened = null;
+
+function Shelf({ shelf, opening, cameFrom, returnTo, onOpen }) {
+  const heading = useId();
+  const open = shelf.playlists.some((playlist) => playlist.id === opening);
+  return (
+    <section data-quiet aria-labelledby={heading} className="w-fit max-w-full min-w-0 pb-8">
+      <div className="flex flex-wrap items-baseline gap-x-4 pb-3">
+        <h2 id={heading} className="w-fit text-2xl" style={open ? { viewTransitionName: "playlist-title" } : undefined}>{shelf.name}</h2>
+        {shelf.cadence && <p className="text-sm text-(--text-muted)">{shelf.cadence}</p>}
+      </div>
+      <ul className="-mx-4 flex snap-x scroll-px-4 gap-4 overflow-x-auto px-4 pt-1 pb-3 [scrollbar-color:var(--control)_transparent] md:-mx-8 md:scroll-px-8 md:gap-6 md:px-8">
+        {shelf.playlists.map((playlist) => {
+          const active = playlist.id === opening;
+          return (
+            <li key={playlist.id} className="w-[144px] shrink-0 snap-start md:w-[192px]">
+              <Link
+                to={`/playlists/${playlist.id}`}
+                ref={playlist.id === cameFrom ? returnTo : undefined}
+                onClick={(event) => onOpen(event, playlist)}
+                className={`group block ${FOCUS}`}
+              >
+                <PlaylistCover
+                  images={playlist.cover_images}
+                  className="aspect-square w-full outline-2 outline-transparent transition-[outline-color] duration-(--duration-quick) group-hover:outline-(--ember)"
+                  style={active ? { viewTransitionName: "playlist-cover" } : undefined}
+                />
+                <span className="block w-fit pt-2 text-sm group-hover:text-(--ember)" style={active ? { viewTransitionName: "playlist-period" } : undefined}>
+                  {describeCoverage(playlist)}
+                </span>
+                <span className="block text-xs text-(--text-muted)">{plural(playlist.track_count, "track")}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 }
 
-function buildCountdown(auto, count) {
-  const generated =
-    count === 0
-      ? "No runs yet"
-      : count === 1
-        ? "1 playlist generated"
-        : `${count} playlists generated`;
-  return `${generated} · ${describeAutomation(auto)} · ${buildSchedule(auto)}`;
-}
-
-function buildCard(auto, count) {
-  return {
-    ...buildAutomationCardBase(auto),
-    countdown: buildCountdown(auto, count),
-  };
-}
-
-function Playlists() {
+export default function Playlists() {
   const { user } = useAuth();
   const username = user?.lastfm_username;
   const navigate = useNavigate();
-  const { automations, counts, isLoading, error, refetch } =
-    useAutomations(username);
+  const location = useLocation();
+  const { automations, generatedPlaylists, isLoading, error, playlistsFailed, refetch } = useAutomations(username);
+  const navigationType = useNavigationType();
+  const cameFrom = location.state?.from ?? (navigationType === "POP" ? lastOpened : null);
+  const returned = useRef(false);
+  // Once only: the list refreshes behind the page and must not pull the shelf back.
+  const returnTo = useCallback((node) => {
+    if (!node || returned.current) return;
+    returned.current = true;
+    node.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    node.focus({ preventScroll: true });
+  }, []);
+  const [opening, setOpening] = useState(cameFrom ?? null);
+  const shelves = useMemo(() => shelvesOf(generatedPlaylists, automations), [generatedPlaylists, automations]);
 
-  if (!username) {
-    return (
-      <AccountLinkPrompt message="Link your Last.fm account to view your playlists." />
-    );
-  }
+  useLayoutEffect(() => glideArrived(), []);
 
-  if (isLoading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader />
-      </div>
-    );
-  }
+  useEffect(() => {
+    document.title = "Playlists - ListFM";
+  }, []);
 
-  const cards = automations.map((auto) =>
-    buildCard(auto, counts.get(auto.id) || 0)
-  );
+  const openPlaylist = (event, playlist) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    lastOpened = playlist.id;
+    // Named before the browser's first picture: only the opened playlist glides.
+    flushSync(() => setOpening(playlist.id));
+    glide(() => navigate(`/playlists/${playlist.id}`, { state: { playlist } }));
+  };
+
+  const failed = error || playlistsFailed;
+  const empty = !isLoading && !failed && shelves.length === 0;
 
   return (
-    <main className="page-enter flex-1 overflow-y-auto min-h-screen">
-      <div className="max-w-5xl mx-auto px-6 md:px-10 py-12 md:py-16" data-quiet>
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          className="space-y-8"
-        >
-          <motion.header variants={fadeUp}>
-            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-              Playlists
-            </h1>
-            <p className="text-neutral-500 text-sm mt-2">
-              Your automated playlist generations
+    <main className="scroll-edge h-full w-full min-w-0 flex-1 overflow-y-auto px-4 pb-8 text-left md:px-8">
+      <div className="mx-auto max-w-6xl">
+        <header data-quiet className="w-fit pt-4 pb-8">
+          <h1 className="text-4xl">Playlists</h1>
+          {shelves.length > 0 && (
+            <p className="pt-1 text-base text-(--text-muted)">
+              {plural(generatedPlaylists.length, "playlist")}
             </p>
-          </motion.header>
-
-          {error && (
-            <motion.div variants={fadeUp}>
-              <div className="rounded-xl border border-red-900/30 bg-red-950/20 p-4 text-center">
-                <p className="text-sm text-red-400">{error}</p>
-                <button
-                  onClick={() => refetch()}
-                  className="mt-3 px-4 py-2 bg-neutral-800 text-white text-sm rounded-lg hover:bg-[var(--ember)] transition-colors"
-                >
-                  Retry
-                </button>
-              </div>
-            </motion.div>
           )}
+        </header>
 
-          {!error && automations.length === 0 && (
-            <motion.div variants={fadeUp}>
-              <div className="rounded-xl border border-neutral-800 bg-[#1a1a1a] p-8 text-center">
-                <p className="text-white font-medium mb-2">No playlists yet</p>
-                <p className="text-neutral-500 text-sm mb-4">
-                  Create your first automated playlist to get started.
-                </p>
-                <button
-                  onClick={() => navigate("/playlists/new")}
-                  className="px-4 py-2 bg-[var(--ember)] text-white text-sm rounded-lg hover:bg-[#e04d0a] transition-colors"
-                >
-                  Create a playlist
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {!error && automations.length > 0 && (
-            <motion.div variants={fadeUp}>
-              <div className="flex flex-wrap items-start gap-5">
-                {cards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="shrink-0 cursor-pointer"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`View ${card.title} playlist`}
-                    onClick={() => navigate(`/playlists/${card.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        navigate(`/playlists/${card.id}`);
-                      }
-                    }}
-                  >
-                    <TiltedCard
-                      {...CARD_DEFAULTS}
-                      imageSrc={card.image}
-                      glowColor={card.glowColor}
-                      altText={card.title}
-                      captionText={card.title}
-                      countdownText={card.countdown}
-                    />
-                  </div>
-                ))}
-
-                <NewPlaylistCard onClick={() => navigate("/playlists/new")} />
-              </div>
-            </motion.div>
-          )}
-        </motion.div>
+        {!username && (
+          <p data-quiet className="text-base text-(--text-muted)">
+            <Link to="/link-lastfm" className={`text-(--ember) underline underline-offset-4 ${FOCUS}`}>Link your Last.fm account</Link> to get playlists.
+          </p>
+        )}
+        {username && isLoading && <Loader />}
+        {username && failed && !isLoading && (
+          <div data-quiet role="alert">
+            <p className="pb-3 text-base">Your playlists could not load.</p>
+            <Button variant="outline" onClick={() => refetch()}>Try again</Button>
+          </div>
+        )}
+        {username && empty && (
+          <div data-quiet>
+            <p className="text-2xl">Nothing here yet</p>
+            <p className="pt-1 pb-4 text-base text-(--text-muted)">
+              {automations.length > 0
+                ? "Each run of an automation leaves a playlist here. Start one, or wait for its next date."
+                : "An automation makes your playlists. Create the first one."}
+            </p>
+            <Link to={automations.length > 0 ? "/automations" : "/automations/new"} className={buttonVariants()}>
+              {automations.length > 0 ? "See your automations" : "Create an automation"}
+            </Link>
+          </div>
+        )}
+        {!failed && shelves.map((shelf) => (
+          <Shelf key={shelf.key} shelf={shelf} opening={opening} cameFrom={cameFrom} returnTo={returnTo} onOpen={openPlaylist} />
+        ))}
       </div>
     </main>
   );
 }
-
-export default Playlists;

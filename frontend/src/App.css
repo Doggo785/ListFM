@@ -400,6 +400,29 @@ html, body, #root {
   animation: page-enter var(--duration-enter) step-end backwards;
 }
 
+/* A playlist glides from its shelf to its page; the rest of the page swaps at once. */
+::view-transition-old(root) {
+  display: none;
+}
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(playlist-cover),
+::view-transition-group(playlist-title),
+::view-transition-group(playlist-period) {
+  animation-duration: var(--duration-enter);
+  animation-timing-function: var(--ease-out);
+}
+::view-transition-old(playlist-cover),
+::view-transition-new(playlist-cover),
+::view-transition-old(playlist-title),
+::view-transition-new(playlist-title),
+::view-transition-old(playlist-period),
+::view-transition-new(playlist-period) {
+  animation-duration: var(--duration-quick);
+  image-rendering: pixelated;
+}
+
 /* A scrolling page dissolves under the bar above it instead of being cut in half. The mask stays with the box, not the scroll. */
 .scroll-edge {
   mask:
@@ -506,6 +529,14 @@ html, body, #root {
 
   .top-nav__links a {
     padding: 6px 8px;
+  }
+}
+
+@media (pointer: coarse) {
+  .top-nav__links a,
+  .top-nav__account button {
+    display: inline-block;
+    padding-block: 10px;
   }
 }
 

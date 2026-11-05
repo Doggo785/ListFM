@@ -111,8 +111,15 @@ export function writeSchedule({ frequency, minute = 0, hour = 8, weekday = 1, da
   return "";
 }
 
-const formatDay = (day, withYear = true) =>
+export const formatDay = (day, withYear = true) =>
   new Date(`${day}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(withYear && { year: "numeric" }) });
+
+/** An automation's cadence, in words. */
+export function describeSchedule(cron) {
+  if (!cron) return "No schedule";
+  if (readSchedule(cron).frequency === "seasonal") return "Every season";
+  return (isValidCron(cron) && describeCron(cron)) || cron;
+}
 
 /** The dates a run covers, as the preview returned them. */
 export function describePeriod(period) {

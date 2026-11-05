@@ -270,7 +270,7 @@ export default function PlaylistDetail() {
     setDeleteError(null);
     try {
       await deleteAutomation(automation.id);
-      navigate("/playlists");
+      navigate("/automations");
     } catch (err) {
       console.error("Failed to delete automation:", err);
       setDeleteError(err.message || "Failed to delete automation");
@@ -473,8 +473,8 @@ export default function PlaylistDetail() {
           <p className="text-neutral-400 mb-6">
             This automation may have been deleted or the link is invalid.
           </p>
-          <Button onClick={() => navigate("/playlists")}>
-            Back to playlists
+          <Button onClick={() => navigate("/automations")}>
+            Back to automations
           </Button>
         </div>
       </div>
@@ -501,11 +501,11 @@ export default function PlaylistDetail() {
         >
           <button
             type="button"
-            onClick={() => navigate("/playlists")}
+            onClick={() => navigate("/automations")}
             className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm mb-4 group"
           >
             <IconArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            Back to playlists
+            Back to automations
           </button>
 
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">

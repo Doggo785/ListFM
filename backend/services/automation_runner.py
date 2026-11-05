@@ -275,6 +275,11 @@ async def run_automation_pipeline_cached(
         "window_artists": len(window_artists),
         "known_tag_artists": len(window_artists & artist_tags.keys()),
         "source_tracks": candidates[:SOURCE_TRACKS_SHOWN],
+        # end is exclusive: 1 September 00:00 means up to 31 August.
+        "period": {
+            "start": start.date().isoformat() if start else None,
+            "end": (end - timedelta(microseconds=1)).date().isoformat(),
+        },
     }
 
 
@@ -508,6 +513,8 @@ async def _persist_result_playlist(
             tracks=tracks,
             track_count=len(tracks),
             filter_groups=_filter_groups_to_json(automation.filter_groups),
+            period_start=result["period"]["start"],
+            period_end=result["period"]["end"],
         ),
         # Persist only: these rows carry no fetched data (the enrich cache
         # wrote the real values already), so never stamp them as fetched.
