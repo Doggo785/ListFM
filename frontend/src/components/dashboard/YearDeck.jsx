@@ -123,7 +123,7 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
   const [height, setHeight] = useState(0);
   const [armed, setArmed] = useState(false); // The covers are large: asked for only when the flight is near.
   const [focusIndex, setFocusIndex] = useState(0);
-  const [layer, setLayer] = useState(null);
+  const [layer] = useState(() => document.getElementById("under-ribbon"));
   const wrap = useRef(null);
   const anchor = useRef(null);
   const caption = useRef(null);
@@ -143,10 +143,6 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
     [view, monthsTrack, cards],
   );
   const travel = Math.max(0, cards.length - 1) * SCROLL_PER_CARD;
-
-  useLayoutEffect(() => {
-    setLayer(document.getElementById("under-ribbon"));
-  }, []);
 
   useLayoutEffect(() => {
     const measure = () => {

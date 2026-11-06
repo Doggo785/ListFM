@@ -218,8 +218,6 @@ export default function Playlist() {
 
   useEffect(() => {
     let current = true;
-    setTracks(null);
-    setTracksFailed(false);
     getGeneratedPlaylistTracks(id)
       .then((list) => current && setTracks(list))
       .catch(() => current && setTracksFailed(true));
@@ -284,7 +282,11 @@ export default function Playlist() {
         </header>
 
         <section data-quiet aria-label="Tracks" className="min-w-0">
-          <Tracks tracks={tracks} failed={tracksFailed} onRetry={() => setAttempt((n) => n + 1)} />
+          <Tracks tracks={tracks} failed={tracksFailed} onRetry={() => {
+            setTracks(null);
+            setTracksFailed(false);
+            setAttempt((n) => n + 1);
+          }} />
         </section>
       </div>
     </main>

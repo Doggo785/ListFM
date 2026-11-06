@@ -6,28 +6,22 @@ export function useAutomation(id) {
   const [isLoading, setIsLoading] = useState(Boolean(id));
   const [error, setError] = useState(null);
 
+  const load = useCallback(() => getAutomation(id)
+    .then(setAutomation)
+    .catch((err) => setError(err instanceof Error ? err.message : "Failed to load automation."))
+    .finally(() => setIsLoading(false)), [id]);
+
   const refetch = useCallback(async () => {
-    if (!id) {
-      setAutomation(null);
-      setError(null);
-      setIsLoading(false);
-      return;
-    }
+    if (!id) return;
     setIsLoading(true);
     setError(null);
-    try {
-      const data = await getAutomation(id);
-      setAutomation(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load automation.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id]);
+    await load();
+  }, [id, load]);
 
+  // A new id comes with a new page (App keys pages by path): the first load starts from the initial state.
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    if (id) load();
+  }, [id, load]);
 
   const update = useCallback(
     async (payload) => {

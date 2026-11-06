@@ -20,24 +20,23 @@ export function forgetPlaylist(id) {
   seen = { ...seen, generatedPlaylists: seen.generatedPlaylists.filter((playlist) => playlist.id !== id) };
 }
 
+const NOTHING = [];
+const NO_COUNTS = new Map();
+
 export function useAutomations(username) {
   const kept = username && seen?.username === username ? seen : null;
   const [automations, setAutomations] = useState(kept?.automations ?? []);
   const [generatedPlaylists, setGeneratedPlaylists] = useState(kept?.generatedPlaylists ?? []);
   const [counts, setCounts] = useState(() => countByAutomation(kept?.generatedPlaylists));
-  const [isLoading, setIsLoading] = useState(Boolean(username) && !kept);
+  // Whose lists are on screen: loading is having none yet for this name.
+  const [loadedFor, setLoadedFor] = useState(kept ? username : null);
   const [error, setError] = useState(null);
   const [playlistsFailed, setPlaylistsFailed] = useState(false);
+  const isLoading = Boolean(username) && loadedFor !== username;
 
-  const refetch = useCallback(
-    async ({ initial = false } = {}) => {
-      if (!username) return;
-      if (initial) setIsLoading(true);
-      try {
-        const [autosResult, generatedResult] = await Promise.allSettled([
-          getAutomations(),
-          getGeneratedPlaylists(),
-        ]);
+  const load = useCallback(
+    () => Promise.allSettled([getAutomations(), getGeneratedPlaylists()])
+      .then(([autosResult, generatedResult]) => {
         if (autosResult.status === "rejected") {
           throw autosResult.reason;
         }
@@ -55,28 +54,28 @@ export function useAutomations(username) {
         setGeneratedPlaylists(generatedList);
         setCounts(countByAutomation(generatedList));
         setError(null);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load playlists."
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    },
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load playlists."))
+      .finally(() => setLoadedFor(username)),
     [username]
   );
 
+  const refetch = useCallback(
+    async ({ initial = false } = {}) => {
+      if (!username) return;
+      if (initial) setLoadedFor(null);
+      await load();
+    },
+    [username, load]
+  );
+
   useEffect(() => {
-    if (!username) {
-      setAutomations([]);
-      setGeneratedPlaylists([]);
-      setCounts(new Map());
-      setError(null);
-      setIsLoading(false);
-      return;
-    }
-    refetch({ initial: seen?.username !== username });
-  }, [username, refetch]);
+    if (username) load();
+  }, [username, load]);
+
+  if (!username) {
+    return { automations: NOTHING, generatedPlaylists: NOTHING, counts: NO_COUNTS, isLoading: false, error: null, playlistsFailed, refetch };
+  }
 
   return { automations, generatedPlaylists, counts, isLoading, error, playlistsFailed, refetch };
 }
