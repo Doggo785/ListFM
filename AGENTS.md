@@ -33,6 +33,7 @@ Lire avant d'agir :
 - Tokens de provider : aucune colonne en clair. Les rajouter seulement chiffrées au repos.
 - Last.fm se lie par son autorisation web : le jeton de retour ne sert qu'une fois, la clé de session n'est pas gardée. Un test lie un compte avec `link_lastfm` de `tests/conftest.py`.
 - `users.timezone` vide veut dire « pas encore connu », lu comme UTC : le navigateur ne le remplit que dans ce cas, pour ne jamais écraser un choix fait dans les réglages.
+- `POST /api/public/listener` (scène 7 de la page d'accueil) ne demande aucun compte et dépense le budget Last.fm des synchros : limité par visiteur et pour tout le site, gardé 1 h en mémoire seulement. En POST pour que le pseudo reste hors des logs d'accès ; il n'est écrit ni en base ni dans la console.
 - `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.
 - Un cron se lit toujours via `schemas.cron_trigger`, jamais `CronTrigger.from_crontab` : APScheduler compte les jours depuis lundi, donc `1` tomberait un mardi.
 - Le scheduler du sweep ne démarre qu'avec `ENABLE_SCHEDULER` ; le rate limiter vit en mémoire du process. L'app suppose un seul worker.
@@ -45,6 +46,8 @@ Lire avant d'agir :
 - Polices pixel : Tiny5 pour les titres et chiffres, Jersey 20 pour le texte, sans `letter-spacing` ni tailles hors de l'échelle `--text-*`, sinon les lettres deviennent floues. Aucune graisse n'existe : la hiérarchie passe par la taille et la couleur.
 - Le ruban de pixels (`lib/pixelRibbon.js`) se monte une seule fois dans `App` et n'a pas de raison d'être remonté. Tout bloc de contenu porte `data-quiet` (12 au plus à l'écran) : le ruban se dissout autour et ne passe jamais sous un texte, sauf le nom forgé du Dashboard. Une page qui porte `data-ribbon-hot` le fait chauffer (une génération en échec). Un élément vide `data-chain="412,120,50"` le couche droit dans cette bande, avec une largeur par étage de la chaîne.
 - Le Dashboard pilote le ruban par `ribbonStage` et le lui rend en partant : c'est le seul écran à y poser une piste. Ses cartes vivent dans `#under-ribbon`, sous le canvas, montées par un portail, en enfants directs : la perspective du calque n'atteint que ceux-là.
+- La page d'accueil a son propre canvas (`lib/landing/stage.js`) et le shader se tait sous elle (`silent` dans sa scène) : c'est la seule exception au ruban unique, parce que le fil doit pouvoir se défaire en pixels. Tout ce qui suit le scroll se calcule depuis le scroll, pour se rejouer à l'envers.
+- `lib/landing/demo.json` sort de `scripts/landing_demo.py`, à travers le vrai moteur, et il est public à vie une fois commité : l'owner le relit avant. Ne pas le modifier à la main.
 - `DESIGN.md` décrit le monde visuel, écrit depuis le Créateur. Les écrans pas encore refaits ne sont pas une référence.
 
 ## Base de données locale

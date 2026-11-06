@@ -48,20 +48,20 @@ ListFM works from everything a person has listened to, because Last.fm logs list
 
 **Constraints:**
 - Last.fm is the only listening source, permanently. No other provider is planned as a source.
-- Running filters makes no Last.fm calls, and every product change aims for fewer calls.
+- Running filters makes no Last.fm calls, and every product change aims for fewer calls. Visiting the landing page makes none; typing a username there makes two, limited per visitor and for the whole site, and nothing is stored.
 - A field that has not been fetched passes no filter, so unknown data must never read as a negative result.
 - Tokens stay in httpOnly cookies, internal errors are not shown to users, and there is no unnecessary tracking.
 
 **Open decisions:**
 - When direct streaming-app import ships, and for which apps. It is the stated final goal but needs its own go-ahead. Checked on 2026-11-06: Spotify's development mode stops at 5 users added by hand, and more takes a company with 250,000 monthly users; YouTube allows 100 searches a day for the whole site; Apple costs 99 USD a year. Shape the owner has in mind: link music accounts in the future settings, import a playlist from its page, and set auto-import on each automation. Before sending covers anywhere, check the rights on altered album art and each service's image limits; drawing the cover would also move to the server, since auto-import runs with no browser open. An image creator is left for after v1.
-- Whether the public can actually sign up at v1.0.0. The current deployment is a small single-worker VPS used by the owner and friends.
+- Sign-ups are open to everyone: the landing page has no waiting list. The deployment is a small single-worker VPS, so sign-ups would close if it saturates.
 
 ## Brand Commitments
 
 - Type: Tiny5 for titles and numerals, Jersey 20 for reading text, chosen by the owner on 2026-11-04. Both are under the SIL Open Font License.
 - The name is ListFM. There is no logo yet: `frontend/public/favicon.svg` is not a brand asset.
 - The whole site is built around one art direction and is animated throughout, with clean transitions between pages. One precise style carries across every page and evolves from page to page. This is the owner's ultimate goal for the interface, so it is a foundation rather than a finishing touch.
-- That art direction is pixel: a dithered ember ribbon roams every page, guides the eye and changes shape and heat with each page, while always staying secondary to the content. Inspired by the Wave shader by Ali Imam on 21st.dev, whose code is not reused because its licence is unknown.
+- That art direction is pixel: a dithered ember ribbon roams every page, guides the eye and changes shape and heat with each page, while always staying secondary to the content. The landing page is the one exception: there the ribbon is the thread, a living presence with no face and no voice, and it is the subject of the page. Text still never sits on it, except a forged name. Inspired by the Wave shader by Ali Imam on 21st.dev, whose code is not reused because its licence is unknown.
 - The palette is Braise, on a dark ground: 03071e, 370617, 6a040f, 9d0208, d00000, dc2f02, e85d04, f48c06, faa307, ffba08.
 - Changing page must feel instant: the content swaps at once and only the ribbon travels. No transition covers the screen or makes anyone wait.
 - The sidebar is gone, and the previous look is not a reference for anything.
@@ -70,7 +70,7 @@ ListFM works from everything a person has listened to, because Last.fm logs list
 
 ## Evidence on Hand
 
-- Real demonstration material exists: the owner's Last.fm history and automations in the development database.
+- Real demonstration material exists: the owner's Last.fm history, from July 2024 on, when it really starts, frozen in `frontend/src/lib/landing/demo.json` by `scripts/landing_demo.py` through the real engine, and shown as such ("as Doggo lived it"). Anything committed there is public for good, so the owner reads it first.
 - There are no testimonials, customer logos, usage figures, press or pricing. Do not invent any.
 - The name of Last.fm and of streaming services describe real integrations only. No partnership or endorsement exists.
 

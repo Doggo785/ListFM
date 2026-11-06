@@ -64,14 +64,18 @@ Chaque PR branche le ruban sur les vraies données de l'écran et supprime l'anc
 5. *(fait)* **Dashboard** : une affiche, puis l'année en vol. Le nom de l'artiste du moment en géant prend feu depuis la tête de lecture du ruban (la forge), au-dessus de la largeur du ruban qui suit les écoutes jour par jour, des braises qui en montent, des albums du moment, des derniers runs et des totaux. Plus bas, le scroll rembobine l'année : les pochettes sortent de la gauche sur un arc 3D, chacune celle de l'artiste du mois, à travers la flamme. Le même arc montre les automations. Les images d'artistes de Last.fm étant mortes, seules les pochettes d'albums servent.
 6. *(fait)* **Envoi vers les apps** : sur la page d'une playlist, un bouton copie la liste, explique les étapes dans une modale et ouvre Tune My Music, et un autre télécharge la pochette (384 px). L'export direct reste bloqué par les plateformes, voir « Plus tard ».
 7. *(fait)* **Connexion et réglages** : « ListFM » en géant sur le ruban et le formulaire à côté, sur tous les écrans avant le site. Réglages s'ouvre depuis le nom d'utilisateur : fuseau, compte Last.fm, mot de passe (les autres appareils sont déconnectés), suppression du compte (écoutes et lien Last.fm vraiment effacés, l'email libéré). Last.fm se lie par l'autorisation officielle, plus aucun pseudo à taper, et seul le pseudo est gardé. Le navigateur ne pose le fuseau qu'une fois, ensuite seuls les réglages le changent.
-8. **Page d'accueil** : refaite à 100 % avant le login, avec une présentation propre de ListFM. Elle retire `Grainient` et `ogl`, qui ne servent plus qu'à elle.
-9. Réactiver la règle ESLint `react-hooks/set-state-in-effect`.
+8. *(fait)* **Page d'accueil** : choisie sur prototype parmi trois variantes (« La forge »). Elle est la machine, racontée au scroll par un fil vivant, sur le vrai historique de l'owner depuis juillet 2024, figé dans `lib/landing/demo.json` : il se réveille, écoute, travaille (Window, Filters, Sort, Limit, un carré par morceau du vrai mois), livre une pochette, continue seul, obéit à d'autres recettes, puis se tourne vers le visiteur, dont le pseudo Last.fm suffit à forger le nom de son artiste, sans compte (`POST /api/public/listener`, 2 appels Last.fm, limité, rien de stocké). `Grainient` et `ogl` retirés.
+9. *(fait)* Règle ESLint `react-hooks/set-state-in-effect` réactivée.
 
 ### Phase D : finition
 
 **Guide interactif pour les nouveaux arrivants** (demande de l'owner) : obligatoire avant la v1.0.0, une fois les écrans de la phase C refaits. Sa forme reste à définir avec l'owner.
 
 **Premier import d'un compte neuf** (demande de l'owner) : se connecter avec un compte Last.fm jamais vu et suivre l'import complet des écoutes de bout en bout. Vérifier ce que l'utilisateur voit pendant ce temps (indicateur des tâches de fond, morceaux qui arrivent, aperçu partiel, runs qui attendent la fin) et que les animations le montrent bien.
+
+**Le fil travaille dans l'app** (promesse de la page d'accueil) : pendant la synchro, la recherche de tags et les runs, on doit le voir au travail, sans visage ni voix.
+
+**Page Privacy et mentions obligatoires** : les inscriptions sont ouvertes à tous, donc des emails et des écoutes d'inconnus sont collectés. À vérifier avant la mise en ligne publique.
 
 Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impeccable polish` et `harden` sur tout le site. Puis v1.0.0 quand l'owner le dit, et seulement là migration du VPS : le site doit être utilisable par un utilisateur classique.
 
@@ -81,7 +85,7 @@ Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impecca
 
 Comptes : se connecter avec Last.fm, changer d'email, lier ou délier Google et Discord depuis les réglages.
 
-Export direct vers Spotify/YouTube/Apple (bloqué par leurs règles : 5 utilisateurs ajoutés à la main chez Spotify, 100 recherches par jour pour tout le site chez YouTube, 99 USD par an chez Apple ; relevé le 2026-11-06, à revérifier), social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts).
+Export direct vers Spotify/YouTube/Apple (bloqué par leurs règles : 5 utilisateurs ajoutés à la main chez Spotify, 100 recherches par jour pour tout le site chez YouTube, 99 USD par an chez Apple ; relevé le 2026-11-06, à revérifier), social et partage, presets partagés, découverte (morceaux jamais écoutés), filtres auditeurs et popularité mondiale (un appel par morceau), domaine + HTTPS (`COOKIE_SECURE` et CORS strict sont prêts), puis l'image d'aperçu quand on partage le lien (elle exige une adresse complète).
 
 **Noms qui se mettent à jour** (idée de l'owner, utile surtout une fois les playlists envoyées sur les apps de streaming) : un nom d'automation peut contenir des variables résolues à chaque run, par exemple `Seasonal {season} {year}` donne « Seasonal Winter 2026 ». À trancher : la liste des variables, l'hémisphère pour les saisons, et l'année d'un hiver à cheval sur deux ans.
 
