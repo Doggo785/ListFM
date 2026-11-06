@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { CELL, ribbonStage } from "@/lib/pixelRibbon";
-import { createForge, forgeRamps, letterMask } from "@/lib/forge";
+import { createForge, forgedNames, forgeRamps, letterMask } from "@/lib/forge";
 import { SWEEP_SECONDS, sweepAt } from "@/lib/ribbonTrack";
 
 // Tiny5's pixels land on the 4px grid at these sizes only.
@@ -10,9 +10,6 @@ const HEIGHT_SHARE = 0.3; // Of the viewport at most: the poster keeps its other
 const LINE_HEIGHT = 0.8;
 const FLAME_ROOM = 96; // CSS pixels above the letters for the flames to rise into.
 const LICK_EVERY_MS = [14000, 26000];
-
-// The name that finished burning in this page load: the slow burn is for the first look, coming back it starts from cream.
-let forgedName = null;
 
 /** The largest size that fits, or null when even the smallest doesn't. */
 function fitSize(name, family, width, viewportHeight) {
@@ -27,11 +24,11 @@ function fitSize(name, family, width, viewportHeight) {
 }
 
 /** The artist's name as large as it fits. It catches fire from the ribbon's playhead, and flames still cross it now and then. */
-export default function ForgedName({ name, reducedMotion, relights = true }) {
+export default function ForgedName({ name, reducedMotion, relights = true, lit = true, headX, sweepSeconds = SWEEP_SECONDS, onSpark, quiet = false }) {
   const box = useRef(null);
   const canvas = useRef(null);
   const [size, setSize] = useState(SIZES.at(-1));
-  const [cold, setCold] = useState(!reducedMotion && forgedName !== name);
+  const [cold, setCold] = useState(!reducedMotion && !forgedNames.has(name));
   const cut = size === null; // Too long even at the smallest size: plain, and shortened.
 
   useLayoutEffect(() => {
@@ -47,7 +44,7 @@ export default function ForgedName({ name, reducedMotion, relights = true }) {
   }, [name]);
 
   useEffect(() => {
-    if (reducedMotion || cut || (!relights && forgedName === name)) return undefined;
+    if (reducedMotion || cut || !lit || (!relights && forgedNames.has(name))) return undefined;
     let frameId = 0;
     let lickTimer = 0;
     let stopped = false;
@@ -82,28 +79,30 @@ export default function ForgedName({ name, reducedMotion, relights = true }) {
         height,
         mask,
         ramps: forgeRamps(ember, root.getPropertyValue("--text")),
-        sweepSeconds: SWEEP_SECONDS,
-        soaked: forgedName === name,
+        sweepSeconds,
+        soaked: forgedNames.has(name),
         // The ribbon's own playhead, so the letter catches as the flame passes under it. Without one, it just crosses.
         headX: (seconds) => {
           // The page may already be gone: this frame runs before the effect's cleanup.
           const here = box.current?.getBoundingClientRect() ?? rect;
+          if (headX) return headX(seconds) - here.left / CELL;
           return ribbonStage.track ? (ribbonStage.track.head - here.left) / CELL : (sweepAt(seconds) * here.width) / CELL;
         },
         onSpark: (x, y) => {
           const here = element.getBoundingClientRect();
-          ribbonStage.burst(here.left + x * CELL, here.top + y * CELL);
+          if (onSpark) onSpark(here.left / CELL + x, here.top / CELL + y);
+          else ribbonStage.burst(here.left + x * CELL, here.top + y * CELL);
         },
         // Now, not on the next render: the canvas stops painting these letters in this very frame.
         onCream: () => {
-          forgedName = name;
+          forgedNames.add(name);
           flushSync(() => setCold(false));
         },
         onIdle: () => {
           element.style.visibility = "hidden";
         },
       });
-      if (forgedName === name) instance.lick();
+      if (forgedNames.has(name)) instance.lick();
       else instance.ignite();
       let last = performance.now();
       const frame = (now) => {
@@ -141,11 +140,12 @@ export default function ForgedName({ name, reducedMotion, relights = true }) {
       window.cancelAnimationFrame(frameId);
       clearTimeout(lickTimer);
     };
-  }, [name, size, cut, reducedMotion, relights]);
+  }, [name, size, cut, reducedMotion, relights, lit, headX, sweepSeconds, onSpark]);
 
   return (
     <h1
       ref={box}
+      data-quiet={quiet ? "" : undefined}
       className={`forged-name ${cut ? "forged-name--cut" : cold ? "forged-name--cold" : ""}`}
       style={cut ? undefined : { fontSize: `${size}px`, lineHeight: `${size * LINE_HEIGHT}px` }}
     >
