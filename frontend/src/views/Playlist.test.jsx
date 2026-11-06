@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deleteGeneratedPlaylist, getGeneratedPlaylistTracks } from "@/lib/api";
+import { coverPng } from "@/lib/playlistCover";
 import Playlist from "./Playlist";
 
 const hook = vi.hoisted(() => ({ value: {}, forget: vi.fn() }));
@@ -11,6 +12,7 @@ vi.mock("@/hooks/useAutomations", () => ({ useAutomations: () => hook.value, for
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { lastfm_username: "doggo" } }) }));
 vi.mock("@/lib/glide", () => ({ glide: (go) => go(), glideArrived: () => {} }));
 vi.mock("@/lib/api", () => ({ deleteGeneratedPlaylist: vi.fn(), getGeneratedPlaylistTracks: vi.fn() }));
+vi.mock("@/lib/playlistCover", async (original) => ({ ...(await original()), coverPng: vi.fn() }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -98,6 +100,64 @@ describe("Playlist", () => {
     await act(async () => button("Copy list").click());
     expect(button("Couldn't copy")).toBeTruthy();
     delete document.execCommand;
+  });
+
+  const sendLink = () => host.querySelector('a[href="https://www.tunemymusic.com/transfer"]');
+  // A real click would make jsdom try to follow the link.
+  const follow = (link) => {
+    const stop = (event) => event.preventDefault();
+    document.addEventListener("click", stop, { once: true });
+    link.click();
+  };
+
+  it("copies the list and says what to do with it when sending it to an app", async () => {
+    const writeText = vi.fn().mockResolvedValue();
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    await show();
+    expect(sendLink().target).toBe("_blank");
+    await act(async () => follow(sendLink()));
+    expect(writeText).toHaveBeenCalledWith("A/B - One & Two\nC - Three");
+    expect(host.textContent).toContain("choose Free text, paste it, then pick your app");
+  });
+
+  it("says when the list couldn't be copied for sending", async () => {
+    vi.stubGlobal("navigator", {});
+    document.execCommand = vi.fn(() => false);
+    await show();
+    await act(async () => follow(sendLink()));
+    expect(host.textContent).toContain("couldn't be copied");
+    delete document.execCommand;
+  });
+
+  it("has nothing to send while the tracks are missing", async () => {
+    getGeneratedPlaylistTracks.mockResolvedValue([]);
+    await show();
+    expect(sendLink()).toBe(null);
+  });
+
+  it("downloads the cover under the playlist's name", async () => {
+    const blob = new Blob(["png"]);
+    coverPng.mockResolvedValue(blob);
+    const createObjectURL = vi.fn(() => "blob:cover");
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const saved = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function record() {
+      saved.push(this.download);
+    });
+    hook.value = { ...LOADED, generatedPlaylists: [{ ...PLAYLIST, cover_images: ["a.jpg"] }] };
+    await show();
+    await act(async () => button("Download cover").click());
+    expect(coverPng).toHaveBeenCalledWith("p1", ["a.jpg"]);
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(saved).toEqual(["Seasonal.png"]);
+    click.mockRestore();
+  });
+
+  it("says when the cover couldn't be downloaded", async () => {
+    coverPng.mockRejectedValue(new Error("no cover"));
+    await show();
+    await act(async () => button("Download cover").click());
+    expect(button("Couldn't download")).toBeTruthy();
   });
 
   it("says when a playlist has no tracks", async () => {
