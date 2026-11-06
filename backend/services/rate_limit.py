@@ -61,6 +61,10 @@ refresh_limiter = RateLimiter(max_requests=20, window_seconds=60)
 link_lastfm_limiter = RateLimiter(max_requests=10, window_seconds=60)
 oauth_login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# The landing page's public route: two Last.fm calls per name, on the same budget
+# as the signed-in users' syncs. The total keeps it under a quarter of that budget.
+listener_limiter = RateLimiter(max_requests=5, window_seconds=60)
+listener_total_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
 
 def _client_ip(request: Request) -> str:

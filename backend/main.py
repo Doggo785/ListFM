@@ -11,6 +11,7 @@ from routers.auth import router as auth_router
 from routers.auth_oauth import router as auth_oauth_router
 from routers.automations import router as automations_router
 from routers.generated_playlists import router as generated_playlists_router
+from routers.public import router as public_router
 from routers.users import router as users_router
 from services.automation_runner import run_due_automations
 from sqlalchemy.exc import SQLAlchemyError
@@ -94,6 +95,7 @@ app.include_router(auth_oauth_router)
 app.include_router(users_router)
 app.include_router(automations_router)
 app.include_router(generated_playlists_router)
+app.include_router(public_router)
 
 
 @app.get("/api/health")
