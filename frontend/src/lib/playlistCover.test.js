@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { COVER_CELLS, COVER_SIZE, albumAddresses, coverShape, drawCover, ribbonCells } from "./playlistCover";
+import { COVER_CELLS, COVER_SIZE, albumAddresses, coverPng, coverShape, drawCover, ribbonCells, siteColors } from "./playlistCover";
 
 const ID = "6f1c2a70-90aa-4a0e-9c55-1f7f6a1b0c11";
 const ids = Array.from({ length: 40 }, (_, i) => `6f1c2a70-90aa-4a0e-9c55-1f7f6a1b0c${String(i).padStart(2, "0")}`);
@@ -69,5 +69,32 @@ describe("drawCover", () => {
     const paint = context();
     drawCover(paint, coverShape(ID), [album, { ...album }], colors);
     expect(paint.drawImage).toHaveBeenCalledTimes(1 + COVER_CELLS);
+  });
+});
+
+describe("coverPng", () => {
+  const stub = (toBlob) => {
+    const context = { fillRect() {}, drawImage() {} };
+    vi.stubGlobal("document", {
+      documentElement: {},
+      createElement: () => ({ getContext: () => context, toBlob }),
+    });
+    vi.stubGlobal("getComputedStyle", () => ({ getPropertyValue: (name) => `${name} ` }));
+  };
+
+  it("draws the cover in the site's colours and returns it as a PNG", async () => {
+    const blob = { type: "image/png" };
+    const toBlob = vi.fn((done) => done(blob));
+    stub(toBlob);
+    expect(siteColors().ground).toBe("--ink");
+    await expect(coverPng(ID, [])).resolves.toBe(blob);
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/png");
+    vi.unstubAllGlobals();
+  });
+
+  it("fails when the browser gives no file", async () => {
+    stub((done) => done(null));
+    await expect(coverPng(ID, [])).rejects.toThrow("no cover");
+    vi.unstubAllGlobals();
   });
 });

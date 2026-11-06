@@ -10,10 +10,13 @@ import Loader from "@/components/elements/Loader";
 import { Gone, LoadFailed, StatePage } from "@/components/elements/PageStates";
 import { deleteGeneratedPlaylist, getGeneratedPlaylistTracks } from "@/lib/api";
 import { glide, glideArrived } from "@/lib/glide";
+import { coverPng } from "@/lib/playlistCover";
 import { describeCoverage, describeMade, plural, tracksAsText } from "@/lib/playlists";
 import { FOCUS } from "@/lib/utils";
 
 const COPIED_MS = 2000;
+// Reads a pasted list and fills a playlist on most streaming apps, which their APIs don't let ListFM do (see ROADMAP).
+const TUNE_MY_MUSIC = "https://www.tunemymusic.com/transfer";
 
 /** navigator.clipboard only exists on HTTPS and localhost, and the site may run on plain HTTP. */
 async function copyText(text) {
@@ -31,26 +34,75 @@ async function copyText(text) {
   }
 }
 
-/** One copy button: says what happened, then goes back to its label. */
-function CopyList({ tracks }) {
+/** A button's short answer: it says what happened, then goes back to its label. */
+function useBriefly() {
   const [said, setSaid] = useState(null);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
+  const say = (text) => {
+    setSaid(text);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setSaid(null), COPIED_MS);
+  };
+  return [said, say];
+}
+
+function CopyList({ tracks }) {
+  const [said, say] = useBriefly();
 
   const copy = async () => {
     try {
       await copyText(tracksAsText(tracks));
-      setSaid("Copied");
+      say("Copied");
     } catch {
-      setSaid("Couldn't copy");
+      say("Couldn't copy");
     }
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setSaid(null), COPIED_MS);
   };
 
   return (
     <>
       <Button variant="outline" onClick={copy} disabled={!tracks?.length}>{said ?? "Copy list"}</Button>
+      <span role="status" className="sr-only">{said}</span>
+    </>
+  );
+}
+
+/** The way out of ListFM for now: the list on the clipboard, and the page that will take it. */
+function SendToApp({ tracks, onNote }) {
+  const send = async () => {
+    // Asked before the new tab takes the focus: the clipboard refuses a page in the background.
+    try {
+      await copyText(tracksAsText(tracks));
+      onNote("List copied. On Tune My Music, a separate service, choose Free text, paste it, then pick your app.");
+    } catch {
+      onNote("The list couldn't be copied. Use Copy list, then paste it on Tune My Music.");
+    }
+  };
+
+  if (!tracks?.length) return null;
+  return (
+    <a href={TUNE_MY_MUSIC} target="_blank" rel="noopener noreferrer" onClick={send} className={buttonVariants()}>
+      Send to your app<span className="sr-only">, opens Tune My Music in a new tab</span>
+    </a>
+  );
+}
+
+function DownloadCover({ playlist, name }) {
+  const [said, say] = useBriefly();
+
+  const download = async () => {
+    try {
+      const url = URL.createObjectURL(await coverPng(playlist.id, playlist.cover_images));
+      Object.assign(document.createElement("a"), { href: url, download: `${name}.png` }).click();
+      setTimeout(() => URL.revokeObjectURL(url), COPIED_MS); // Not at once: some browsers are still reading it.
+    } catch {
+      say("Couldn't download");
+    }
+  };
+
+  return (
+    <>
+      <Button variant="outline" onClick={download}>{said ?? "Download cover"}</Button>
       <span role="status" className="sr-only">{said}</span>
     </>
   );
@@ -106,6 +158,7 @@ export default function Playlist() {
   const [tracksFailed, setTracksFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [deleteFailed, setDeleteFailed] = useState(false);
+  const [sendNote, setSendNote] = useState(null);
 
   const title = useRef(null);
   const hasPlaylist = Boolean(playlist);
@@ -166,8 +219,12 @@ export default function Playlist() {
               </p>
             </div>
           </div>
+          {/* Above the buttons: below them it can fall off a short screen, right when it's needed. */}
+          {sendNote && <p role="status" className="pt-3 text-sm text-(--text-muted)">{sendNote}</p>}
           <div className="flex flex-wrap gap-2 pt-4">
+            <SendToApp tracks={tracks} onNote={setSendNote} />
             <CopyList tracks={tracks} />
+            <DownloadCover playlist={playlist} name={name} />
             {automation && <Link to={`/automations/${automation.id}`} className={buttonVariants({ variant: "outline" })}>See automation</Link>}
             <DeleteAction
               title="Delete this playlist?"

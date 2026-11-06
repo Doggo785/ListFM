@@ -1,13 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { COVER_SIZE, coverShape, drawCover, loadAlbums, loadedAlbums } from "@/lib/playlistCover";
+import { COVER_SIZE, coverShape, drawCover, loadAlbums, loadedAlbums, siteColors } from "@/lib/playlistCover";
 
 const LOAD_AHEAD = "300px";
-
-function siteColors() {
-  const styles = getComputedStyle(document.documentElement);
-  const token = (name) => styles.getPropertyValue(name).trim();
-  return { ground: token("--ink"), ember: Array.from({ length: 9 }, (_, i) => token(`--ember-${i + 1}`)) };
-}
 
 /** A playlist's cover. Size it in multiples of 64px: the ribbon's cells stay whole. Off-screen covers wait to load their albums. */
 export default function PlaylistCover({ seed, images, className, style }) {

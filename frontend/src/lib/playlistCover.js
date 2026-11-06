@@ -147,6 +147,13 @@ function drawSlice(context, image, x, y, width, height) {
   context.drawImage(image, left + x * ratio, top + y * ratio, width * ratio, height * ratio, x, y, width, height);
 }
 
+/** The tokens a canvas needs, since it can't read CSS variables itself. */
+export function siteColors() {
+  const styles = getComputedStyle(document.documentElement);
+  const token = (name) => styles.getPropertyValue(name).trim();
+  return { ground: token("--ink"), ember: Array.from({ length: 9 }, (_, i) => token(`--ember-${i + 1}`)) };
+}
+
 /** Paints a whole cover. With no album, the ribbon alone on the site's ground. */
 export function drawCover(context, shape, albums, colors) {
   context.imageSmoothingQuality = "high";
@@ -165,4 +172,13 @@ export function drawCover(context, shape, albums, colors) {
     context.fillStyle = ramp[tone];
     context.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
   }
+}
+
+/** A cover as a PNG file. It waits for its albums, which the one on screen may still be loading. */
+export async function coverPng(seed, urls) {
+  const canvas = Object.assign(document.createElement("canvas"), { width: COVER_SIZE, height: COVER_SIZE });
+  drawCover(canvas.getContext("2d"), coverShape(seed), await loadAlbums(urls), siteColors());
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("no cover"))), "image/png");
+  });
 }
