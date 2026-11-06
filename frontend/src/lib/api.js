@@ -70,6 +70,15 @@ export async function request(path, options = {}) {
   return res.json();
 }
 
+/** A server's message as a person should read it: without the status it was thrown with. */
+export const readableError = (err) => err.message.replace(/^API \d+: /, "");
+
+/** Leaves for Last.fm's consent page. It comes back to /auth/lastfm. */
+export async function connectLastfm() {
+  const { url } = await request("/api/auth/lastfm/authorize");
+  window.location.assign(url);
+}
+
 export async function startScrobbleSync() {
   return request("/api/scrobbles/sync", { method: "POST" });
 }

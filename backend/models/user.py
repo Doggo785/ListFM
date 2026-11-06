@@ -14,8 +14,9 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(20), default="user")  # user|admin
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # IANA zone the user's cron schedules are read in (set by their browser).
-    timezone: Mapped[str] = mapped_column(String(64), default="UTC", server_default="UTC")
+    # IANA zone schedules and listening moments are read in. Empty until the first browser
+    # sets it; after that only the Settings page changes it.
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     # Listening history sync (ADR 0001): last finished sync, and the end of

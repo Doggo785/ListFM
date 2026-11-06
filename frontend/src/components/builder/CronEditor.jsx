@@ -26,7 +26,7 @@ const asOptions = (labels, first = 0) => labels.map((label, i) => ({ value: Stri
 const DAY_OPTIONS = asOptions(Array.from({ length: 28 }, (_, i) => String(i + 1)), 1);
 const HOUR_OPTIONS = asOptions(Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`));
 
-export default function CronEditor({ value, onChange }) {
+export default function CronEditor({ value, onChange, zone }) {
   // What the custom box last wrote: a half-typed cron keeps it open, and a value from elsewhere, a preset say, closes it.
   const [typed, setTyped] = useState(null);
   const custom = typed === value;
@@ -34,7 +34,7 @@ export default function CronEditor({ value, onChange }) {
   const frequency = custom ? "custom" : schedule.frequency;
   const description = describeCron(value);
   const invalid = Boolean(value) && !isValidCron(value);
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const shownZone = zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const set = (patch) => onChange(writeSchedule({ ...schedule, ...patch }));
   const pickFrequency = (next) => {
@@ -90,7 +90,7 @@ export default function CronEditor({ value, onChange }) {
       )}
       {description && (
         <p className="text-sm text-(--text-muted)">
-          {description} ({timezone})
+          {description} ({shownZone})
         </p>
       )}
     </div>

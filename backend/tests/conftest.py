@@ -3,6 +3,7 @@ import os
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
@@ -207,3 +208,12 @@ def _make_expired_token(user_id: str) -> str:
         settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
     )
+
+
+async def link_lastfm(client, username, **session):
+    """Link through what the browser and Last.fm do together. `session` overrides the token exchange's mock."""
+    authorized = await client.get("/api/auth/lastfm/authorize")
+    back = parse_qs(urlparse(authorized.json()["url"]).query)["cb"][0]
+    state = parse_qs(urlparse(back).query)["state"][0]
+    with patch("routers.auth_oauth.get_session_username", **(session or {"return_value": username})):
+        return await client.post("/api/auth/lastfm/link", json={"token": "token", "state": state})

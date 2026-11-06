@@ -358,7 +358,7 @@ function Creator({ saved }) {
             </FoldedStage>
 
             <Stage label="Schedule">
-              <CronEditor value={draft.cron} onChange={(cron) => update({ cron })} />
+              <CronEditor zone={user?.timezone} value={draft.cron} onChange={(cron) => update({ cron })} />
             </Stage>
 
             <Stage label="Name">

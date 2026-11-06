@@ -1,203 +1,70 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { motion } from "motion/react";
-import { IconAlertCircle } from "@tabler/icons-react";
-import Grainient from "../components/ui/Grainient";
-import { useAuth } from "../contexts/AuthContext";
-import { request } from "@/lib/api";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import AuthScreen, { FormError, TextField } from "@/components/elements/AuthScreen";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/buttonVariants";
+import { useAuth } from "@/contexts/AuthContext";
+import { readableError, request } from "@/lib/api";
 
-function AuthCallback() {
-  const [searchParams] = useSearchParams();
+/** Where a failed or unfinished Google or Discord sign-in lands. A successful one goes straight to the site. */
+export default function AuthCallback() {
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const { isAuthenticated, isLastfmLinked, loading } = useAuth();
-  const [error, setError] = useState(null);
   const [email, setEmail] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [needsEmail, setNeedsEmail] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const needsEmail = params.get("needs_email") === "1";
+  const failure = params.get("error") ? params.get("error_description") || "The sign-in did not finish. Please try again." : "";
 
   useEffect(() => {
-    document.title = "Signing In - ListFM";
+    document.title = "Signing in - ListFM";
   }, []);
 
   useEffect(() => {
-    if (loading) return;
-    const err = searchParams.get("error");
-    const needsEmailParam = searchParams.get("needs_email");
+    if (loading || needsEmail || failure) return;
+    if (!isAuthenticated) navigate("/login", { replace: true });
+    else navigate(isLastfmLinked ? "/dashboard" : "/link-lastfm", { replace: true });
+  }, [loading, needsEmail, failure, isAuthenticated, isLastfmLinked, navigate]);
 
-    if (needsEmailParam === "1") {
-      setNeedsEmail(true);
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!email.trim()) {
+      setError("Enter an email address.");
       return;
     }
-
-    if (err) {
-      setError(searchParams.get("error_description") || "Authentication failed. Please try again.");
-      return;
-    }
-
-    // No params: the backend 302-handles OAuth success straight to
-    // /dashboard or /link-lastfm, so this page only sees direct visits
-    // (or an already-handled login). Route by session, never fake-error.
-    if (!isAuthenticated) {
-      navigate("/login", { replace: true });
-      return;
-    }
-    navigate(isLastfmLinked ? "/dashboard" : "/link-lastfm", { replace: true });
-  }, [searchParams, loading, isAuthenticated, isLastfmLinked, navigate]);
-
-  const handleEmailSubmit = async (e) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-
-    setSubmitting(true);
-    setError(null);
-
+    setError("");
+    setSaving(true);
     try {
-      await request("/api/auth/oauth/complete-email", {
-        method: "POST",
-        body: JSON.stringify({ email: email.trim() }),
-      });
-
-      if (isLastfmLinked) {
-        navigate("/dashboard", { replace: true });
-      } else {
-        navigate("/link-lastfm", { replace: true });
-      }
+      await request("/api/auth/oauth/complete-email", { method: "POST", body: JSON.stringify({ email: email.trim() }) });
+      navigate(isLastfmLinked ? "/dashboard" : "/link-lastfm", { replace: true });
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
+      setError(readableError(err));
+      setSaving(false);
     }
   };
 
+  if (needsEmail) {
+    return (
+      <AuthScreen title="One more thing">
+        <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+          <p className="text-(--text-muted)">Discord did not share an email address. Enter one to finish your account.</p>
+          <TextField id="oauth-email" label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={saving} />
+          <FormError>{error}</FormError>
+          <Button type="submit" disabled={saving}>{saving ? "Saving" : "Continue"}</Button>
+        </form>
+      </AuthScreen>
+    );
+  }
+
   return (
-    <main className="flex-1 flex items-center justify-center bg-[var(--ground)] min-h-screen px-4">
-      <div className="absolute inset-0 overflow-hidden">
-        <Grainient
-          color1="#FF6817"
-          color2="#17AEFF"
-          color3="#1c191c"
-          timeSpeed={0.2}
-          colorBalance={0}
-          warpStrength={1}
-          warpFrequency={5}
-          warpSpeed={1.5}
-          warpAmplitude={50}
-          blendAngle={0}
-          blendSoftness={0.05}
-          rotationAmount={500}
-          noiseScale={2}
-          grainAmount={0.06}
-          grainScale={2}
-          grainAnimated={false}
-          contrast={1.2}
-          gamma={1}
-          saturation={0.8}
-          centerX={0}
-          centerY={0}
-          zoom={1}
-        />
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 text-center space-y-6"
-      >
-        <Link
-          to="/"
-          className="inline-block rounded-full border border-white/10 bg-black/50 px-5 py-2 font-heading text-3xl text-[var(--ember)] backdrop-blur-md transition-opacity hover:opacity-80"
-        >
-          ListFM
-        </Link>
-
-        {needsEmail ? (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold text-white">Complete Your Account</h2>
-              <p className="text-neutral-400 text-sm">
-                Discord didn&apos;t provide an email. Enter one to continue.
-              </p>
-            </div>
-
-            <form onSubmit={handleEmailSubmit} className="space-y-4 max-w-sm mx-auto">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400"
-                >
-                  {error}
-                </motion.div>
-              )}
-
-              <div className="space-y-1.5 text-left">
-                <label
-                  htmlFor="oauth-email"
-                  className="block text-xs font-medium text-neutral-400 uppercase tracking-wider"
-                >
-                  Email Address
-                </label>
-                <input
-                  id="oauth-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  className="w-full rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-2.5 text-sm text-white placeholder-neutral-600 outline-none transition-colors focus:border-[var(--ember)]/50 focus:ring-1 focus:ring-[var(--ember)]/20"
-                  disabled={submitting}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting || !email.trim()}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-[var(--ember)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--ember)]/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    Saving...
-                  </span>
-                ) : (
-                  "Continue"
-                )}
-              </button>
-            </form>
-          </div>
-        ) : error ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mx-auto w-full max-w-sm rounded-2xl border border-neutral-800 bg-[#1a1a1a]/90 p-6 text-center shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
-          >
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10">
-              <IconAlertCircle size={24} className="text-red-400" />
-            </div>
-            <h2 className="text-lg font-semibold text-white">Sign-in failed</h2>
-            <p className="mt-2 text-sm leading-relaxed text-neutral-400">
-              {error}
-            </p>
-            <Link
-              to="/login"
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ember)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--ember)]/90"
-            >
-              Back to Sign In
-            </Link>
-          </motion.div>
-        ) : (
-          <div className="flex items-center justify-center gap-3 text-neutral-400 text-sm">
-            <span className="h-4 w-4 rounded-full border-2 border-[var(--ember)] border-t-transparent animate-spin" />
-            Completing sign in...
-          </div>
-        )}
-      </motion.div>
-    </main>
+    <AuthScreen title={failure ? "You are not signed in" : "Signing in"}>
+      {failure && (
+        <div className="flex flex-col gap-4">
+          <FormError>{failure}</FormError>
+          <Link to="/login" className={buttonVariants()}>Back to log in</Link>
+        </div>
+      )}
+    </AuthScreen>
   );
 }
-
-export default AuthCallback;

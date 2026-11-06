@@ -667,9 +667,9 @@ async def run_due_automations(session_factory=async_session) -> None:
             ).all()
         )
         due_jobs = [
-            (a.id, last_fire_time(a.cron, now, zones.get(a.user_id, "UTC")) or now, 1)
+            (a.id, last_fire_time(a.cron, now, zones.get(a.user_id) or "UTC") or now, 1)
             for a in automations
-            if is_due(a, now, zones.get(a.user_id, "UTC"))
+            if is_due(a, now, zones.get(a.user_id) or "UTC")
         ]
         try:
             retryable = await get_retryable_failures(db, now)

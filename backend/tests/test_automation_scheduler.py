@@ -30,11 +30,12 @@ from .conftest import (
     _register_and_login,
     _TestSessionLocal,
     _unique_email,
+    link_lastfm,
 )
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
-    """Register, log in, and link a Last.fm account (mocked get_user_info)."""
+    """Register, log in, and link a Last.fm account."""
     reg = await client.post(
         "/api/auth/register",
         json={"email": email, "password": "StrongP@ss1!"},
@@ -46,12 +47,7 @@ async def _register_login_link(client: AsyncClient, email: str) -> None:
         json={"email": email, "password": "StrongP@ss1!"},
     )
     assert login.status_code == 200
-    mock_info = {"username": "sched_user", "image": None}
-    with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-        link = await client.post(
-            "/api/auth/link-lastfm",
-            json={"username": "sched_user"},
-        )
+    link = await link_lastfm(client, "sched_user")
     assert link.status_code == 200
 
 
@@ -478,12 +474,7 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
                 json={"email": other_email, "password": "StrongP@ss1!"},
             )
             assert reg.status_code == 201
-            mock_info = {"username": "other_user", "image": None}
-            with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-                link = await fresh.post(
-                    "/api/auth/link-lastfm",
-                    json={"username": "other_user"},
-                )
+            link = await link_lastfm(fresh, "other_user")
             assert link.status_code == 200
             resp = await fresh.get(f"/api/generated-playlists/{playlist_id}/tracks")
             assert resp.status_code == 404
@@ -870,7 +861,7 @@ async def test_set_timezone_stores_valid_zone_and_rejects_unknown(client: AsyncC
     email = _unique_email()
     try:
         await _register_login_link(client, email)
-        assert (await client.get("/api/auth/me")).json()["timezone"] == "UTC"
+        assert (await client.get("/api/auth/me")).json()["timezone"] is None
 
         ok = await client.put("/api/auth/me/timezone", json={"timezone": "Europe/Paris"})
         assert ok.status_code == 200

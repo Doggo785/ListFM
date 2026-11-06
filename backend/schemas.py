@@ -102,6 +102,15 @@ class UserUpdate(PasswordValidatorMixin, BaseModel):
     display_name: str | None = None
 
 
+class PasswordChange(PasswordValidatorMixin, BaseModel):
+    current_password: str = Field(max_length=72)
+    password: str = Field(min_length=8)
+
+
+class AccountDelete(BaseModel):
+    confirm: str
+
+
 class TimezoneUpdate(BaseModel):
     timezone: str
 
@@ -116,12 +125,13 @@ class TimezoneUpdate(BaseModel):
 
 
 class LinkLastfmRequest(BaseModel):
-    username: str
+    token: str
+    state: str
 
 
 class LinkLastfmResponse(BaseModel):
     username: str
-    image: str | None = None
+    first_link: bool
 
 
 class AuthProviderRead(BaseModel):

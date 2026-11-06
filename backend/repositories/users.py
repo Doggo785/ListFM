@@ -3,7 +3,7 @@ import uuid
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -227,11 +227,16 @@ async def get_or_create_user_from_discord(
 async def delete_user(db: AsyncSession, user_id: str) -> bool:
     """Returns True if deleted, False if not found.
 
-    Caller is responsible for committing the session.
+    Sign-in links and identity go at once, so the same email or Last.fm account
+    can start over. Caller is responsible for committing the session.
     """
     user = await get_user_by_id(db, user_id)
     if user is None:
         return False
+    await db.execute(delete(AuthProvider).where(AuthProvider.user_id == user_id))
+    user.email = None
+    user.password_hash = None
+    user.display_name = None
     user.deleted_at = datetime.now(UTC)
     await db.flush()
     return True

@@ -130,6 +130,14 @@ async def delete_automation(db: AsyncSession, automation_id: str, user_id: str) 
     return True
 
 
+async def delete_user_automations(db: AsyncSession, user_id: str) -> None:
+    await db.execute(
+        update(Automation)
+        .where(Automation.user_id == user_id, Automation.deleted_at.is_(None))
+        .values(deleted_at=datetime.now(UTC))
+    )
+
+
 async def set_automations_lastfm_username(
     db: AsyncSession, user_id: str, lastfm_username: str
 ) -> None:

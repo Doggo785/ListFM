@@ -7,7 +7,7 @@ from models.playlist_track import PlaylistTrack
 from models.track import Track
 from repositories.tracks import get_or_create_track
 from schemas import GeneratedPlaylistCreate
-from sqlalchemy import Row, Select, select
+from sqlalchemy import Row, Select, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 COVERS_PER_PLAYLIST = 4
@@ -157,6 +157,14 @@ async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id:
     playlist.deleted_at = datetime.now(UTC)
     await db.flush()
     return True
+
+
+async def delete_user_playlists(db: AsyncSession, user_id: str) -> None:
+    await db.execute(
+        update(GeneratedPlaylist)
+        .where(GeneratedPlaylist.user_id == user_id, GeneratedPlaylist.deleted_at.is_(None))
+        .values(deleted_at=datetime.now(UTC))
+    )
 
 
 async def get_tracks_of_recent_playlists(

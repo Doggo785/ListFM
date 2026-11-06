@@ -25,6 +25,7 @@ from .conftest import (
     _register_and_login,
     _TestSessionLocal,
     _unique_email,
+    link_lastfm,
 )
 
 
@@ -657,21 +658,16 @@ async def test_complete_email_invalid_format(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_link_lastfm_valid(client: AsyncClient):
-    """POST /api/auth/link-lastfm with a valid (mocked) username succeeds."""
+    """A token Last.fm accepts links the account it belongs to."""
     email = _unique_email()
     try:
         await _register_and_login(client, email)
 
-        mock_info = {"username": "testuser123", "image": "https://example.com/img.jpg"}
-        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-            resp = await client.post(
-                "/api/auth/link-lastfm",
-                json={"username": "testuser123"},
-            )
+        resp = await link_lastfm(client, "testuser123")
         assert resp.status_code == 200
         data = resp.json()
         assert data["username"] == "testuser123"
-        assert data["image"] == "https://example.com/img.jpg"
+        assert data["first_link"] is True
     finally:
         await _cleanup_user(email=email)
 
@@ -687,9 +683,7 @@ async def test_relink_other_lastfm_account_moves_automations_and_drops_personal_
         user_id = _get_user_id_from_cookies(client)
 
         async def _link(name: str) -> None:
-            info = {"username": name, "image": None}
-            with patch("routers.auth_oauth.get_user_info", return_value=info):
-                resp = await client.post("/api/auth/link-lastfm", json={"username": name})
+            resp = await link_lastfm(client, name)
             assert resp.status_code == 200
 
         await _link("old_account")
@@ -730,18 +724,14 @@ async def test_relink_other_lastfm_account_moves_automations_and_drops_personal_
 
 @pytest.mark.asyncio
 async def test_link_lastfm_invalid_username(client: AsyncClient):
-    """POST /api/auth/link-lastfm with a nonexistent username returns 400."""
+    """A token Last.fm refuses returns 400."""
     email = _unique_email()
     try:
         await _register_and_login(client, email)
 
-        with patch("routers.auth_oauth.get_user_info", side_effect=pylast.WSError(None, 6, "User not found")):
-            resp = await client.post(
-                "/api/auth/link-lastfm",
-                json={"username": "nonexistent_user_xyz"},
-            )
+        resp = await link_lastfm(client, "nonexistent_user_xyz", side_effect=pylast.WSError(None, 6, "User not found"))
         assert resp.status_code == 400
-        assert resp.json()["detail"] == "Invalid Last.fm username"
+        assert "did not accept" in resp.json()["detail"]
     finally:
         await _cleanup_user(email=email)
 
@@ -753,20 +743,11 @@ async def test_link_lastfm_conflict(client: AsyncClient):
     email2 = _unique_email()
     try:
         await _register_and_login(client, email1)
-        mock_info = {"username": "shareduser", "image": None}
-        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-            resp1 = await client.post(
-                "/api/auth/link-lastfm",
-                json={"username": "shareduser"},
-            )
+        resp1 = await link_lastfm(client, "shareduser")
         assert resp1.status_code == 200
 
         await _register_and_login(client, email2)
-        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-            resp2 = await client.post(
-                "/api/auth/link-lastfm",
-                json={"username": "shareduser"},
-            )
+        resp2 = await link_lastfm(client, "shareduser")
         assert resp2.status_code == 409
         assert "already linked" in resp2.json()["detail"]
     finally:
@@ -776,11 +757,8 @@ async def test_link_lastfm_conflict(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_link_lastfm_no_auth(client: AsyncClient):
-    """POST /api/auth/link-lastfm without auth cookie returns 401."""
-    resp = await client.post(
-        "/api/auth/link-lastfm",
-        json={"username": "someuser"},
-    )
+    """Linking without an auth cookie returns 401."""
+    resp = await client.post("/api/auth/lastfm/link", json={"token": "t", "state": "s"})
     assert resp.status_code == 401
 
 
@@ -791,12 +769,7 @@ async def test_me_returns_lastfm(client: AsyncClient):
     try:
         await _register_and_login(client, email)
 
-        mock_info = {"username": "mylastfmuser", "image": None}
-        with patch("routers.auth_oauth.get_user_info", return_value=mock_info):
-            link_resp = await client.post(
-                "/api/auth/link-lastfm",
-                json={"username": "mylastfmuser"},
-            )
+        link_resp = await link_lastfm(client, "mylastfmuser")
         assert link_resp.status_code == 200
 
         me_resp = await client.get("/api/auth/me")

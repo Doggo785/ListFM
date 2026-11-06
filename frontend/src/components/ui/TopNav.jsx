@@ -39,8 +39,10 @@ export default function TopNav() {
       </div>
       <BackgroundTasks />
       <div className="top-nav__account" data-quiet>
-        {avatar && <img src={avatar} alt="" className="top-nav__avatar" />}
-        {username && <span>{username}</span>}
+        <NavLink to="/settings" className="top-nav__me">
+          {avatar && <img src={avatar} alt="" className="top-nav__avatar" />}
+          <span>{username ?? "Settings"}</span>
+        </NavLink>
         <button type="button" onClick={() => { logout(); navigate("/"); }}>Log out</button>
       </div>
     </header>

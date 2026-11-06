@@ -34,8 +34,8 @@ afterEach(() => {
 });
 
 describe("browser timezone", () => {
-  it("sends the browser zone when the server has another one", async () => {
-    request.mockResolvedValue({ timezone: "UTC" });
+  it("sends the browser zone while the account has none", async () => {
+    request.mockResolvedValue({ timezone: null });
     await render(<AuthProvider>x</AuthProvider>);
     expect(request).toHaveBeenCalledWith("/api/auth/me/timezone", {
       method: "PUT",
@@ -43,8 +43,8 @@ describe("browser timezone", () => {
     });
   });
 
-  it("sends nothing when the zones already match", async () => {
-    request.mockResolvedValue({ timezone: "Europe/Paris" });
+  it("never overwrites a zone the account already has", async () => {
+    request.mockResolvedValue({ timezone: "Asia/Tokyo" });
     await render(<AuthProvider>x</AuthProvider>);
     expect(request).toHaveBeenCalledTimes(1);
   });
@@ -52,6 +52,11 @@ describe("browser timezone", () => {
   it("shows the zone next to the schedule", async () => {
     const container = await render(<CronEditor value="0 8 * * *" onChange={() => {}} />);
     expect(container.textContent).toContain("(Europe/Paris)");
+  });
+
+  it("prefers the account's zone next to the schedule", async () => {
+    const container = await render(<CronEditor value="0 8 * * *" onChange={() => {}} zone="Asia/Tokyo" />);
+    expect(container.textContent).toContain("(Asia/Tokyo)");
   });
 });
 
