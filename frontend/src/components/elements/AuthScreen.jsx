@@ -42,7 +42,7 @@ export function TextField({ id, label, ...props }) {
   );
 }
 
-export function PasswordField({ id, label, ...props }) {
+export function MaskedField({ id, label, ...props }) {
   const [shown, setShown] = useState(false);
   return (
     <FormField id={id} label={label}>
@@ -67,13 +67,10 @@ export function FormError({ children }) {
 }
 
 export function ProviderButtons({ verb, disabled }) {
-  const go = (provider) => () => {
-    window.location.href = `/api/auth/${provider}/login`;
-  };
   return (
     <div className="grid gap-2 sm:grid-cols-2">
-      <Button type="button" variant="outline" onClick={go("google")} disabled={disabled}><GoogleIcon />{verb} with Google</Button>
-      <Button type="button" variant="outline" onClick={go("discord")} disabled={disabled}><DiscordIcon />{verb} with Discord</Button>
+      <Button type="button" variant="outline" onClick={() => { window.location.href = "/api/auth/google/login"; }} disabled={disabled}><GoogleIcon />{verb} with Google</Button>
+      <Button type="button" variant="outline" onClick={() => { window.location.href = "/api/auth/discord/login"; }} disabled={disabled}><DiscordIcon />{verb} with Discord</Button>
     </div>
   );
 }

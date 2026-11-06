@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FormError, PasswordField, TextField } from "@/components/elements/AuthScreen";
+import { FormError, MaskedField, TextField } from "@/components/elements/AuthScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Modal from "@/components/ui/Modal";
@@ -208,9 +208,9 @@ function PasswordRow() {
   return (
     <Row title="Password" note="Changing it logs you out on all your other devices. This one stays logged in.">
       <form onSubmit={submit} noValidate className="flex w-full max-w-80 flex-col gap-4">
-        <PasswordField id="current-password" label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} disabled={saving} />
-        <PasswordField id="new-password" label="New password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} disabled={saving} />
-        <PasswordField id="new-password-again" label="New password again" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} disabled={saving} />
+        <MaskedField id="current-password" label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} disabled={saving} />
+        <MaskedField id="new-password" label="New password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} disabled={saving} />
+        <MaskedField id="new-password-again" label="New password again" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} disabled={saving} />
         <FormError>{error}</FormError>
         {done && <p role="status" className="text-(--text-muted)">Password changed. Your other devices are logged out.</p>}
         <Button type="submit" variant="outline" className="self-start" disabled={saving}>{saving ? "Changing" : "Change password"}</Button>

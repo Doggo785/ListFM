@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import threading
 import time
@@ -90,8 +89,7 @@ def get_session_username(token: str) -> str:
     signed = {"api_key": settings.lastfm_api_key, "method": "auth.getSession", "token": token}
     payload = "".join(f"{key}{signed[key]}" for key in sorted(signed)) + settings.lastfm_api_secret
     # Last.fm's own signature scheme, not a choice made here.
-    signature = hashlib.md5(payload.encode(), usedforsecurity=False).hexdigest()
-    username = _lastfm_json("auth.getSession", token=token, api_sig=signature)["session"]["name"]
+    username = _lastfm_json("auth.getSession", token=token, api_sig=pylast.md5(payload))["session"]["name"]
     log_activity("lastfm", username, "autorisation")
     return username
 

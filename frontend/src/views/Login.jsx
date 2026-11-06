@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import AuthScreen, { FormError, PasswordField, ProviderButtons, TextField } from "@/components/elements/AuthScreen";
+import AuthScreen, { FormError, MaskedField, ProviderButtons, TextField } from "@/components/elements/AuthScreen";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { readableError } from "@/lib/api";
@@ -41,7 +41,7 @@ export default function Login() {
     <AuthScreen title="Log in">
       <form onSubmit={submit} noValidate className="flex flex-col gap-4">
         <TextField id="email" label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} />
-        <PasswordField id="password" label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
+        <MaskedField id="password" label="Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
         <FormError>{error}</FormError>
         <Button type="submit" disabled={loading}>{loading ? "Logging in" : "Log in"}</Button>
       </form>
