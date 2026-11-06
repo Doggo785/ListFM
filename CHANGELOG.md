@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/Doggo785/ListFM/compare/v0.5.0...v0.6.0) (2026-11-06)
+
+
+### Features
+
+* **account:** rebuild sign-in and add Settings ([#139](https://github.com/Doggo785/ListFM/issues/139)) ([e8c47d5](https://github.com/Doggo785/ListFM/commit/e8c47d51d7b1191292f4d6aaf23d46f30a334762))
+* **dashboard:** rebuild the Dashboard as a poster and a year in flight ([#138](https://github.com/Doggo785/ListFM/issues/138)) ([6bef184](https://github.com/Doggo785/ListFM/commit/6bef184a41d3b2e72d8f1f533f55c5e3b74929ce))
+* **ui:** make history the heart of an automation's page ([#136](https://github.com/Doggo785/ListFM/issues/136)) ([85b80ae](https://github.com/Doggo785/ListFM/commit/85b80ae143f0c2b8a5254076c2db22364403ced2))
+
+
+### Bug Fixes
+
+* **ui:** show the pointer cursor on every button ([#140](https://github.com/Doggo785/ListFM/issues/140)) ([9334d91](https://github.com/Doggo785/ListFM/commit/9334d91c1e6aac6a96d5ad1d10a4b61196c4bbf6))
+
 ## [0.5.0](https://github.com/Doggo785/ListFM/compare/v0.4.0...v0.5.0) (2026-11-05)
 
 
