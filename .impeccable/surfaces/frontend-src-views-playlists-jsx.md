@@ -13,7 +13,7 @@ THESIS: Playlists are something you collected, not rows of a report. Each automa
 
 OWN-WORLD: Braise palette on ink, Tiny5 titles, Jersey 20 text, original-quality album art under a 64-cell ribbon using the site's dither, no radius, no shadow, no gradient.
 
-STORY: The visitor sees what their automations made, tells seasons apart by the period under each cover, opens one, listens through Last.fm links, copies it, or deletes it.
+STORY: The visitor sees what their automations made, tells seasons apart by the period under each cover, opens one, listens through Last.fm links, copies it, sends it to a streaming app through Tune My Music, downloads its cover, or deletes it.
 
 FIRST VIEWPORT: Nav with Dashboard, Automations, Playlists. Left-aligned Playlists title with count. Free ribbon around the content. Then shelves: automation name, cadence, horizontal row of 192px covers (128px on phones), period and track count under each.
 
