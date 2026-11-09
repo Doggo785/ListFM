@@ -141,14 +141,15 @@ async def main(out: str, skipped: set[str]) -> None:
             u=user_id, since=SINCE, skipped=sorted(skipped) or [""], per=ALBUMS_PER_QUARTER,
         )
         covers = []
-        for quarter in dict.fromkeys(row[0] for row in along):
-            if len(covers) == COVERS_ALONG_THE_YEARS:
-                break
+        quarters = list(dict.fromkeys(row[0] for row in along))[::-1]
+        # Spread along the whole timeline, from its first quarter to its last, not bunched at the recent end.
+        last = len(quarters) - 1
+        spread = dict.fromkeys(quarters[round(i * last / (COVERS_ALONG_THE_YEARS - 1))] for i in range(COVERS_ALONG_THE_YEARS)) if last > 0 else quarters
+        for quarter in spread:
             # Its most played album that a stranger may know.
             found = await known_first([(a, t) for q, a, t in along if q == quarter], 1)
             if found:
                 covers.append({"share": round((quarter.date() - SINCE).days / (len(weeks) * 7), 4), "url": found[0]})
-        covers.reverse()
 
         # The recipe of the scene: the same month, a year ago, kept to what was played at least 3 times.
         at = datetime(2026, 11, 1, tzinfo=zone)
@@ -181,7 +182,8 @@ async def main(out: str, skipped: set[str]) -> None:
                 "covers": await playlist_covers(keep(made["tracks"])),
             })
 
-        discoveries = await run(at, MONTH, sort="first_played", filters=group(condition("first_played", "within_days", 31)))
+        # Most played first: the discoveries that stuck, rather than three tracks heard once.
+        discoveries = await run(at, MONTH, filters=group(condition("first_played", "within_days", 31)))
         summer_at = datetime(2026, 9, 1, tzinfo=zone)
         summer = await run(summer_at, SEASON)
         moment = {"fromDay": 5, "toDay": 5, "fromHour": 22, "toHour": 2}
@@ -222,7 +224,7 @@ async def main(out: str, skipped: set[str]) -> None:
             "chain": chain,
             "runs": runs,
             "recipes": [
-                recipe_entry("Discoveries of the month", "On the 1st of each month, the tracks first heard in the month before.", discoveries, new_by_day),
+                recipe_entry("Discoveries of the month", "On the 1st of each month, the tracks first heard in the month before, most played first.", discoveries, new_by_day),
                 recipe_entry("Seasonal", "At each change of season, what was played most during the one that ended.", summer, summer_days),
                 recipe_entry("Friday nights", "Most played on Friday nights, 10pm to 2am, over the last 3 months.", friday, by_hour),
             ],
