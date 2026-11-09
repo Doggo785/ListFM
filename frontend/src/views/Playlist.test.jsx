@@ -102,7 +102,8 @@ describe("Playlist", () => {
     delete document.execCommand;
   });
 
-  const sendLink = () => host.querySelector('a[href="https://www.tunemymusic.com/transfer"]');
+  const sendLink = () => document.querySelector('a[href="https://www.tunemymusic.com/transfer"]');
+  const dialog = () => document.querySelector('[role="dialog"]');
   // A real click would make jsdom try to follow the link.
   const follow = (link) => {
     const stop = (event) => event.preventDefault();
@@ -110,29 +111,36 @@ describe("Playlist", () => {
     link.click();
   };
 
-  it("copies the list and says what to do with it when sending it to an app", async () => {
+  it("copies the list on opening the steps, and sends to Tune My Music only on OK", async () => {
     const writeText = vi.fn().mockResolvedValue();
     vi.stubGlobal("navigator", { clipboard: { writeText } });
     await show();
+    expect(sendLink()).toBe(null);
+    await act(async () => button("Send to your app").click());
+    expect(writeText).toHaveBeenCalledWith("A/B - One & Two\nC - Three");
+    expect(dialog().textContent).toContain("Your list is copied: 2 tracks.");
+    expect(dialog().textContent).toContain("Free text");
     expect(sendLink().target).toBe("_blank");
     await act(async () => follow(sendLink()));
-    expect(writeText).toHaveBeenCalledWith("A/B - One & Two\nC - Three");
-    expect(host.textContent).toContain("choose Free text, paste it, then pick your app");
+    expect(dialog()).toBe(null);
   });
 
-  it("says when the list couldn't be copied for sending", async () => {
+  it("offers to copy again when the list couldn't be copied for sending", async () => {
     vi.stubGlobal("navigator", {});
     document.execCommand = vi.fn(() => false);
     await show();
-    await act(async () => follow(sendLink()));
-    expect(host.textContent).toContain("couldn't be copied");
+    await act(async () => button("Send to your app").click());
+    expect(dialog().textContent).toContain("couldn't be copied");
+    document.execCommand = vi.fn(() => true);
+    await act(async () => button("Copy again").click());
+    expect(dialog().textContent).toContain("Your list is copied");
     delete document.execCommand;
   });
 
   it("has nothing to send while the tracks are missing", async () => {
     getGeneratedPlaylistTracks.mockResolvedValue([]);
     await show();
-    expect(sendLink()).toBe(null);
+    expect(button("Send to your app")).toBe(undefined);
   });
 
   it("downloads the cover under the playlist's name", async () => {
@@ -191,7 +199,7 @@ describe("Playlist", () => {
     await show();
     expect(host.querySelector('[role="alert"]').textContent).toContain("could not load");
     await act(async () => button("Try again").click());
-    expect(host.querySelectorAll("ol li")).toHaveLength(2);
+    expect(host.querySelectorAll("ol.divide-y li")).toHaveLength(2);
   });
 
   it("tells the way back which playlist to glide to", async () => {

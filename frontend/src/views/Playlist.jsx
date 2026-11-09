@@ -5,6 +5,7 @@ import { forgetPlaylist, useAutomations } from "@/hooks/useAutomations";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import DeleteAction from "@/components/ui/DeleteAction";
+import Modal from "@/components/ui/Modal";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import Loader from "@/components/elements/Loader";
 import { Gone, LoadFailed, StatePage } from "@/components/elements/PageStates";
@@ -67,23 +68,66 @@ function CopyList({ tracks }) {
   );
 }
 
-/** The way out of ListFM for now: the list on the clipboard, and the page that will take it. */
-function SendToApp({ tracks, onNote }) {
-  const send = async () => {
-    // Asked before the new tab takes the focus: the clipboard refuses a page in the background.
+/** What the user will meet on Tune My Music, drawn like the thing to look for. */
+function Key({ children }) {
+  return <span className="border-2 border-(--ember) px-2 text-(--text)">{children}</span>;
+}
+
+/** The way out of ListFM for now: the list on the clipboard, then the steps, then the page that takes it. */
+function SendToApp({ tracks }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(null);
+
+  // Copied on the opening click: the clipboard wants a click, and the user then reads the steps calmly.
+  const copy = async () => {
     try {
       await copyText(tracksAsText(tracks));
-      onNote("List copied. On Tune My Music, a separate service, choose Free text, paste it, then pick your app.");
+      setCopied(true);
     } catch {
-      onNote("The list couldn't be copied. Use Copy list, then paste it on Tune My Music.");
+      setCopied(false);
     }
+  };
+  const start = () => {
+    setOpen(true);
+    copy();
   };
 
   if (!tracks?.length) return null;
+  const steps = [
+    copied === false ? (
+      <>The list couldn't be copied. <Button variant="outline" onClick={copy}>Copy again</Button></>
+    ) : (
+      <>{copied ? `Your list is copied: ${plural(tracks.length, "track")}.` : "Copying your list…"}</>
+    ),
+    <>On Tune My Music, choose <Key>Free text</Key></>,
+    <>Paste the list: <Key>Ctrl + V</Key>, <Key>⌘ + V</Key> on a Mac, a long press on a phone.</>,
+    <>Pick your app, sign in to it there, and start the transfer.</>,
+  ];
+
   return (
-    <a href={TUNE_MY_MUSIC} target="_blank" rel="noopener noreferrer" onClick={send} className={buttonVariants()}>
-      Send to your app<span className="sr-only">, opens Tune My Music in a new tab</span>
-    </a>
+    <>
+      <Button onClick={start}>Send to your app</Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Send to your app"
+        description="Tune My Music, a separate free service, puts this list in your streaming app."
+        body={
+          <ol className="mb-6 flex flex-col gap-3">
+            {steps.map((step, i) => (
+              <li key={i} className="flex items-baseline gap-3">
+                <span className={`font-heading ${i === 0 && copied ? "text-(--ember)" : "text-(--text-muted)"}`}>{i + 1}</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        }>
+        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+        <a href={TUNE_MY_MUSIC} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)} className={buttonVariants()}>
+          OK, open Tune My Music<span className="sr-only">, in a new tab</span>
+        </a>
+      </Modal>
+    </>
   );
 }
 
@@ -158,7 +202,6 @@ export default function Playlist() {
   const [tracksFailed, setTracksFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [deleteFailed, setDeleteFailed] = useState(false);
-  const [sendNote, setSendNote] = useState(null);
 
   const title = useRef(null);
   const hasPlaylist = Boolean(playlist);
@@ -219,10 +262,8 @@ export default function Playlist() {
               </p>
             </div>
           </div>
-          {/* Above the buttons: below them it can fall off a short screen, right when it's needed. */}
-          {sendNote && <p role="status" className="pt-3 text-sm text-(--text-muted)">{sendNote}</p>}
           <div className="flex flex-wrap gap-2 pt-4">
-            <SendToApp tracks={tracks} onNote={setSendNote} />
+            <SendToApp tracks={tracks} />
             <CopyList tracks={tracks} />
             <DownloadCover playlist={playlist} name={name} />
             {automation && <Link to={`/automations/${automation.id}`} className={buttonVariants({ variant: "outline" })}>See automation</Link>}
