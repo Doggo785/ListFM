@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forgedNames } from "@/lib/forge";
 import demo from "@/lib/landing/demo.json";
-import { STORY_SCREENS } from "@/lib/landing/story";
+import { storyBeats, storyScreens } from "@/lib/landing/story";
 import Landing from "./Landing";
 
 const hook = vi.hoisted(() => ({ auth: {}, reduced: false }));
@@ -16,7 +16,8 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const VIEW = 800;
 const STORY_TOP = VIEW;
-const STORY_HEIGHT = STORY_SCREENS * VIEW;
+const BEATS = storyBeats(demo.runs.length, demo.recipes.length).length;
+const STORY_HEIGHT = storyScreens({ length: BEATS }) * VIEW;
 
 function fakeContext() {
   return new Proxy(
@@ -36,18 +37,19 @@ describe("Landing", () => {
   let now;
 
   const scroller = () => host.querySelector(".landing");
-  const flush = async (count = 3) => {
+  const flush = async (count = 3, ms = 16) => {
     for (let i = 0; i < count; i += 1) {
-      now += 16;
+      now += ms;
       const due = frames;
       frames = [];
       await act(async () => due.forEach((run) => run(now)));
     }
   };
-  /** Through the story, from 0 to 1, as a wheel would. */
+  const goToBeat = (beat) => goTo(beat / (BEATS - 1));
+  /** Through the story, from 0 to 1, as a wheel would, then long enough for the show to play its way there. */
   const goTo = async (share) => {
     scroller().scrollTop = STORY_TOP + share * (STORY_HEIGHT - VIEW);
-    await flush();
+    await flush(80, 50);
   };
   const show = async () => {
     await act(async () => {
@@ -122,7 +124,6 @@ describe("Landing", () => {
 
   it("is honest at the end, and links its source", async () => {
     await show();
-    expect(host.textContent).toContain("copy, paste, done");
     expect(host.textContent).toContain("isn't affiliated with Last.fm");
     expect(host.querySelector("footer a").href).toBe("https://github.com/Doggo785/ListFM");
     expect(host.querySelector("footer").textContent).toContain(`${demo.name}'s real history, as of`);
@@ -161,43 +162,74 @@ describe("Landing", () => {
 
   it("tells the listens: the years, then the total", async () => {
     await show();
-    await goTo(0.005);
+    await goToBeat(1);
     expect(host.textContent).toContain(`followed ${demo.name}'s listening since ${demo.since}`);
     expect(host.textContent).toContain("Last.fm logs what you play across your apps.");
-    await goTo(0.05);
-    expect(host.querySelector('[data-show="count"]').textContent).not.toBe(demo.total.toLocaleString("en-US"));
-    await goTo(0.165);
     expect(host.querySelector('[data-show="count"]').textContent).toBe(demo.total.toLocaleString("en-US"));
     expect(host.querySelectorAll("[data-show-cover]").length).toBe(demo.covers.length);
+    expect(host.querySelector('a[href="https://github.com/Doggo785"]').textContent).toBe(demo.name);
+  });
+
+  it("shows where the story is, and jumps to a scene", async () => {
+    await show();
+    expect(host.querySelector(".landing__rail")).toBe(null);
+    await goToBeat(1);
+    const steps = () => [...host.querySelectorAll(".landing__rail button")];
+    expect(steps().map((step) => step.getAttribute("aria-current"))).toEqual(["step", null, null, null, null]);
+    await act(async () => steps()[2].click());
+    expect(scroller().scrollTo).toHaveBeenLastCalledWith({ top: expect.any(Number), behavior: "smooth" });
+  });
+
+  it("follows the scroll smoothly, then settles on the next step the way it went", async () => {
+    await show();
+    await goToBeat(1);
+    await goToBeat(4);
+    expect(host.querySelector(".landing__stages").textContent).toContain("Limit-");
+    // A wheel notch, part of the way to the limit: a moment later the page has glided on to it, and the show with it.
+    scroller().scrollTop = STORY_TOP + (4.3 / (BEATS - 1)) * (STORY_HEIGHT - VIEW);
+    await flush(3, 50);
+    expect(host.querySelector(".landing__stages").textContent).toContain("Limit-");
+    await flush(60, 50);
+    expect(scroller().scrollTop).toBeCloseTo(STORY_TOP + (5 / (BEATS - 1)) * (STORY_HEIGHT - VIEW), 0);
+    expect(host.querySelector(".landing__stages").textContent).toContain(`Limit${demo.chain.size}`);
+  });
+
+  it("settles back on a step it barely left, going up", async () => {
+    await show();
+    await goToBeat(1);
+    await goToBeat(4);
+    scroller().scrollTop = STORY_TOP + (3.7 / (BEATS - 1)) * (STORY_HEIGHT - VIEW);
+    await flush(60, 50);
+    expect(scroller().scrollTop).toBeCloseTo(STORY_TOP + (3 / (BEATS - 1)) * (STORY_HEIGHT - VIEW), 0);
   });
 
   it("runs the chain with a counter per stage", async () => {
     await show();
-    await goTo(0.22);
+    await goToBeat(2);
     expect(host.textContent).toContain("Tell it what you want");
     expect(host.querySelector('[data-show="marker"]').textContent).toBe(demo.chain.label);
-    for (const share of [0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.52, 0.54]) await goTo(share);
+    for (const beat of [3, 4, 5]) await goToBeat(beat);
     const stages = host.querySelector(".landing__stages").textContent;
     expect(stages).toContain(demo.chain.plays.length.toLocaleString("en-US"));
     expect(stages).toContain(String(demo.chain.kept));
     expect(stages).toContain(`Limit${demo.chain.size}`);
-    await goTo(0.2);
-    expect(host.querySelector(".landing__stages").textContent).toContain("Window-");
+    await goToBeat(2);
+    expect(host.querySelector(".landing__stages").textContent).toContain("Filters-");
   });
 
   it("delivers the playlist, with the month it covers", async () => {
     await show();
-    await goTo(0.58);
-    await goTo(0.61);
+    await goToBeat(5);
+    await goToBeat(6);
     expect(host.textContent).toContain(`${demo.chain.label}, as ${demo.name} lived it. ${demo.chain.size} tracks.`);
     expect(host.textContent).toContain(demo.chain.top[0].title);
   });
 
   it("keeps going by itself, one run after another", async () => {
     await show();
-    await goTo(0.68);
+    await goToBeat(7);
     expect(host.textContent).toContain("Nobody pressed anything.");
-    await goTo(0.79);
+    await goToBeat(6 + demo.runs.length);
     expect(host.querySelector(".landing__count").textContent).toContain(demo.runs.at(-1).at);
     expect(host.querySelector(".landing__runs").textContent).toContain(demo.runs.at(-1).period);
     expect(host.querySelectorAll("[data-show-slot]").length).toBe(demo.runs.length);
@@ -205,10 +237,10 @@ describe("Landing", () => {
 
   it("obeys any recipe, each with its own result", async () => {
     await show();
-    await goTo(0.84);
+    await goToBeat(7 + demo.runs.length);
     expect(host.textContent).toContain("Anything you can describe.");
     expect(host.textContent).toContain(demo.recipes[0].name);
-    await goTo(0.98);
+    await goToBeat(6 + demo.runs.length + demo.recipes.length);
     expect(host.textContent).toContain(demo.recipes.at(-1).name);
     await goTo(1);
     expect(host.textContent).toContain(demo.recipes.at(-1).sentence);

@@ -592,6 +592,56 @@ html, body, #root {
 .landing__story {
   position: relative;
 }
+.landing__rail {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  z-index: 4;
+  transform: translateY(-50%);
+}
+.landing__rail ol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.landing__rail-step {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0 4px 8px;
+  color: var(--text-muted);
+  background: var(--ink);
+}
+.landing__rail-step[aria-current] {
+  color: var(--ember);
+}
+.landing__rail-label {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.landing__rail-step[aria-current] .landing__rail-label,
+.landing__rail:hover .landing__rail-label,
+.landing__rail-step:focus-visible .landing__rail-label {
+  opacity: 1;
+}
+.landing__rail-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+.landing__rail-step[aria-current] .landing__rail-dot {
+  height: 24px;
+}
+@media (max-width: 767px) {
+  .landing__rail-label {
+    display: none;
+  }
+}
 .landing__pin {
   position: sticky;
   top: 0;

@@ -8,7 +8,7 @@ export const hash = (x, y) => {
   return s - Math.floor(s);
 };
 
-// In screens of scroll. The chain gets the most: it's what must explain itself.
+// The share of the show each scene plays in. The chain gets the most: it's what must explain itself.
 const SCENES = [
   ["listens", 2.2],
   ["chain", 4.8],
@@ -17,7 +17,10 @@ const SCENES = [
   ["obeys", 2.4],
 ];
 const TRAVEL = SCENES.reduce((sum, [, length]) => sum + length, 0);
-export const STORY_SCREENS = TRAVEL + 1; // The pin itself is one screen tall.
+// Of a screen: the scroll from one beat to the next. A wheel notch moves part of the way, and the page settles the rest.
+export const BEAT_SCREENS = 0.5;
+/** How tall the story is, in screens: a short scroll per beat, and the pin itself one screen tall. */
+export const storyScreens = (beats) => (beats.length - 1) * BEAT_SCREENS + 1;
 
 /** Which scene the visitor is in, and how far through it, from how far through the pinned story. */
 export function storyAt(p) {
@@ -28,6 +31,54 @@ export function storyAt(p) {
     from += share;
   }
   return { scene: SCENES.at(-1)[0], k: 1 };
+}
+
+export const SCENE_NAMES = SCENES.map(([scene]) => scene);
+
+/** Where each scene starts, as a share of the pinned story. */
+export const sceneStarts = () => {
+  let from = 0;
+  return SCENES.map(([, length]) => {
+    const start = from;
+    from += length / TRAVEL;
+    return start;
+  });
+};
+
+// Of a scene: where the show holds, once a step has said what it changes. Keeps and Obeys hold once per run and per recipe.
+const SWEPT = 0.9; // The listens: the playhead has crossed the years, and the albums are still up.
+// Just short of a scene's end: its very end is already the next scene's start.
+const END = 0.999;
+const CHAIN_STEPS = [0.3, 0.6, 0.8, END]; // Window, Filters, Sort, Limit: each one done, the next not begun.
+const BEFORE_MORPH = 0.8; // Of a recipe: its shape is whole, the next one not yet coming in.
+
+/** The story's beats, as shares of it: a little scroll plays a whole step, then the show holds there. */
+export function storyBeats(runs, recipes) {
+  const holds = {
+    listens: [SWEPT],
+    chain: CHAIN_STEPS,
+    delivered: [END],
+    keeps: Array.from({ length: runs }, (_, i) => (i === runs - 1 ? END : (i + 1) / runs - 1 + END)),
+    obeys: Array.from({ length: recipes }, (_, i) => (i === recipes - 1 ? 1 : (i + BEFORE_MORPH) / recipes)),
+  };
+  const starts = sceneStarts();
+  return [0, ...SCENES.flatMap(([scene, length], i) => holds[scene].map((k) => starts[i] + (k * length) / TRAVEL))];
+}
+
+const NEAR = 0.08; // Of a beat: this close, the page settles back on it whatever the way.
+
+/** Where the page settles once the scroll stops, from the beat it's at: the next one the way it went, as scroll-driven sites snap. */
+export function beatToSettle(count, at, down) {
+  const nearest = Math.round(at);
+  if (Math.abs(at - nearest) < NEAR) return clamp(nearest, 0, count - 1);
+  return clamp(down ? Math.ceil(at) : Math.floor(at), 0, count - 1);
+}
+
+/** A fractional beat as a share of the story: between two beats, the way is straight. */
+export function shareAtBeat(beats, f) {
+  const i = clamp(Math.floor(f), 0, beats.length - 1);
+  if (i === beats.length - 1) return beats[i];
+  return beats[i] + (beats[i + 1] - beats[i]) * (f - i);
 }
 
 export function chainPhases(k) {

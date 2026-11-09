@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainPhases, clamp, ease, hash, heartbeat, listensUpTo, STORY_SCREENS, storyAt, timelineShare, timelineTicks } from "./story";
+import { beatToSettle, chainPhases, clamp, ease, hash, heartbeat, listensUpTo, shareAtBeat, storyAt, storyBeats, timelineShare, timelineTicks } from "./story";
 
 describe("storyAt", () => {
   it("walks the five scenes in order and ends on the last one", () => {
@@ -10,7 +10,6 @@ describe("storyAt", () => {
     }
     expect(seen).toEqual(["listens", "chain", "delivered", "keeps", "obeys"]);
     expect(storyAt(1)).toEqual({ scene: "obeys", k: 1 });
-    expect(STORY_SCREENS).toBeGreaterThan(10);
   });
 
   it("says how far through a scene the visitor is", () => {
@@ -78,5 +77,36 @@ describe("the small maths", () => {
     expect(hash(3, 4)).toBeGreaterThanOrEqual(0);
     expect(hash(3, 4)).toBeLessThan(1);
     expect(hash(3, 4)).toBe(hash(3, 4));
+  });
+});
+
+describe("storyBeats", () => {
+  const beats = storyBeats(6, 3);
+
+  it("holds once for the listens, per chain stage, for the playlist, per run and per recipe", () => {
+    expect(beats).toHaveLength(1 + 1 + 4 + 1 + 6 + 3);
+    expect(beats[0]).toBe(0);
+    expect(beats.at(-1)).toBe(1);
+    expect([...beats].sort((a, b) => a - b)).toEqual(beats);
+  });
+
+  it("holds inside a scene, never on the next one's start", () => {
+    expect(storyAt(beats[5]).scene).toBe("chain");
+    expect(chainPhases(storyAt(beats[5]).k).stage).toBe(4);
+    expect(storyAt(beats[6]).scene).toBe("delivered");
+  });
+
+  it("settles on the next beat the way the scroll went, or back on one it barely left", () => {
+    const count = beats.length;
+    expect(beatToSettle(count, 2.4, true)).toBe(3);
+    expect(beatToSettle(count, 2.4, false)).toBe(2);
+    expect(beatToSettle(count, 2.03, true)).toBe(2);
+    expect(beatToSettle(count, 2.97, false)).toBe(3);
+    expect(beatToSettle(count, count - 1.5, true)).toBe(count - 1);
+  });
+
+  it("lies straight between two beats", () => {
+    expect(shareAtBeat(beats, 2.5)).toBeCloseTo((beats[2] + beats[3]) / 2);
+    expect(shareAtBeat(beats, beats.length - 1)).toBe(1);
   });
 });

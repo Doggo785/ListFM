@@ -6,8 +6,8 @@ import { plural } from "@/lib/playlists";
 
 const STAGES = ["Window", "Filters", "Sort", "Limit"];
 const CLAUSES = ["The same month, a year ago.", "Played at least 3 times.", "Most played first.", "Keep 50."];
-const LAST_STAGE = STAGES.length - 1;
 const RUNS_SHOWN = 3;
+const OWNER = "https://github.com/Doggo785";
 
 const number = (n) => n.toLocaleString("en-US");
 
@@ -40,7 +40,7 @@ export function Listens({ demo, still }) {
     <div className="landing__scene">
       <div className="landing__head">
         <div data-quiet data-reveal className="max-w-3xl text-xl text-balance md:text-2xl">
-          <p>This thread has followed {demo.name}'s listening since {demo.since}.</p>
+          <p>This thread has followed <a href={OWNER} target="_blank" rel="noopener noreferrer" className="underline hover:text-(--ember)">{demo.name}</a>'s listening since {demo.since}.</p>
           <p className="text-(--text-muted)">Last.fm logs what you play across your apps.</p>
         </div>
         <p data-quiet className="landing__count">
@@ -71,8 +71,9 @@ export function Chain({ demo, stage, still }) {
         <p data-reveal className="landing__recipe">
           <span className="block pb-1 text-(--text-muted)">Tell it what you want:</span>
           {CLAUSES.map((clause, i) => {
-            const current = !still && i === Math.min(stage, LAST_STAGE);
-            return <span key={clause} className={`block ${current ? "text-(--ember)" : i < stage ? "text-(--text)" : "text-(--text-muted)"}`}>{clause}</span>;
+            // The clause just applied lights up with its counter: the show holds there, so cause and result read together.
+            const current = !still && i === stage - 1;
+            return <span key={clause} className={`block ${current ? "text-(--ember)" : i < stage - 1 ? "text-(--text)" : "text-(--text-muted)"}`}>{clause}</span>;
           })}
         </p>
         <p className="landing__count">

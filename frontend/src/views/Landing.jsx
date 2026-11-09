@@ -10,11 +10,34 @@ import { forgedNames } from "@/lib/forge";
 import demo from "@/lib/landing/demo.json";
 import { createShow, FUSE_SECONDS } from "@/lib/landing/show";
 import { createStage } from "@/lib/landing/stage";
-import { STORY_SCREENS } from "@/lib/landing/story";
+import { SCENE_NAMES, sceneStarts, storyBeats, storyScreens } from "@/lib/landing/story";
 import { loadAlbums } from "@/lib/playlistCover";
 
 const NAME = "ListFM";
 const REPOSITORY = "https://github.com/Doggo785/ListFM";
+const BEATS = storyBeats(demo.runs.length, demo.recipes.length);
+const STORY_SCREENS = storyScreens(BEATS);
+// A scene's first beat: where the rail jumps to.
+const SCENE_BEATS = sceneStarts().map((start) => BEATS.findIndex((beat) => beat > start));
+const RAIL = ["Your listens", "The recipe", "The playlist", "Every month", "Any idea"];
+
+/** Where the story is, and a way to jump to any of its scenes. */
+function Rail({ scene, onJump }) {
+  return (
+    <nav data-quiet className="landing__rail" aria-label="The story">
+      <ol>
+        {SCENE_NAMES.map((name, i) => (
+          <li key={name}>
+            <button type="button" onClick={() => onJump(i)} aria-current={scene === name ? "step" : undefined} className="landing__rail-step">
+              <span className="landing__rail-label">{RAIL[i]}</span>
+              <span className="landing__rail-dot" aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
 
 function useShow({ still, intro, root, canvas }) {
   const show = useRef(null);
@@ -75,10 +98,12 @@ function Page({ still }) {
     for (const covers of [demo.chain.covers, ...demo.runs.map((run) => run.covers)]) loadAlbums(covers);
   }, [scrolledIn]);
 
-  const seeHow = () => {
+  const storyAt = (share) => {
     const story = root.current.querySelector('[data-show="story"]');
-    root.current.scrollTo({ top: story.offsetTop, behavior: still ? "auto" : "smooth" });
+    return story.offsetTop + share * (story.offsetHeight - root.current.clientHeight);
   };
+  const seeHow = () => root.current.scrollTo({ top: storyAt(0), behavior: still ? "auto" : "smooth" });
+  const jump = (i) => root.current.scrollTo({ top: storyAt(SCENE_BEATS[i] / (BEATS.length - 1)), behavior: "smooth" });
 
   return (
     <main
@@ -119,13 +144,13 @@ function Page({ still }) {
           {(still || view.scene === "obeys") && <Obeys demo={demo} recipe={view.step} still={still} />}
         </div>
       </section>
+      {!still && SCENE_NAMES.includes(view.scene) && <Rail scene={view.scene} onJump={jump} />}
 
       <YourTurn forgeHead={forgeHead} sparkAt={sparkAt} keystroke={keystroke} forged={forged} reducedMotion={still} />
 
       <section className="landing__end">
         <div data-quiet className="max-w-2xl text-xl">
-          <p>Send any playlist to Spotify, Apple Music, YouTube Music and more: copy, paste, done. Automatic import is the goal.</p>
-          <p className="pt-3 text-(--text-muted)">Your first load takes a few minutes, then it only fetches what's new.</p>
+          <p className="text-(--text-muted)">Your first load takes a few minutes, then it only fetches what's new.</p>
           <p className="pt-3 text-(--text-muted)">No Last.fm yet? It's free and logs what you play across your apps.</p>
         </div>
         <div className="landing__end-row">

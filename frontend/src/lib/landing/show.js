@@ -1,14 +1,15 @@
 /**
  * The thread's life on the landing page, frame by frame. The page's text stays in the DOM: this reads where it is, draws around it,
  * and only says which scene is on through onChange.
- * Everything tied to the scroll is computed from it, so scrolling back plays it backwards. Only the falling pixels have a memory.
+ * The show follows the scroll a little behind, smoothed, and once the scroll stops the page glides to the next beat the way it went,
+ * so it always rests on a step that says what it changed. Going back plays it backwards. Only the falling pixels have a memory.
  */
 import { dither } from "@/lib/forge";
 import { CELL } from "@/lib/pixelRibbon";
 import { coverShape } from "@/lib/playlistCover";
 import { mix, smoothstep as sstep } from "@/lib/ribbonTrack";
 import { createMachine } from "./machine";
-import { chainPhases, clamp, ease, heartbeat, listensUpTo, storyAt, timelineShare } from "./story";
+import { beatToSettle, chainPhases, clamp, ease, heartbeat, listensUpTo, shareAtBeat, storyAt, storyBeats, timelineShare } from "./story";
 
 export const BREATH_SECONDS = 1.7;
 export const FUSE_SECONDS = 1.7;
@@ -19,6 +20,11 @@ const LEAN = 0.12;
 const SCENE_SHOWS_FROM = 0.6; // Of the story's way in: the first scene is already there as it scrolls up.
 const LINE_COMES_IN = 160; // CSS pixels of scroll: a line of the page has its thread by the time it's in view, even at the page's end.
 const RECIPE_MORPH = [0.85, 1];
+const SCRUB_SECONDS = 0.3; // How long the show takes to catch up with the scroll: smooth, never laggy.
+const MAX_BEATS_PER_SECOND = 5; // A fling still shows each step go by.
+const SETTLE_AFTER = 0.15; // Seconds of a still scroll before the page settles on a beat.
+const settleSeconds = (beats) => clamp(0.3 + 0.4 * beats, 0.3, 0.9);
+const glideOut = (k) => 1 - (1 - k) ** 3;
 const RECIPE_HEAT = [2, 1, 3];
 // Softer than wide, like the site's ribbon: dithered reds, and amber only where something is happening.
 const RESTING_SOFTNESS = 1.35;
@@ -34,11 +40,17 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
   const sliceTo = timelineShare(demo.first, demo.weeks, demo.chain.end);
   const machine = createMachine(stage, demo.chain);
   const coverLine = coverShape(demo.chain.start).center;
+  const beats = storyBeats(demo.runs.length, demo.recipes.length);
 
   const m = {
     t: intro ? 0 : INTRO_SECONDS,
     passed: null,
     lastP: 0,
+    beat: null,
+    top: 0,
+    idle: 0,
+    down: true,
+    settle: null,
     lastL: 0,
     lastR: 0,
     y: null,
@@ -273,8 +285,36 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
       const lineRect = lineBox.getBoundingClientRect();
       const storyRect = story.getBoundingClientRect();
       const lineY = (lineRect.top + lineRect.height / 2) / CELL;
-      const p = clamp(-storyRect.top / Math.max(1, storyRect.height - vh));
       const enter = 1 - sstep(0, vh * 0.85, storyRect.top);
+      const span = Math.max(1, storyRect.height - vh);
+      const at = clamp(-storyRect.top / span) * (beats.length - 1);
+      // The visitor's own scroll, not the page's settling, gives the way and wakes the wait.
+      if (root.scrollTop !== m.top) {
+        if (m.settle && Math.abs(root.scrollTop - m.settle.set) > 1) m.settle = null;
+        if (!m.settle) {
+          m.down = root.scrollTop > m.top;
+          m.idle = 0;
+        }
+      } else {
+        m.idle += dt;
+      }
+      if (m.settle) {
+        m.settle.t += dt;
+        const k = clamp(m.settle.t / m.settle.seconds);
+        root.scrollTop = mix(m.settle.from, m.settle.to, glideOut(k));
+        m.settle.set = root.scrollTop;
+        if (k >= 1) m.settle = null;
+      } else if (m.idle > SETTLE_AFTER && enter >= 1 && at > 0 && at < beats.length - 1) {
+        const beat = beatToSettle(beats.length, at, m.down);
+        const to = root.scrollTop + storyRect.top + (beat / (beats.length - 1)) * span;
+        if (Math.abs(to - root.scrollTop) > 1) m.settle = { from: root.scrollTop, to, t: 0, seconds: settleSeconds(Math.abs(beat - at)), set: root.scrollTop };
+      }
+      m.top = root.scrollTop;
+      // Arriving mid-story, after a reload, shows that beat at once; after that the show eases after the scroll.
+      if (m.beat === null || enter < SCENE_SHOWS_FROM) m.beat = at;
+      const catchUp = (at - m.beat) * (1 - Math.exp(-dt / SCRUB_SECONDS));
+      m.beat += clamp(catchUp, -MAX_BEATS_PER_SECOND * dt, MAX_BEATS_PER_SECOND * dt);
+      const p = shareAtBeat(beats, m.beat);
       const shift = pin.getBoundingClientRect().top / CELL;
       const { scene, k } = storyAt(p);
 
