@@ -12,11 +12,12 @@ import json
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
+import pylast
 from database import async_session
 from models import User
 from repositories.scrobbles import get_window_tracks
 from services.automation_runner import run_automation_pipeline_cached, window_bounds
-from services.lastfm import get_album_image
+from services.lastfm import NO_IMAGE_HASH, _lastfm_json, _pick_image, _throttled_call
 from sqlalchemy import select, text
 
 OWNER_NAME = "Doggo"
@@ -31,6 +32,9 @@ MONTH = {"length": {"amount": 1, "unit": "month"}, "ago": None}
 SEASON = {"length": {"amount": 3, "unit": "month"}, "ago": None}
 A_YEAR_AGO = {"length": {"amount": 1, "unit": "month"}, "ago": {"amount": 1, "unit": "year"}}
 NOT_MUCH = 3
+# A cover a stranger may know: the albums under this many Last.fm listeners only fill in when nothing better is there.
+KNOWN = 300_000
+ALBUMS_PER_QUARTER = 15
 
 
 def condition(field: str, operator: str, value, **extra) -> dict:
@@ -58,27 +62,41 @@ async def rows(db, sql: str, **params):
     return (await db.execute(text(sql), params)).all()
 
 
-async def album_cover(db, artist: str, album: str) -> str | None:
-    stored = await db.scalar(
-        text("select image_url from albums where lower(artist) = lower(:artist) and lower(title) = lower(:album) and image_url like 'http%' limit 1"),
-        {"artist": artist, "album": album},
-    )
-    return stored or await asyncio.to_thread(get_album_image, artist, album)
+_albums: dict[tuple[str, str], tuple[str | None, int]] = {}
 
 
-async def playlist_covers(db, tracks: list[dict], wanted: int = 2) -> list[str]:
-    seen, covers = set(), []
-    for track in tracks:
-        album = track.get("album")
-        if not album or (track["artist"], album) in seen:
-            continue
-        seen.add((track["artist"], album))
-        cover = await album_cover(db, track["artist"], album)
-        if cover:
-            covers.append(cover)
-        if len(covers) == wanted:
+def _album_info(artist: str, album: str) -> tuple[str | None, int]:
+    _throttled_call()
+    try:
+        data = _lastfm_json("album.getInfo", artist=artist, album=album)["album"]
+    except pylast.WSError:  # An album Last.fm can't describe just isn't shown.
+        return None, 0
+    image = _pick_image(data.get("image"), ("extralarge", "large", "medium", "small"))
+    return (None if image is None or NO_IMAGE_HASH in image else image), int(data.get("listeners") or 0)
+
+
+async def album_cover(artist: str, album: str) -> tuple[str | None, int]:
+    """An album's cover and how many Last.fm listeners it has, asked once per album."""
+    key = (artist.lower(), album.lower())
+    if key not in _albums:
+        _albums[key] = await asyncio.to_thread(_album_info, artist, album)
+    return _albums[key]
+
+
+async def known_first(albums: list[tuple[str, str]], wanted: int) -> list[str]:
+    """Covers in the given order, the albums strangers know first; the others only fill in."""
+    known, others = [], []
+    for artist, album in dict.fromkeys(albums):
+        url, listeners = await album_cover(artist, album)
+        if url:
+            (known if listeners >= KNOWN else others).append(url)
+        if len(known) == wanted:
             break
-    return covers
+    return (known + others)[:wanted]
+
+
+async def playlist_covers(tracks: list[dict], wanted: int = 2) -> list[str]:
+    return await known_first([(t["artist"], t["album"]) for t in tracks if t.get("album")], wanted)
 
 
 def shown(tracks: list[dict], count: int = TRACKS_SHOWN) -> list[dict]:
@@ -115,18 +133,21 @@ async def main(out: str, skipped: set[str]) -> None:
         ]
         along = await rows(
             db,
-            """select q, artist, title, plays from (
+            """select q, artist, title from (
                  select date_trunc('quarter', s.played_at) q, a.artist, a.title, count(*) plays,
                         row_number() over (partition by date_trunc('quarter', s.played_at) order by count(*) desc) r
                  from scrobbles s join tracks t on t.id = s.track_id join albums a on a.id = t.album_id
-                 where s.user_id = :u and s.played_at >= :since and a.artist <> all(:skipped) group by 1, 2, 3) x where r = 1 order by q desc limit :n""",
-            u=user_id, since=SINCE, skipped=sorted(skipped) or [""], n=COVERS_ALONG_THE_YEARS + 3,
+                 where s.user_id = :u and s.played_at >= :since and a.artist <> all(:skipped) group by 1, 2, 3) x where r <= :per order by q desc, r""",
+            u=user_id, since=SINCE, skipped=sorted(skipped) or [""], per=ALBUMS_PER_QUARTER,
         )
         covers = []
-        for quarter, artist, title, _plays in along:
-            url = await album_cover(db, artist, title)
-            if url and len(covers) < COVERS_ALONG_THE_YEARS:
-                covers.append({"share": round((quarter.date() - SINCE).days / (len(weeks) * 7), 4), "url": url})
+        for quarter in dict.fromkeys(row[0] for row in along):
+            if len(covers) == COVERS_ALONG_THE_YEARS:
+                break
+            # Its most played album that a stranger may know.
+            found = await known_first([(a, t) for q, a, t in along if q == quarter], 1)
+            if found:
+                covers.append({"share": round((quarter.date() - SINCE).days / (len(weeks) * 7), 4), "url": found[0]})
         covers.reverse()
 
         # The recipe of the scene: the same month, a year ago, kept to what was played at least 3 times.
@@ -144,7 +165,7 @@ async def main(out: str, skipped: set[str]) -> None:
             "kept": result["after_filter"],
             "size": result["total"],
             "top": shown(keep(result["tracks"])),
-            "covers": await playlist_covers(db, keep(result["tracks"])),
+            "covers": await playlist_covers(keep(result["tracks"])),
         }
 
         runs = []
@@ -157,7 +178,7 @@ async def main(out: str, skipped: set[str]) -> None:
                 "at": when.strftime("%b 1"),
                 "period": period_start.strftime("%b %Y"),
                 "size": made["total"],
-                "covers": await playlist_covers(db, keep(made["tracks"])),
+                "covers": await playlist_covers(keep(made["tracks"])),
             })
 
         discoveries = await run(at, MONTH, sort="first_played", filters=group(condition("first_played", "within_days", 31)))
