@@ -71,6 +71,8 @@ Chaque PR branche le ruban sur les vraies données de l'écran et supprime l'anc
 
 **Guide interactif pour les nouveaux arrivants** (demande de l'owner) : obligatoire avant la v1.0.0, une fois les écrans de la phase C refaits. Sa forme reste à définir avec l'owner.
 
+**Premier import d'un compte neuf** (demande de l'owner) : se connecter avec un compte Last.fm jamais vu et suivre l'import complet des écoutes de bout en bout. Vérifier ce que l'utilisateur voit pendant ce temps (indicateur des tâches de fond, morceaux qui arrivent, aperçu partiel, runs qui attendent la fin) et que les animations le montrent bien.
+
 Animations restantes, mesure de charge du ruban sur petit PC et mobile, `impeccable polish` et `harden` sur tout le site. Puis v1.0.0 quand l'owner le dit, et seulement là migration du VPS : le site doit être utilisable par un utilisateur classique.
 
 ## Plus tard (feu vert owner requis)
