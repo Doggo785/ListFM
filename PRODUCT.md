@@ -18,7 +18,7 @@ ListFM is a machine that makes playlists automatically from a person's Last.fm l
 
 Success means the end-to-end loop is reliable (automation, then playlist, then history), and the result is exactly what the settings promise.
 
-The final goal is for people to import their playlists directly into their streaming apps. That does not exist yet.
+The final goal is for people to import their playlists directly into their streaming apps. That does not exist yet: for now a playlist leaves ListFM by hand, through the free text import of Tune My Music, with its cover downloaded separately.
 
 ## Positioning
 
@@ -28,7 +28,7 @@ ListFM works from everything a person has listened to, because Last.fm logs list
 
 - A person first connects a Last.fm account. Their listens are copied into ListFM once, which can take minutes for a long history, then only new listens are fetched. A tag catalogue fills in the background afterwards, so tag filters can be incomplete for a while. The interface has to be honest about both.
 - Building an automation is an iterative session: change a setting, read the preview, adjust. Scheduled runs then happen with nobody watching, so people come back to read results and history rather than to operate anything.
-- Generated playlists currently live inside ListFM.
+- Generated playlists live inside ListFM. Sending one to an app is a copy and a paste on Tune My Music, an independent service, and doesn't update afterwards.
 
 ## Capabilities and Constraints
 
@@ -53,7 +53,7 @@ ListFM works from everything a person has listened to, because Last.fm logs list
 - Tokens stay in httpOnly cookies, internal errors are not shown to users, and there is no unnecessary tracking.
 
 **Open decisions:**
-- When streaming-app import ships, and for which apps. It is the stated final goal but needs its own go-ahead. Shape the owner has in mind: link music accounts in the future settings, import a playlist from its page, and set auto-import on each automation. Before sending covers anywhere, check the rights on altered album art and each service's image limits; drawing the cover would also move to the server, since auto-import runs with no browser open. An image creator is left for after v1.
+- When direct streaming-app import ships, and for which apps. It is the stated final goal but needs its own go-ahead. Checked on 2026-11-06: Spotify's development mode stops at 5 users added by hand, and more takes a company with 250,000 monthly users; YouTube allows 100 searches a day for the whole site; Apple costs 99 USD a year. Shape the owner has in mind: link music accounts in the future settings, import a playlist from its page, and set auto-import on each automation. Before sending covers anywhere, check the rights on altered album art and each service's image limits; drawing the cover would also move to the server, since auto-import runs with no browser open. An image creator is left for after v1.
 - Whether the public can actually sign up at v1.0.0. The current deployment is a small single-worker VPS used by the owner and friends.
 
 ## Brand Commitments

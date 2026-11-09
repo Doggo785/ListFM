@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deleteGeneratedPlaylist, getGeneratedPlaylistTracks } from "@/lib/api";
+import { coverPng } from "@/lib/playlistCover";
 import Playlist from "./Playlist";
 
 const hook = vi.hoisted(() => ({ value: {}, forget: vi.fn() }));
@@ -11,6 +12,7 @@ vi.mock("@/hooks/useAutomations", () => ({ useAutomations: () => hook.value, for
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: { lastfm_username: "doggo" } }) }));
 vi.mock("@/lib/glide", () => ({ glide: (go) => go(), glideArrived: () => {} }));
 vi.mock("@/lib/api", () => ({ deleteGeneratedPlaylist: vi.fn(), getGeneratedPlaylistTracks: vi.fn() }));
+vi.mock("@/lib/playlistCover", async (original) => ({ ...(await original()), coverPng: vi.fn() }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -100,6 +102,72 @@ describe("Playlist", () => {
     delete document.execCommand;
   });
 
+  const sendLink = () => document.querySelector('a[href="https://www.tunemymusic.com/transfer"]');
+  const dialog = () => document.querySelector('[role="dialog"]');
+  // A real click would make jsdom try to follow the link.
+  const follow = (link) => {
+    const stop = (event) => event.preventDefault();
+    document.addEventListener("click", stop, { once: true });
+    link.click();
+  };
+
+  it("copies the list on opening the steps, and sends to Tune My Music only on OK", async () => {
+    const writeText = vi.fn().mockResolvedValue();
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    await show();
+    expect(sendLink()).toBe(null);
+    await act(async () => button("Send to your app").click());
+    expect(writeText).toHaveBeenCalledWith("A/B - One & Two\nC - Three");
+    expect(dialog().textContent).toContain("Your list is copied: 2 tracks.");
+    expect(dialog().textContent).toContain("Free text");
+    expect(sendLink().target).toBe("_blank");
+    await act(async () => follow(sendLink()));
+    expect(dialog()).toBe(null);
+  });
+
+  it("offers to copy again when the list couldn't be copied for sending", async () => {
+    vi.stubGlobal("navigator", {});
+    document.execCommand = vi.fn(() => false);
+    await show();
+    await act(async () => button("Send to your app").click());
+    expect(dialog().textContent).toContain("couldn't be copied");
+    document.execCommand = vi.fn(() => true);
+    await act(async () => button("Copy again").click());
+    expect(dialog().textContent).toContain("Your list is copied");
+    delete document.execCommand;
+  });
+
+  it("has nothing to send while the tracks are missing", async () => {
+    getGeneratedPlaylistTracks.mockResolvedValue([]);
+    await show();
+    expect(button("Send to your app")).toBe(undefined);
+  });
+
+  it("downloads the cover under the playlist's name", async () => {
+    const blob = new Blob(["png"]);
+    coverPng.mockResolvedValue(blob);
+    const createObjectURL = vi.fn(() => "blob:cover");
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    const saved = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function record() {
+      saved.push(this.download);
+    });
+    hook.value = { ...LOADED, generatedPlaylists: [{ ...PLAYLIST, cover_images: ["a.jpg"] }] };
+    await show();
+    await act(async () => button("Download cover").click());
+    expect(coverPng).toHaveBeenCalledWith("p1", ["a.jpg"]);
+    expect(createObjectURL).toHaveBeenCalledWith(blob);
+    expect(saved).toEqual(["Seasonal.png"]);
+    click.mockRestore();
+  });
+
+  it("says when the cover couldn't be downloaded", async () => {
+    coverPng.mockRejectedValue(new Error("no cover"));
+    await show();
+    await act(async () => button("Download cover").click());
+    expect(button("Couldn't download")).toBeTruthy();
+  });
+
   it("says when a playlist has no tracks", async () => {
     getGeneratedPlaylistTracks.mockResolvedValue([]);
     await show();
@@ -131,7 +199,7 @@ describe("Playlist", () => {
     await show();
     expect(host.querySelector('[role="alert"]').textContent).toContain("could not load");
     await act(async () => button("Try again").click());
-    expect(host.querySelectorAll("ol li")).toHaveLength(2);
+    expect(host.querySelectorAll("ol.divide-y li")).toHaveLength(2);
   });
 
   it("tells the way back which playlist to glide to", async () => {
