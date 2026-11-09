@@ -89,8 +89,9 @@ export function chainPhases(k) {
     filter: smoothstep(0.4, 0.6, k),
     sort: smoothstep(0.6, 0.8, k),
     limit: smoothstep(0.8, 0.97, k),
-    // How many stages are done: the counters show their results, the sentence lights the one at work.
-    stage: k < 0.3 ? 0 : k < 0.6 ? 1 : k < 0.8 ? 2 : k < 0.97 ? 3 : 4,
+    // How many stages are done: the counters show their results, the sentence lights the one just applied.
+    // A hair before each hold, so a hold reached from below already says what its picture shows.
+    stage: k < 0.29 ? 0 : k < 0.59 ? 1 : k < 0.79 ? 2 : k < 0.97 ? 3 : 4,
   };
 }
 

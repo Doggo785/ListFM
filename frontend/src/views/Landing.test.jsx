@@ -176,8 +176,51 @@ describe("Landing", () => {
     await goToBeat(1);
     const steps = () => [...host.querySelectorAll(".landing__rail button")];
     expect(steps().map((step) => step.getAttribute("aria-current"))).toEqual(["step", null, null, null, null]);
+    // At once, and the show with it: no replay of the steps on the way.
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function offsetTop() {
+      return this.dataset.show === "story" ? STORY_TOP : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function offsetHeight() {
+      return this.dataset.show === "story" ? STORY_HEIGHT : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(VIEW);
+    scroller().scrollTo = vi.fn(({ top }) => {
+      scroller().scrollTop = top;
+    });
     await act(async () => steps()[2].click());
-    expect(scroller().scrollTo).toHaveBeenLastCalledWith({ top: expect.any(Number), behavior: "smooth" });
+    expect(scroller().scrollTo).toHaveBeenLastCalledWith({ top: expect.any(Number) });
+    await flush(2);
+    expect(steps().map((step) => step.getAttribute("aria-current"))).toEqual([null, null, "step", null, null]);
+  });
+
+  it("leaves the rail behind once the story is over", async () => {
+    await show();
+    await goTo(1);
+    expect(host.querySelector(".landing__rail")).toBeTruthy();
+    scroller().scrollTop = STORY_TOP + STORY_HEIGHT - VIEW / 4;
+    await flush();
+    expect(host.querySelector(".landing__rail")).toBe(null);
+  });
+
+  it("waits for a finger to let go before it settles", async () => {
+    await show();
+    await goToBeat(2);
+    await act(async () => scroller().dispatchEvent(new Event("touchstart")));
+    const held = STORY_TOP + (2.5 / (BEATS - 1)) * (STORY_HEIGHT - VIEW);
+    scroller().scrollTop = held;
+    await flush(30, 50);
+    expect(scroller().scrollTop).toBe(held);
+    await act(async () => window.dispatchEvent(new Event("touchend")));
+    await flush(60, 50);
+    expect(scroller().scrollTop).toBeCloseTo(STORY_TOP + (3 / (BEATS - 1)) * (STORY_HEIGHT - VIEW), 0);
+  });
+
+  it("names the stage its picture shows, arriving from above or below", async () => {
+    await show();
+    await goToBeat(2);
+    await goToBeat(3);
+    expect(host.querySelector(".landing__stages").textContent).toContain(`Filters${demo.chain.kept}`);
+    expect(host.querySelector(".landing__stages").textContent).toContain("Sort-");
   });
 
   it("follows the scroll smoothly, then settles on the next step the way it went", async () => {

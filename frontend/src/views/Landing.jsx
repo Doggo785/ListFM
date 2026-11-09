@@ -21,28 +21,32 @@ const STORY_SCREENS = storyScreens(BEATS);
 const SCENE_BEATS = sceneStarts().map((start) => BEATS.findIndex((beat) => beat > start));
 const RAIL = ["Your listens", "The recipe", "The playlist", "Every month", "Any idea"];
 
-/** Where the story is, and a way to jump to any of its scenes. */
+/** Where the story is, and a way to jump to any of its scenes. On a phone, a bar that fills along the bottom instead. */
 function Rail({ scene, onJump }) {
   return (
-    <nav data-quiet className="landing__rail" aria-label="The story">
-      <ol>
-        {SCENE_NAMES.map((name, i) => (
-          <li key={name}>
-            <button type="button" onClick={() => onJump(i)} aria-current={scene === name ? "step" : undefined} className="landing__rail-step">
-              <span className="landing__rail-label">{RAIL[i]}</span>
-              <span className="landing__rail-dot" aria-hidden="true" />
-            </button>
-          </li>
-        ))}
-      </ol>
-    </nav>
+    <>
+      <nav data-quiet className="landing__rail" aria-label="The story">
+        <ol>
+          {SCENE_NAMES.map((name, i) => (
+            <li key={name}>
+              <button type="button" onClick={() => onJump(i)} aria-current={scene === name ? "step" : undefined} className="landing__rail-step">
+                {/* Out of the rail's box unless shown: the thread only steps around a label that's there. */}
+                <span data-quiet={scene === name ? "" : undefined} className="landing__rail-label">{RAIL[i]}</span>
+                <span className="landing__rail-dot" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <div data-show="progress" className="landing__progress" aria-hidden="true" />
+    </>
   );
 }
 
 function useShow({ still, intro, root, canvas }) {
   const show = useRef(null);
   const [lit, setLit] = useState(!intro);
-  const [view, setView] = useState({ scene: "hero", step: null });
+  const [view, setView] = useState({ scene: "hero", step: null, story: false });
 
   useEffect(() => {
     if (still) return undefined;
@@ -52,7 +56,7 @@ function useShow({ still, intro, root, canvas }) {
       demo,
       root: root.current,
       intro,
-      onChange: (scene, step) => setView({ scene, step }),
+      onChange: (scene, step, story) => setView({ scene, step, story }),
       onLit: () => setLit(true),
     });
     let frame = 0;
@@ -68,6 +72,7 @@ function useShow({ still, intro, root, canvas }) {
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
+      show.current.destroy();
       stage.destroy();
       show.current = null;
     };
@@ -79,9 +84,11 @@ function useShow({ still, intro, root, canvas }) {
   const sparkAt = useCallback((x, y) => show.current?.sparkAt(x, y), []);
   const keystroke = useCallback(() => show.current?.keystroke(), []);
   const forged = useCallback(() => show.current?.forged(), []);
+  const asking = useCallback((on) => show.current?.asking(on), []);
+  const leap = useCallback(() => show.current?.leap(), []);
   const pointer = useCallback((event) => show.current?.pointer(event.clientX, event.clientY), []);
 
-  return { lit, view, fuseHead, forgeHead, sparkAt, keystroke, forged, pointer };
+  return { lit, view, fuseHead, forgeHead, sparkAt, keystroke, forged, asking, leap, pointer };
 }
 
 function Page({ still }) {
@@ -89,7 +96,7 @@ function Page({ still }) {
   const canvas = useRef(null);
   // A visitor back from Log in has seen it: the name burns once per page load, on every screen.
   const [intro] = useState(() => !still && !forgedNames.has(NAME));
-  const { lit, view, fuseHead, forgeHead, sparkAt, keystroke, forged, pointer } = useShow({ still, intro, root, canvas });
+  const { lit, view, fuseHead, forgeHead, sparkAt, keystroke, forged, asking, leap, pointer } = useShow({ still, intro, root, canvas });
   const scrolledIn = view.scene !== "hero";
 
   // Once the visitor is on the way: a cover cut by the fuse must already have its albums, and a visitor who leaves at the top costs nothing.
@@ -103,7 +110,11 @@ function Page({ still }) {
     return story.offsetTop + share * (story.offsetHeight - root.current.clientHeight);
   };
   const seeHow = () => root.current.scrollTo({ top: storyAt(0), behavior: still ? "auto" : "smooth" });
-  const jump = (i) => root.current.scrollTo({ top: storyAt(SCENE_BEATS[i] / (BEATS.length - 1)), behavior: "smooth" });
+  // At once, like changing page: a smooth trip would replay every step on the way.
+  const jump = (i) => {
+    root.current.scrollTo({ top: storyAt(SCENE_BEATS[i] / (BEATS.length - 1)) });
+    leap();
+  };
 
   return (
     <main
@@ -144,9 +155,9 @@ function Page({ still }) {
           {(still || view.scene === "obeys") && <Obeys demo={demo} recipe={view.step} still={still} />}
         </div>
       </section>
-      {!still && SCENE_NAMES.includes(view.scene) && <Rail scene={view.scene} onJump={jump} />}
+      {!still && view.story && <Rail scene={view.scene} onJump={jump} />}
 
-      <YourTurn forgeHead={forgeHead} sparkAt={sparkAt} keystroke={keystroke} forged={forged} reducedMotion={still} />
+      <YourTurn forgeHead={forgeHead} sparkAt={sparkAt} keystroke={keystroke} forged={forged} asking={asking} reducedMotion={still} />
 
       <section className="landing__end">
         <div data-quiet className="max-w-2xl text-xl">

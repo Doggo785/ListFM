@@ -45,7 +45,7 @@ function Glimpse({ glimpse, reducedMotion, headX, onSpark }) {
 }
 
 /** Scene 7: a visitor's own name in the fire, before any account. */
-export default function YourTurn({ forgeHead, sparkAt, keystroke, forged, reducedMotion }) {
+export default function YourTurn({ forgeHead, sparkAt, keystroke, forged, asking: working, reducedMotion }) {
   const [username, setUsername] = useState("");
   const [asking, setAsking] = useState(false);
   const [glimpse, setGlimpse] = useState(null);
@@ -56,6 +56,7 @@ export default function YourTurn({ forgeHead, sparkAt, keystroke, forged, reduce
     const name = username.trim();
     if (!name || asking) return;
     setAsking(true);
+    working(true);
     setError("");
     try {
       const answer = await getListenerGlimpse(name);
@@ -66,6 +67,7 @@ export default function YourTurn({ forgeHead, sparkAt, keystroke, forged, reduce
       setError(readableError(err));
     } finally {
       setAsking(false);
+      working(false);
     }
   };
 
@@ -91,6 +93,7 @@ export default function YourTurn({ forgeHead, sparkAt, keystroke, forged, reduce
           <Button type="submit" disabled={asking || !username.trim()}>{asking ? "Looking" : "Show me"}</Button>
         </div>
         <p className="pt-2 text-sm text-(--text-muted)">Public data. Nothing is saved.</p>
+        <p className="text-sm text-(--text-muted)" aria-live="polite">{asking ? "Reading your listens on Last.fm. A long history takes a few seconds." : ""}</p>
         <div className="pt-2"><FormError>{error}</FormError></div>
       </form>
       {glimpse ? (

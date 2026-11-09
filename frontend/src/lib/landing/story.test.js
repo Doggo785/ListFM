@@ -96,6 +96,12 @@ describe("storyBeats", () => {
     expect(storyAt(beats[6]).scene).toBe("delivered");
   });
 
+  it("names, at each chain hold, the stage its picture has just applied, even a hair short of it", () => {
+    for (const [beat, done] of [[2, 1], [3, 2], [4, 3], [5, 4]]) {
+      expect(chainPhases(storyAt(shareAtBeat(beats, beat - 0.01)).k).stage).toBe(done);
+    }
+  });
+
   it("settles on the next beat the way the scroll went, or back on one it barely left", () => {
     const count = beats.length;
     expect(beatToSettle(count, 2.4, true)).toBe(3);

@@ -63,7 +63,7 @@ export function MaskedField({ id, label, ...props }) {
 }
 
 export function FormError({ children }) {
-  return children ? <p role="alert" className="text-(--ember-7)">{children}</p> : null;
+  return children ? <p role="alert" className="text-pretty text-(--ember-7)">{children}</p> : null;
 }
 
 export function ProviderButtons({ verb, disabled }) {

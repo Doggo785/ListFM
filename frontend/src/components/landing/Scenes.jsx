@@ -50,7 +50,8 @@ export function Listens({ demo, still }) {
       </div>
       <div className="landing__covers" aria-hidden="true">
         {demo.covers.map((cover) => (
-          <div key={cover.url} data-show-cover={cover.share} className="landing__cover" style={{ left: `${cover.share * 100}%` }}>
+          // Kept whole on screen: the first quarter starts at the very edge of the timeline.
+          <div key={cover.url} data-show-cover={cover.share} className="landing__cover" style={{ left: `clamp(48px, ${cover.share * 100}%, calc(100% - 48px))` }}>
             <AlbumArt url={cover.url} seed={cover.url} eager small className="block aspect-square w-full object-cover" />
           </div>
         ))}
@@ -102,7 +103,7 @@ export function Delivered({ demo }) {
         <PlaylistCover seed={chain.start} images={chain.covers} className="w-full" />
       </div>
       <div data-show="delivered-list" data-quiet className="min-w-0 flex-1 text-base">
-        <p className="pb-2 text-xl">{chain.label}, as {demo.name} lived it. {chain.size} tracks.</p>
+        <p className="pb-2 text-xl text-pretty">{chain.label}, as {demo.name} lived it. {chain.size} tracks.</p>
         <TrackList tracks={chain.top} />
       </div>
     </div>
@@ -137,7 +138,7 @@ export function Keeps({ demo, run, still }) {
         {demo.runs.slice(Math.max(0, shown - RUNS_SHOWN + 1), shown + 1).map((entry) => (
           <li key={entry.at} className="flex justify-between gap-4 border-t border-(--line) py-1">
             <span>{entry.at}, 00:00</span>
-            <span className="text-(--text-muted)">{entry.size}/{entry.size} tracks, {entry.period}</span>
+            <span className="text-(--text-muted)">{entry.size} tracks, {entry.period}</span>
           </li>
         ))}
       </ul>
@@ -153,11 +154,11 @@ export function Obeys({ demo, recipe, still }) {
       {list.map((entry) => (
         <div key={entry.name} data-quiet className="landing__recipe-card">
           <p className="text-xl text-(--ember)">{entry.name}</p>
-          <p className="pb-2 text-xl">{entry.sentence} <span className="text-(--text-muted)">{entry.size} tracks out of {number(entry.of)}.</span></p>
+          <p className="pb-2 text-xl text-pretty">{entry.sentence} <span className="text-(--text-muted)">{entry.size} tracks out of {number(entry.of)}.</span></p>
           <TrackList tracks={entry.top} />
         </div>
       ))}
-      <p data-quiet className="landing__also text-base text-(--text-muted)">Tags, loved tracks, play counts, first listens and top artists too, in AND and OR groups. Everything stays folded until you go looking for it.</p>
+      <p data-quiet className="landing__also text-base text-(--text-muted)">Tags, loved tracks, play counts, first listens and top artists too, with rules that must all match, or any one of them. Everything stays folded until you go looking for it.</p>
     </div>
   );
 }

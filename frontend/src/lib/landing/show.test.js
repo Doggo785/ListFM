@@ -96,7 +96,7 @@ describe("createShow", () => {
     stage.W = 100;
     stage.onResize();
     show.frame(0.016);
-    expect(onChange).toHaveBeenCalledWith("hero", null);
+    expect(onChange).toHaveBeenCalledWith("hero", null, false);
   });
 
   it("leans toward a pointer once nothing else happens", () => {

@@ -23,6 +23,7 @@ const RECIPE_MORPH = [0.85, 1];
 const SCRUB_SECONDS = 0.3; // How long the show takes to catch up with the scroll: smooth, never laggy.
 const MAX_BEATS_PER_SECOND = 5; // A fling still shows each step go by.
 const SETTLE_AFTER = 0.15; // Seconds of a still scroll before the page settles on a beat.
+const ON_BEAT = 0.005; // Of a beat, about 2 CSS px: a settled scroll rounded to whole pixels still rests on its beat.
 const settleSeconds = (beats) => clamp(0.3 + 0.4 * beats, 0.3, 0.9);
 const glideOut = (k) => 1 - (1 - k) ** 3;
 const RECIPE_HEAT = [2, 1, 3];
@@ -51,6 +52,9 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
     idle: 0,
     down: true,
     settle: null,
+    held: false,
+    asking: false,
+    story: false,
     lastL: 0,
     lastR: 0,
     y: null,
@@ -75,12 +79,26 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
   lay();
   stage.onResize = lay;
 
-  const say = (scene, step) => {
-    if (scene === m.scene && step === m.step) return;
+  // A finger on the page or a hand on its scrollbar is still scrolling, even holding still: the page waits for it to let go, as GSAP does.
+  const grab = () => {
+    m.held = true;
+    m.settle = null;
+  };
+  const letGo = () => {
+    m.held = false;
+    m.idle = 0;
+  };
+  root.addEventListener("touchstart", grab, { passive: true });
+  root.addEventListener("mousedown", grab);
+  for (const name of ["touchend", "touchcancel", "mouseup"]) window.addEventListener(name, letGo);
+
+  const say = (scene, step, story) => {
+    if (scene === m.scene && step === m.step && story === m.story) return;
     if (scene !== m.scene) m.sceneAt = m.t;
     m.scene = scene;
     m.step = step;
-    onChange(scene, step);
+    m.story = story;
+    onChange(scene, step, story);
   };
 
   const drawHeartbeat = (x, y) => {
@@ -269,6 +287,20 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
     forged: () => {
       m.forgedAt = m.t;
     },
+    /** While a visitor's name is being read, a playhead runs along their line: the thread is at work. */
+    asking: (on) => {
+      m.asking = on;
+    },
+    /** A jump from the rail: the show is there at once instead of playing every step on the way. */
+    leap: () => {
+      m.beat = null;
+      m.settle = null;
+    },
+    destroy: () => {
+      root.removeEventListener("touchstart", grab);
+      root.removeEventListener("mousedown", grab);
+      for (const name of ["touchend", "touchcancel", "mouseup"]) window.removeEventListener(name, letGo);
+    },
 
     frame(dt) {
       m.t += dt;
@@ -287,7 +319,8 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
       const lineY = (lineRect.top + lineRect.height / 2) / CELL;
       const enter = 1 - sstep(0, vh * 0.85, storyRect.top);
       const span = Math.max(1, storyRect.height - vh);
-      const at = clamp(-storyRect.top / span) * (beats.length - 1);
+      const scrolled = clamp(-storyRect.top / span) * (beats.length - 1);
+      const at = Math.abs(scrolled - Math.round(scrolled)) < ON_BEAT ? Math.round(scrolled) : scrolled;
       // The visitor's own scroll, not the page's settling, gives the way and wakes the wait.
       if (root.scrollTop !== m.top) {
         if (m.settle && Math.abs(root.scrollTop - m.settle.set) > 1) m.settle = null;
@@ -304,7 +337,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
         root.scrollTop = mix(m.settle.from, m.settle.to, glideOut(k));
         m.settle.set = root.scrollTop;
         if (k >= 1) m.settle = null;
-      } else if (m.idle > SETTLE_AFTER && enter >= 1 && at > 0 && at < beats.length - 1) {
+      } else if (!m.held && m.idle > SETTLE_AFTER && enter >= 1 && at > 0 && at < beats.length - 1) {
         const beat = beatToSettle(beats.length, at, m.down);
         const to = root.scrollTop + storyRect.top + (beat / (beats.length - 1)) * span;
         if (Math.abs(to - root.scrollTop) > 1) m.settle = { from: root.scrollTop, to, t: 0, seconds: settleSeconds(Math.abs(beat - at)), set: root.scrollTop };
@@ -314,7 +347,11 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
       if (m.beat === null || enter < SCENE_SHOWS_FROM) m.beat = at;
       const catchUp = (at - m.beat) * (1 - Math.exp(-dt / SCRUB_SECONDS));
       m.beat += clamp(catchUp, -MAX_BEATS_PER_SECOND * dt, MAX_BEATS_PER_SECOND * dt);
+      // The catch-up only ever nears its beat: it lands on it, so a hold shows exactly its step and its count.
+      if (Math.abs(at - m.beat) < ON_BEAT / 2) m.beat = at;
       const p = shareAtBeat(beats, m.beat);
+      const progress = find("progress");
+      if (progress) progress.style.transform = `scaleX(${p})`;
       const shift = pin.getBoundingClientRect().top / CELL;
       const { scene, k } = storyAt(p);
 
@@ -372,7 +409,8 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
 
       const turnLine = find("turn-line");
       if (turnLine) {
-        const lit = lineThread(turnLine, W, m.typing);
+        const lit = lineThread(turnLine, W, m.asking ? 1 : m.typing);
+        if (lit && m.asking) drawHead(((t / FUSE_SECONDS) % 1) * W, lit.y);
         if (lit && m.forgedAt !== null && t - m.forgedAt < FUSE_SECONDS) {
           const at = mix(0, W, sstep(0, FUSE_SECONDS, t - m.forgedAt));
           drawHead(at, lit.y);
@@ -401,7 +439,8 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
       if (enter >= 1 && entering < 1) for (const element of root.querySelectorAll("[data-reveal]")) stage.veil(element.getBoundingClientRect(), entering);
 
       m.lastP = p;
-      say(enter >= SCENE_SHOWS_FROM ? scene : "hero", step);
+      // The story's guides leave with it: past half a screen of its end, the page is the visitor's.
+      say(enter >= SCENE_SHOWS_FROM ? scene : "hero", step, enter >= SCENE_SHOWS_FROM && storyRect.bottom > vh / 2);
     },
   };
 }

@@ -25,7 +25,7 @@ from services.rate_limit import (
 router = APIRouter(prefix="/api/public", tags=["public"])
 
 USERNAME = re.compile(r"[A-Za-z0-9_-]{2,32}")
-UNKNOWN = "The thread can't find that name."
+UNKNOWN = "The thread can't find that name. It's the one in your Last.fm profile's address."
 PRIVATE = "This profile keeps its listens private, so the thread can't read them."
 BUSY = "The thread is busy, try again in a minute."
 DOWN = "Last.fm isn't answering. Try again in a minute."
