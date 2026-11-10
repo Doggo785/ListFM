@@ -12,7 +12,7 @@ from models.track import Track
 from models.user import User
 from services import album_covers
 from services.listening_story import build_story
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from .conftest import _cleanup_user, _TestSessionLocal, _unique_email
 from .test_preview import _register_login_link
@@ -170,7 +170,7 @@ async def test_a_look_up_pass_stops_at_the_first_cover_of_each_list():
 
 
 @pytest.mark.asyncio
-async def test_the_route_answers_and_starts_the_look_ups(client: AsyncClient):
+async def test_the_route_answers_and_starts_the_look_ups_once_the_first_import_is_done(client: AsyncClient):
     email = _unique_email()
     try:
         await _register_login_link(client, email)
@@ -185,6 +185,13 @@ async def test_the_route_answers_and_starts_the_look_ups(client: AsyncClient):
         assert body["moment"]["artist"] == "A"
         assert body["covers_pending"] is True
         assert body["listens_last_day"] == 1
+        # The import is still running: the albums shown will change, nothing is looked up yet.
+        assert start.call_count == 0
+        async with _TestSessionLocal() as db:
+            await db.execute(update(User).where(User.id == user).values(scrobbles_complete_at=datetime.now(UTC)))
+            await db.commit()
+        with patch("routers.users.start_album_covers") as start:
+            assert (await client.get("/api/scrobbles/story")).json()["covers_pending"] is True
         assert start.call_count == 1
     finally:
         await _cleanup_user(email=email)

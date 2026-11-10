@@ -88,7 +88,8 @@ async def listening_story(
 ):
     """The Dashboard's poster and year, from stored listens only; missing album art is looked up behind."""
     story, awaiting_art = await build_story(db, current_user.id, current_user.timezone or "UTC")
-    if awaiting_art:
+    # During a first import the albums shown change at every read: their art waits for the final ones.
+    if awaiting_art and current_user.scrobbles_complete_at is not None:
         start_album_covers(current_user.id, username, awaiting_art)
     return story
 
