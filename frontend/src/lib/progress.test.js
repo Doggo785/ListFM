@@ -194,11 +194,15 @@ describe("pollProgress", () => {
   });
 
   it("throws a timeout error after timeoutMs", async () => {
+    // Fake clock: on a loaded machine 5 real ms could pass before the second read.
+    vi.useFakeTimers();
     const getSnapshot = vi.fn(async () => ({ stage: "enrich", done: 1, total: 10 }));
-    await expect(
-      pollProgress(getSnapshot, { intervalMs: 1, timeoutMs: 5 })
-    ).rejects.toMatchObject({ code: "PROGRESS_TIMEOUT" });
+    const polling = pollProgress(getSnapshot, { intervalMs: 1, timeoutMs: 5 });
+    const outcome = expect(polling).rejects.toMatchObject({ code: "PROGRESS_TIMEOUT" });
+    await vi.advanceTimersByTimeAsync(10);
+    await outcome;
     expect(getSnapshot.mock.calls.length).toBeGreaterThan(1);
+    vi.useRealTimers();
   });
 
   it("stops early when shouldStop is set", async () => {

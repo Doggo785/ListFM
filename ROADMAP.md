@@ -71,9 +71,9 @@ Chaque PR branche le ruban sur les vraies données de l'écran et supprime l'anc
 
 **Guide interactif pour les nouveaux arrivants** (demande de l'owner) : obligatoire avant la v1.0.0, une fois les écrans de la phase C refaits. Sa forme reste à définir avec l'owner.
 
-**Premier import d'un compte neuf** (demande de l'owner) : se connecter avec un compte Last.fm jamais vu et suivre l'import complet des écoutes de bout en bout. Vérifier ce que l'utilisateur voit pendant ce temps (indicateur des tâches de fond, morceaux qui arrivent, aperçu partiel, runs qui attendent la fin) et que les animations le montrent bien.
+*(fait)* **Premier import d'un compte neuf** : suivi de bout en bout sur un faux Last.fm puis sur le vrai compte de l'owner remis à zéro. Trouvé et corrigé : la recherche de tags attendait ~3 min avant son premier artiste (requête qui relisait toutes les écoutes par morceau), le Dashboard cherchait une pochette à chaque lecture pendant l'import, et « Your year » restait sur les automations quand ses mois arrivaient après l'ouverture.
 
-**Le fil travaille dans l'app** (promesse de la page d'accueil) : pendant la synchro, la recherche de tags et les runs, on doit le voir au travail, sans visage ni voix.
+**Le fil travaille dans l'app** (promesse de la page d'accueil) : *(fait pour la synchro et les tags)* variante A choisie sur prototype, « le front s'allume ». La ligne du haut dit jusqu'où l'import a lu, sa part et le temps restant ; le ruban porte un front chaud qui glisse entre deux lectures, et sur le Dashboard la flamme montre l'historique lu (les années d'avant en ligne basse, puis l'année qui arrive). Reste les runs, planifiés compris, visibles quand l'app est ouverte (choix de l'owner) : il faut un registre des runs en cours par utilisateur côté serveur.
 
 **Page Privacy et mentions obligatoires** : les inscriptions sont ouvertes à tous, donc des emails et des écoutes d'inconnus sont collectés. À vérifier avant la mise en ligne publique.
 

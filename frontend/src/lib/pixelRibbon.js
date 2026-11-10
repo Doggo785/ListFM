@@ -1,6 +1,7 @@
 /** The ember ribbon behind every page: one WebGL2 canvas that morphs instead of remounting. */
 
 import { burstEmber, createEmberLayer, linkProgram, stepEmbers } from "@/lib/ribbonEmbers";
+import { frontAt } from "@/lib/backgroundWork";
 import { monthAt, smoothstep } from "@/lib/ribbonTrack";
 
 export const CELL = 4; // CSS pixels per ribbon pixel: rendering one fragment per cell keeps it cheap.
@@ -21,6 +22,8 @@ const TRACK_EDGE = 0.92; // Of its half-width: only the tallest days reach the c
 const TRACK_QUIET_FADE = 44; // CSS pixels. It must fit between a poster's rows; other pages have room for the wide one.
 const QUIET_FADE = 130;
 const MAX_HOLES = 4;
+const WORK_GLOW_MS = 2500; // A finished task's front stays this long, for its last flare, then the ribbon lets it go.
+const FRONT_EASE = 2.5; // Per second: how fast the drawn front catches up with where it should be.
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
 const PHONE_WIDTH = 860; // Where the auth screens stack, and the free space moves under the form.
@@ -44,8 +47,10 @@ const SCENES = {
 /**
  * What a page asks of the ribbon, read at every frame. Only the Dashboard sets it:
  * track is the wave of listens (see drawTrack below), embers how many pixels climb from it.
+ * work is the background task BackgroundTasks reports (see lib/backgroundWork.js); the ribbon adds the front
+ * it draws, glided between two reads: shown (share done) and shownUntil (the date a history has reached).
  */
-export const ribbonStage = { track: null, embers: 0, beforeDraw: null, alive: false, silent: false, burst() {} };
+export const ribbonStage = { work: null, track: null, embers: 0, beforeDraw: null, alive: false, silent: false, burst() {} };
 
 export function sceneFor(pathname) {
   if (pathname === "/") return SCENES.landing;
@@ -120,6 +125,7 @@ precision highp float;
 uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull,uCalm,uEdge,uClip;uniform vec2 uPoint,uBand;
 uniform float uCols[${COLUMNS}];uniform vec3 uRamp[4];uniform vec4 uQuiet[${MAX_QUIET}];uniform int uN;
 uniform vec3 uHot[2];uniform vec4 uMap,uWave,uDrum,uDrumB;uniform sampler2D uSeries;
+uniform vec3 uFront;uniform float uImport;
 uniform vec4 uHoles[${MAX_HOLES}],uCut,uBurn;uniform vec3 uEdges[${MAX_HOLES * 4}],uInk;uniform float uFade;
 out vec4 o;
 float b2(vec2 a){a=floor(a);return fract(a.x/2.+a.y*a.y*.75);}
@@ -154,6 +160,10 @@ void main(){
     float beyond=smoothstep(uMap.z-.2,uMap.z+.5,mo)+smoothstep(.2,-.5,mo);
     amount=max(amount,.5*uDrum.x*min(beyond,1.));
     float past=uDrum.x*1.8;float ends=smoothstep(-past,.3-past*.5,mo)*smoothstep(uMap.z+past,uMap.z-.14+past*.5,mo);
+    // A first import reads the years before the one shown: left of the year, a low line lit up to the front.
+    float early=uImport*step(px,uMap.x);
+    amount*=1.-early;
+    ends=mix(ends,clamp((uWave.z-px)/8.,0.,1.),early);
     heat=track*exp(-pow((px-uWave.z)/90.,2.));
     amount=max(amount,.6*heat); // The playhead stands out even over a quiet day.
     float wave=uWave.y*(.17+.83*amount)*ends*(1.+.22*heat);
@@ -162,6 +172,7 @@ void main(){
     hw=mix(hw,wave,track);
     // Upward only: the name leaves room on the right, and below the line there is text.
     float sweep=smoothstep(${TRACK_RISE_FROM.toFixed(2)},1.,(px-uMap.x)/(uMap.y*uMap.z))*max(.5-uWave.x,0.)*${TRACK_RISE.toFixed(2)}*(1.+.2*sin(q.x*3.+uWander*.21)+.1*sin(q.x*7.-uWander*.31));
+    sweep*=1.-uImport; // The arriving year's end is not the year's end: it does not rise yet.
     float curve=(1.-uDrum.x)*(${TRACK_CURVE.toFixed(3)}*sin(q.x*2.+uWander*.1)+sweep); // The slow bend of the site's ribbon.
     c=mix(c,uWave.x+curve-uDrum.x*uDrumB.z*(1.-cos(th))*scale,track);
     // A flame climbs: its tongues reach upward from the core and barely below it.
@@ -169,6 +180,10 @@ void main(){
     tongue=vn(f)*.65+vn(f*2.1+9.)*.35;
     hw*=1.+uWave.w*track*(q.y>c?2.6+2.6*heat:.3)*tongue*tongue;
   }
+  // Background work: a warm head walks the ribbon up to the share done, what it has passed stays warmer.
+  float front=exp(-pow((s-uFront.x)/.015,2.));
+  hw*=1.+.35*front*uFront.y;
+  float workHeat=(max(.5*step(s,uFront.x),1.2*front)+1.2*uFront.z)*uFront.y;
   // On the track the flame's heat falls off all the way to its edge, instead of a flat band with a dithered rim.
   float v=clamp((hw-abs(q.y-c))/mix(uEdge,max(uEdge,hw*.82),track),0.,1.);
   float m=1.;
@@ -210,14 +225,14 @@ void main(){
     }
   }
   v=max(max(v*m,edgeFire*uWave.w*track*calm*(1.-covered)),rim*track);
-  float idx=floor(v*(4.+2.*heat)+b8(cell));
+  float idx=floor(v*(4.+2.*(heat+workHeat))+b8(cell));
   // What has burnt is gone: the page's own ink over it, unless a card still whole lies there.
   if(idx<1.){o=(burnt>0.&&covered<=0.)||b8(cell)<charred?vec4(uInk,1.):vec4(0.);return;}
   int tone=int(min(idx,6.))-1;
   o=vec4(tone<4?uRamp[tone]:uHot[tone-4],1.);
 }`;
 
-const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN", "uHot", "uMap", "uWave", "uDrum", "uDrumB", "uSeries", "uHoles", "uCut", "uBurn", "uEdges", "uInk", "uFade"];
+const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN", "uHot", "uMap", "uWave", "uDrum", "uDrumB", "uSeries", "uHoles", "uCut", "uBurn", "uEdges", "uInk", "uFade", "uFront", "uImport"];
 
 function compile(gl) {
   const program = linkProgram(gl, VERTEX, FRAGMENT);
@@ -354,6 +369,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
   let clock = 0;
   let drawn = false;
   let loaderRect;
+  let frontStrength = 0;
   const opening = new WeakMap();
   const frame = (time) => {
     // A frame's timestamp can precede the last one: a negative step would make the easing diverge.
@@ -362,6 +378,17 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     if (!reducedMotion) {
       t += dt;
       wander += dt;
+    }
+    const ease = (rate) => (reducedMotion ? 1 : 1 - Math.exp(-dt * rate));
+    const work = ribbonStage.work;
+    if (work?.doneAt != null && time - work.doneAt > WORK_GLOW_MS) ribbonStage.work = null;
+    else if (work) {
+      // Read before the page draws: the Dashboard's flame puts the same front on its wave.
+      const wanted = frontAt(work, time);
+      const fresh = work.shownKind !== work.kind;
+      work.shown = fresh ? wanted.share : work.shown + (wanted.share - work.shown) * ease(FRONT_EASE);
+      work.shownUntil = fresh || wanted.until == null ? wanted.until : work.shownUntil + (wanted.until - work.shownUntil) * ease(FRONT_EASE);
+      work.shownKind = work.kind;
     }
     ribbonStage.beforeDraw?.();
     const track = ribbonStage.track;
@@ -399,7 +426,6 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
       heat = wantedHeat;
       target.ramp = rampFor(heat, palette);
     }
-    const ease = (rate) => (reducedMotion ? 1 : 1 - Math.exp(-dt * rate));
     const shape = ease(4.5);
     const glow = ease(3);
     now.cols = now.cols.map((v, i) => v + (target.cols[i] - v) * shape);
@@ -439,6 +465,12 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     gl.clear(gl.COLOR_BUFFER_BIT);
     drawTrack(gl, uniforms, lastTrack, now.track);
     gl.uniform1f(uniforms.uT, t);
+    // On the Dashboard the flame shows the work its own way (YearDeck): the head here is for the site's ribbon.
+    const shown = ribbonStage.work;
+    frontStrength += ((shown && !track ? 1 : 0) - frontStrength) * ease(3);
+    const flare = shown?.doneAt != null ? Math.exp(-(time - shown.doneAt) / 700) : 0;
+    gl.uniform3f(uniforms.uFront, shown?.shown ?? 0, frontStrength, flare);
+    gl.uniform1f(uniforms.uImport, track?.importing ?? 0);
     gl.uniform1f(uniforms.uFade, (track ? TRACK_QUIET_FADE : QUIET_FADE) / CELL);
     gl.uniform1f(uniforms.uWander, wander);
     gl.uniform1f(uniforms.uAngle, now.angle);

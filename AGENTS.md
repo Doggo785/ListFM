@@ -32,6 +32,8 @@ Lire avant d'agir :
 - `Automation.output` est stocké à plat (`output_max_size`) et reconstruit par un `model_validator`.
 - Tokens de provider : aucune colonne en clair. Les rajouter seulement chiffrées au repos.
 - Last.fm se lie par son autorisation web : le jeton de retour ne sert qu'une fois, la clé de session n'est pas gardée. Un test lie un compte avec `link_lastfm` de `tests/conftest.py`.
+- La synchro et la recherche de tags donnent leur avancement par `progress_store` : `since`/`until` (l'historique lu) et `eta_seconds()` (au rythme mesuré). `BackgroundTasks` le pose sur `ribbonStage.work`, que le ruban fait glisser entre deux lectures (`lib/backgroundWork.js`).
+- Pendant un premier import (`scrobbles_complete_at` vide), le Dashboard ne cherche aucune pochette : ses albums changent à chaque lecture. La recherche part sur les albums finaux.
 - `users.timezone` vide veut dire « pas encore connu », lu comme UTC : le navigateur ne le remplit que dans ce cas, pour ne jamais écraser un choix fait dans les réglages.
 - `POST /api/public/listener` (scène 7 de la page d'accueil) ne demande aucun compte et dépense le budget Last.fm des synchros : limité par visiteur et pour tout le site, gardé 1 h en mémoire seulement. En POST pour que le pseudo reste hors des logs d'accès ; il n'est écrit ni en base ni dans la console.
 - `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.

@@ -83,3 +83,30 @@ def test_cap_evicts_oldest_first():
     assert store.read("first") is None
     assert store.read("second") is not None
     assert store.read("third") is not None
+
+
+def test_eta_follows_the_pace_so_far():
+    store = ProgressStore()
+    with patch("services.progress.time.monotonic", return_value=100.0):
+        store.start("k")
+        assert store.read("k").eta_seconds() is None
+    with patch("services.progress.time.monotonic", return_value=110.0):
+        store.report("k", "sync", 2, 6)
+        # 5 s per page, 4 pages left.
+        assert store.read("k").eta_seconds() == 20
+    with patch("services.progress.time.monotonic", return_value=115.0):
+        assert store.read("k").eta_seconds() == 15
+    with patch("services.progress.time.monotonic", return_value=200.0):
+        assert store.read("k").eta_seconds() == 0
+        store.report("k", "sync", 6, 6)
+        assert store.read("k").eta_seconds() is None
+
+
+def test_span_keeps_its_start_and_moves_its_end():
+    store = ProgressStore()
+    store.start("k")
+    store.report("k", "sync", 1, 3, since=10, until=20)
+    store.report("k", "sync", 2, 3, since=15, until=30)
+    store.report("k", "sync", 3, 3)
+    progress = store.read("k")
+    assert (progress.since, progress.until) == (10, 30)

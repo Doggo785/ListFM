@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -49,9 +50,17 @@ def _sync_status(user: User) -> ScrobbleSyncStatus:
         error=progress.error if progress else None,
         complete=user.scrobbles_complete_at is not None,
         synced_at=user.scrobbles_synced_at,
+        eta_seconds=progress.eta_seconds() if progress and progress.stage == "sync" else None,
+        since=_instant(progress.since if progress else None),
+        until=_instant(progress.until if progress else None),
         tags_done=tags.done if tags and tags_running else 0,
         tags_total=tags.total if tags and tags_running else 0,
+        tags_eta_seconds=tags.eta_seconds() if tags and tags_running else None,
     )
+
+
+def _instant(uts: float | None) -> datetime | None:
+    return datetime.fromtimestamp(uts, tz=UTC) if uts is not None else None
 
 
 @router.get("/scrobbles/sync", response_model=ScrobbleSyncStatus)
@@ -79,7 +88,8 @@ async def listening_story(
 ):
     """The Dashboard's poster and year, from stored listens only; missing album art is looked up behind."""
     story, awaiting_art = await build_story(db, current_user.id, current_user.timezone or "UTC")
-    if awaiting_art:
+    # During a first import the albums shown change at every read: their art waits for the final ones.
+    if awaiting_art and current_user.scrobbles_complete_at is not None:
         start_album_covers(current_user.id, username, awaiting_art)
     return story
 

@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import { describeAutomation, describeSchedule } from "@/lib/automation-rules";
+import { historyBand, monthStart } from "@/lib/backgroundWork";
 import { ribbonStage } from "@/lib/pixelRibbon";
 import { plural } from "@/lib/playlists";
-import { cardCorners, cardPose, deckLayout, mix, monthsEnd, monthSeries, runsSeries, smoothstep, sweepAt, SWEEP_SECONDS } from "@/lib/ribbonTrack";
+import { cardCorners, cardPose, deckLayout, mix, monthsEnd, monthSeries, runsSeries, SAMPLES_PER_MONTH, smoothstep, sweepAt, SWEEP_SECONDS } from "@/lib/ribbonTrack";
 import { describeRun, RUN_TONES } from "@/lib/runs";
 import { FOCUS } from "@/lib/utils";
 import AlbumArt from "./AlbumArt";
@@ -20,6 +21,11 @@ const MAX_EMBERS = 180;
 const BAND_ENDS = 0.02;
 const NO_BAND = -100000;
 const HERO_FLAME = 0.9;
+// A first import before any month of the year is in: the year is there, empty, never the automations' wave.
+const EMPTY_YEAR = { series: new Uint8Array(SAMPLES_PER_MONTH), end: 0, count: 1 };
+const WORK_EASE = 0.5; // Seconds: how fast the flame goes into an import's band, and back to its year after.
+const IMPORT_FLARE = 0.6; // Of the flame: its last roar when an import ends.
+const random = Math.random; // Where sparks fly: noise for the eye, never a secret.
 const DECK_FLAME = 1;
 const HERO_HALF_SHARE = 0.78; // Of the poster's line: the wave keeps inside it downward, only its flames leave, upward.
 const DECK_HALF_SHARE = 0.4; // Of a card: only its tongues rise past the cards' top.
@@ -118,7 +124,9 @@ function Caption({ card }) {
  */
 export default function YearDeck({ scrollerRef, lineRef, story, automations, playlists, runs, reducedMotion }) {
   const months = story.months;
-  const [view, setView] = useState(months.length ? "months" : "automations");
+  // Until the person picks, the year when it has months: a first import's months arrive after the page opened.
+  const [picked, setPicked] = useState(null);
+  const view = picked ?? (months.length ? "months" : "automations");
   const [card, setCard] = useState(CARD_SIZES[1]);
   const [height, setHeight] = useState(0);
   const [armed, setArmed] = useState(false); // The covers are large: asked for only when the flight is near.
@@ -132,6 +140,10 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
   const dealtAt = useRef(0);
   const startedAt = useRef(0);
   const shownFocus = useRef(-1);
+  // 1 while the flame shows a background task: band for a first import being read, lead for the head on any front.
+  // Kept across the effect's restarts, which happen as an import brings months in.
+  const working = useRef({ band: 0, lead: 0, at: 0, span: null });
+  const firstMonth = months[0]?.month;
 
   const cards = useMemo(
     () => (view === "months" ? monthCards(months) : automationCards(automations, playlists, runs)),
@@ -227,20 +239,36 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       }
 
       // The ribbon: the whole year across the poster, then wrapped on the drum.
-      const source = zoom > 0.5 || !months.length ? cardsTrack : monthsTrack;
+      // Background work: a first import shows the history being read, oldest on the left; any task leads the head.
+      const work = ribbonStage.work;
+      const reading = work?.kind === "listens" && work.doneAt == null && work.since != null;
+      const state = working.current;
+      if (reading) state.span = { since: work.since, until: work.shownUntil ?? work.since };
+      const step = reducedMotion || !state.at ? 1 : 1 - Math.exp(-Math.max(0, now - state.at) / 1000 / WORK_EASE);
+      state.at = now;
+      state.band += ((reading ? 1 : 0) - state.band) * step;
+      state.lead += ((work && work.doneAt == null ? 1 : 0) - state.lead) * step;
+      if (state.band < 0.001) state.band = 0;
+      const { band, lead, span } = state;
+      const source = band > 0 ? (months.length ? monthsTrack : EMPTY_YEAR) : zoom > 0.5 || !months.length ? cardsTrack : monthsTrack;
+      const yearStart = monthStart(Date.now(), 11);
+      const origin = firstMonth ? new Date(`${firstMonth}-01T00:00:00`).getTime() : span ? Math.max(yearStart, monthStart(span.since)) : yearStart;
+      const history = span ? historyBand({ ...span, yearStart, origin, width }) : { yearX: 0, perMonth: width / 12, frontX: 0 };
       const lineRect = line.getBoundingClientRect();
       const seconds = reducedMotion ? SWEEP_SECONDS : (now - startedAt.current) / 1000;
-      const perMonth = width / Math.max(0.01, source.end);
+      const perMonth = mix(width / (source.end > 0.5 ? source.end : 12), history.perMonth, band);
       const rest = width - 28 + (reducedMotion ? 0 : Math.sin(now / 420) * 10);
-      const heroHead = seconds < SWEEP_SECONDS ? sweepAt(seconds) * width : rest;
+      const frontX = reading ? history.frontX : (work?.shown ?? 1) * width;
+      const heroHead = mix(seconds < SWEEP_SECONDS ? sweepAt(seconds) * width : rest, frontX, lead);
       const heroY = lineRect.top + lineRect.height / 2;
       const heroHalf = (lineRect.height / 2) * HERO_HALF_SHARE;
       const deckHalf = card * DECK_HALF_SHARE;
       Object.assign(track, {
         series: source.series,
-        end: source.end,
+        // While the year arrives its wave ends at the gliding front, not at the last page in: it grows, never jumps.
+        end: mix(source.end, (history.frontX - history.yearX) / history.perMonth, band),
         count: source.count,
-        x0: 0,
+        x0: history.yearX * band,
         perMonth,
         zoom,
         cx,
@@ -254,9 +282,13 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
         bandTop: zoom < BAND_ENDS ? lineRect.top : zoom > 1 - BAND_ENDS ? cy - card / 2 : NO_BAND,
         bandBottom: zoom < BAND_ENDS ? lineRect.bottom : zoom > 1 - BAND_ENDS ? cy + card / 2 + layout.bow * 0.5 : NO_BAND,
         holes: holes.sort((a, b) => a.away - b.away),
+        importing: band,
       });
       ribbonStage.track = track;
       ribbonStage.embers = Math.min(MAX_EMBERS, story.listens_last_day);
+      // The front spits sparks where the work is landing; an import ends in one last roar.
+      if (!reducedMotion && lead > 0.5 && zoom < 0.5) ribbonStage.burst(heroHead + (random() - 0.5) * 24, track.y - random() * track.half * 0.6);
+      if (work?.kind === "listens" && work.doneAt != null) track.flame += IMPORT_FLARE * Math.exp(-(now - work.doneAt) / 700);
     };
     drive();
     let frameId = 0;
@@ -277,7 +309,7 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       ribbonStage.embers = 0;
       if (stage) stage.style.visibility = "hidden";
     };
-  }, [months.length, cards, card, travel, cardsTrack, monthsTrack, reducedMotion, scrollerRef, lineRef, story.listens_last_day]);
+  }, [months.length, firstMonth, cards, card, travel, cardsTrack, monthsTrack, reducedMotion, scrollerRef, lineRef, story.listens_last_day]);
 
   // A long list of automations scrolls sideways: the current one stays in view.
   useEffect(() => {
@@ -302,7 +334,7 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
     // A new deck starts on its newest card, at the top of the flight.
     const scroller = scrollerRef.current;
     scroller.scrollTop += wrap.current.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    setView(next);
+    setPicked(next);
   };
 
   const current = cards[Math.min(cards.length - 1, focusIndex)];

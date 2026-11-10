@@ -160,16 +160,21 @@ async def replace_artist_tags(db: AsyncSession, artist: str, tags: list[dict]) -
 
 async def get_artists_to_tag(db: AsyncSession, user_id: str, stale_before: datetime) -> list[str]:
     """This user's artists with unknown or expired tags, most listened first."""
+    # Listens counted per track first: the primary key puts played_at before track_id, so joining
+    # scrobbles track by track rereads all of the user's listens each time (minutes on a big history).
+    plays = (
+        select(Scrobble.track_id, func.count().label("plays"))
+        .where(Scrobble.user_id == user_id)
+        .group_by(Scrobble.track_id)
+        .subquery()
+    )
     rows = await db.execute(
         select(Track.artist)
-        .join(Scrobble, Scrobble.track_id == Track.id)
+        .join(plays, plays.c.track_id == Track.id)
         .outerjoin(Artist, Artist.name == Track.artist)
-        .where(
-            Scrobble.user_id == user_id,
-            or_(Artist.name.is_(None), Artist.tags_fetched_at < stale_before),
-        )
+        .where(or_(Artist.name.is_(None), Artist.tags_fetched_at < stale_before))
         .group_by(Track.artist)
-        .order_by(func.count().desc(), Track.artist)
+        .order_by(func.sum(plays.c.plays).desc(), Track.artist)
     )
     return list(rows.scalars())
 

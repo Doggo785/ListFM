@@ -32,7 +32,8 @@ export function useListening(username) {
         setTotals(nextTotals);
         setFailed(false);
         remember(username, { story: nextStory, totals: nextTotals });
-        artPolls = nextStory.covers_pending ? artPolls + 1 : 0;
+        // Art is only looked up once a first import is done: the reads before do not count toward giving up.
+        artPolls = nextStory.covers_pending && nextTotals.complete ? artPolls + 1 : 0;
         if (!nextTotals.complete || (nextStory.covers_pending && artPolls < MAX_ART_POLLS)) timer = setTimeout(load, POLL_MS);
       } catch {
         if (!stopped) setFailed(true);
