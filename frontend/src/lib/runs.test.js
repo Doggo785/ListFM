@@ -79,3 +79,9 @@ describe("days", () => {
     expect(daysOf(chains, now).map(({ day, chains: list }) => [day, list.length])).toEqual([["Today", 2], ["Nov 3, 2026", 1]]);
   });
 });
+
+describe("a run waiting for the listens", () => {
+  it("is neither a failure nor a result", () => {
+    expect(describeRun({ status: "waiting", attempt: 1 })).toEqual({ label: "Waiting", tone: "muted" });
+  });
+});

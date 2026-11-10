@@ -7,12 +7,21 @@ cron parseable by the scheduler, maxSize bounded 1-200 with explicit 0->50):
 - success -> 200 with {tracks, total}
 """
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
+from models.user import User
+from repositories.scrobbles import store_scrobbles
 
-from .conftest import _cleanup_user, _unique_email, link_lastfm
+from .conftest import (
+    _cleanup_user,
+    _get_user_id_from_cookies,
+    _TestSessionLocal,
+    _unique_email,
+    link_lastfm,
+)
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
@@ -236,5 +245,33 @@ async def test_preview_of_a_schedule_shows_what_a_run_makes_and_says_which_perio
         assert data["next_run"] > end.date().isoformat()
         assert "period" not in rolling.json()
         assert "next_run" not in rolling.json()
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
+async def test_preview_during_a_first_load_says_how_far_back_the_history_is_read(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        user_id = _get_user_id_from_cookies(client)
+        read_from = datetime.now(UTC) - timedelta(days=30)
+        async with _TestSessionLocal() as db:
+            await store_scrobbles(db, user_id, [("Song", "Artist", read_from)])
+            await db.commit()
+
+        with patch("services.automation_runner.get_window_tracks", return_value=[]):
+            months = (await client.post("/api/automations/preview", json=_preview_body())).json()
+            week = (await client.post("/api/automations/preview", json=_preview_body(
+                window={"length": {"amount": 7, "unit": "day"}},
+            ))).json()
+            async with _TestSessionLocal() as db:
+                (await db.get(User, user_id)).scrobbles_complete_at = datetime.now(UTC)
+                await db.commit()
+            done = (await client.post("/api/automations/preview", json=_preview_body())).json()
+        assert months["history_partial"] is True
+        assert months["history_read_from"].startswith(read_from.date().isoformat())
+        assert week["history_partial"] is False
+        assert "history_partial" not in done
     finally:
         await _cleanup_user(email=email)

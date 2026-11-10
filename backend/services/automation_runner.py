@@ -7,6 +7,7 @@ Pipeline (ADR 0002, 0003): the user's stored listens in the window -> sort
 endpoint.
 """
 
+import asyncio
 import calendar
 import logging
 import random
@@ -41,10 +42,12 @@ from services.lastfm import PAGE_ERRORS, is_rate_limit_error
 from services.progress import store as progress_store
 from services.scrobble_sync import (
     SyncSuperseded,
+    after_sync,
     is_syncing,
     start_scrobble_sync,
     sync_scrobbles,
 )
+from services.tag_catalogue import after_pass, is_tagging
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -384,16 +387,37 @@ class HistoryLoading(Exception):
     """The user's first full listening history sync has not finished."""
 
 
-async def _sync_before_run(db: AsyncSession, automation: Automation) -> None:
-    """Bring the listens up to date before a run; wait out the first full load.
+class TagsLoading(Exception):
+    """A tag pass is looking up this user's artists, and the run filters by tags."""
 
-    A failed incremental sync is logged and the run uses the stored listens.
-    """
+
+NOT_READY = (HistoryLoading, TagsLoading)
+_WAITING_FOR = {
+    HistoryLoading: "Your listening history is still loading.",
+    TagsLoading: "The tag lookup is still running.",
+}
+
+
+def _filters_by_tags(filter_groups) -> bool:
+    return any(value for _, value in conditions_on(filter_groups, "tags", "value"))
+
+
+async def _check_ready(db: AsyncSession, automation: Automation) -> None:
+    """A run waits for the first full load, and one filtering by tags for the tag pass in flight."""
     user = await db.get(User, automation.user_id)
     if user is None or user.scrobbles_complete_at is None:
         # Restarts an interrupted first load; a no-op while one runs.
         start_scrobble_sync(automation.user_id, automation.lastfm_username)
         raise HistoryLoading
+    if _filters_by_tags(automation.filter_groups) and is_tagging(automation.user_id):
+        raise TagsLoading
+
+
+async def _sync_before_run(db: AsyncSession, automation: Automation) -> None:
+    """Bring the listens up to date before a run.
+
+    A failed incremental sync is logged and the run uses the stored listens.
+    """
     if is_syncing(automation.user_id):
         return
     try:
@@ -405,8 +429,6 @@ async def _sync_before_run(db: AsyncSession, automation: Automation) -> None:
 
 def _public_error(exc: Exception) -> str:
     """Message shown in history and progress; the raw error goes to the logs only."""
-    if isinstance(exc, HistoryLoading):
-        return "Your listening history is still loading. The run will retry."
     if is_rate_limit_error(exc):
         return "Last.fm is rate limiting requests. Try again in a few minutes."
     return "The run failed (Last.fm or server error)."
@@ -425,6 +447,27 @@ async def _mark_failure(
     history.completed_at = datetime.now(UTC)
     automation.last_run = datetime.now(UTC)
     await db.flush()
+
+
+async def _mark_waiting(db: AsyncSession, history: AutomationHistory, exc: Exception, automation: Automation) -> None:
+    """A run that cannot start yet waits on its row, never counted as a try; the sweep must not start it as due."""
+    history.status = "waiting"
+    history.error_message = _WAITING_FOR[type(exc)]
+    history.completed_at = None
+    automation.last_run = datetime.now(UTC)
+    await db.flush()
+
+
+async def _waiting_head(db: AsyncSession, automation_id: str) -> AutomationHistory | None:
+    latest = (
+        await db.execute(
+            select(AutomationHistory)
+            .where(AutomationHistory.automation_id == automation_id)
+            .order_by(AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    return latest if latest is not None and latest.status == "waiting" else None
 
 
 async def run_automation(
@@ -446,22 +489,43 @@ async def run_automation(
     linked from the history row, so every run stays openable with its exact
     track snapshot. The synchronous pipeline (pylast + ThreadPoolExecutor)
     runs in the default executor so the event loop is never blocked.
+    A run that cannot start yet (see _check_ready) waits on its row instead,
+    and any later start of the automation picks that row up: one wait, one line.
     Returns the history row (uncommitted — the caller commits).
     """
     scheduled_for = scheduled_for or datetime.now(UTC)
     started_at = datetime.now(UTC)
-    history = await create_automation_history(
-        db,
-        automation_id=automation.id,
-        status="running",
-        filter_groups_used=_filter_groups_to_json(automation.filter_groups),
-        target_size=automation.output_max_size,
-        scheduled_for=scheduled_for,
-        attempt=attempt,
-        started_at=started_at,
-    )
-
     label = automation_label(automation.name)
+    history = await _waiting_head(db, automation.id)
+    if history is None:
+        history = await create_automation_history(
+            db,
+            automation_id=automation.id,
+            status="running",
+            filter_groups_used=_filter_groups_to_json(automation.filter_groups),
+            target_size=automation.output_max_size,
+            scheduled_for=scheduled_for,
+            attempt=attempt,
+            started_at=started_at,
+        )
+    else:
+        # The settings at the run, not at the wait: they may have changed meanwhile.
+        history.scheduled_for = scheduled_for
+        history.filter_groups_used = _filter_groups_to_json(automation.filter_groups)
+        history.target_size = automation.output_max_size
+    try:
+        await _check_ready(db, automation)
+    except NOT_READY as exc:
+        if history.status != "waiting":
+            log_activity("run", label, "en attente des écoutes" if isinstance(exc, HistoryLoading) else "en attente des tags")
+        await _mark_waiting(db, history, exc, automation)
+        if progress_key is not None:
+            progress_store.finish(progress_key)
+        return history
+    history.status = "running"
+    history.error_message = None
+    history.started_at = started_at
+
     # A run started by the sweep has no ticket from a client: it gets its own, so the app can follow it.
     key = progress_key or f"run:{automation.id}:{history.id}"
     if progress_key is None:
@@ -498,11 +562,8 @@ async def _run_and_record(
             progress_key=key,
         )
     except Exception as exc:
-        if isinstance(exc, HistoryLoading):
-            log_activity("run", label, "historique en cours de chargement, nouvel essai prévu")
-        else:
-            logger.exception("run failed for automation %s", automation.id)
-            log_activity("run", label, f"échec : {type(exc).__name__}")
+        logger.exception("run failed for automation %s", automation.id)
+        log_activity("run", label, f"échec : {type(exc).__name__}")
         await _mark_failure(db, history, exc, automation)
         progress_store.finish(key, error=_public_error(exc))
         return history
@@ -744,6 +805,8 @@ async def run_due_automations(session_factory=async_session) -> None:
         ]
         try:
             retryable = await get_retryable_failures(db, now)
+            # Started again each tick: after a restart nothing else would, and a run still not ready just waits on.
+            waiting = await get_waiting_runs(db)
         except Exception:
             logger.exception("sweep failed reading retryable failures")
             return
@@ -754,6 +817,8 @@ async def run_due_automations(session_factory=async_session) -> None:
             scheduled_for=scheduled_for,
             attempt=attempt,
         )
+    for row in waiting:
+        await _run_single(session_factory, row.automation_id, scheduled_for=row.scheduled_for, attempt=row.attempt)
     for failed in sorted(retryable, key=lambda r: (r.scheduled_for, r.automation_id)):
         logger.info(
             "retrying automation %s (attempt %d, scheduled for %s)",
@@ -767,3 +832,46 @@ async def run_due_automations(session_factory=async_session) -> None:
             scheduled_for=failed.scheduled_for,
             attempt=failed.attempt + 1,
         )
+
+
+async def get_waiting_runs(db: AsyncSession, user_id: str | None = None) -> list[AutomationHistory]:
+    """Runs waiting on their row (see run_automation), oldest first: only a chain head still waits."""
+    query = (
+        select(AutomationHistory)
+        .join(Automation, Automation.id == AutomationHistory.automation_id)
+        .where(Automation.deleted_at.is_(None), Automation.enabled.is_(True))
+        .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
+        .distinct(AutomationHistory.automation_id)
+    )
+    if user_id is not None:
+        query = query.where(Automation.user_id == user_id)
+    heads = (await db.execute(query)).scalars().all()
+    return sorted((row for row in heads if row.status == "waiting"), key=lambda row: row.started_at)
+
+
+async def run_waiting(user_id: str, session_factory=async_session) -> None:
+    """Start this user's waiting runs; one still not ready keeps waiting."""
+    async with session_factory() as db:
+        rows = await get_waiting_runs(db, user_id)
+    for row in rows:
+        await _run_single(session_factory, row.automation_id, scheduled_for=row.scheduled_for, attempt=row.attempt)
+
+
+# Strong references, so running tasks are not collected.
+_waiting_tasks: set[asyncio.Task] = set()
+
+
+def start_waiting_runs(user_id: str) -> None:
+    """The listens or the tags runs wait for are in: start them, in the background."""
+    task = asyncio.create_task(run_waiting(user_id))
+    _waiting_tasks.add(task)
+    task.add_done_callback(_waiting_tasks.discard)
+
+
+def _on_ready(user_id: str) -> None:
+    # Looked up at call time, so a test can stub start_waiting_runs.
+    start_waiting_runs(user_id)
+
+
+after_sync.append(_on_ready)
+after_pass.append(_on_ready)

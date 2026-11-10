@@ -26,6 +26,7 @@ const failedLabel = (attempt) => (attempt > 1 ? `Failed after ${attempt} tries` 
 /** What a run came to, in words. A short or empty run is a result, not a failure. */
 export function describeRun(run, now = new Date()) {
   if (run.status === "running") return { label: "Running", tone: "plain" };
+  if (run.status === "waiting") return { label: "Waiting", tone: "muted" };
   if (run.status === "empty") return { label: "Empty · No track matched", tone: "muted" };
   if (run.status === "failed") {
     if (run.next_retry_at) {

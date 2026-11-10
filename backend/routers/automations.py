@@ -15,6 +15,7 @@ from repositories.automations import (
     get_automations,
     update_automation,
 )
+from repositories.scrobbles import get_earliest_played_at
 from routers.deps import (
     get_current_active_user,
     get_current_user_lastfm_username,
@@ -38,9 +39,9 @@ from services.automation_runner import (
     next_fire_time,
     run_automation,
     run_automation_pipeline_cached,
+    window_bounds,
 )
 from services.progress import store as progress_store
-from services.scrobble_sync import start_scrobble_sync
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -109,6 +110,12 @@ async def preview_automation(
         del result["period"]
     if automation.cron and (next_run := next_fire_time(automation.cron, now, zone)):
         result["next_run"] = next_run.date().isoformat()
+    if current_user.scrobbles_complete_at is None:
+        # A first load reads newest first: the window may reach back past what is in yet.
+        read_from = await get_earliest_played_at(db, current_user.id)
+        start, _ = window_bounds(automation.window.model_dump(), at or now)
+        result["history_read_from"] = read_from
+        result["history_partial"] = read_from is None or start is None or start < read_from
     return result
 
 
@@ -168,6 +175,8 @@ async def run_progress(
         return ProgressRead(stage="done", done=done, total=done)
     if latest.status == "failed":
         return ProgressRead(stage="error", done=0, total=0, error=latest.error_message)
+    if latest.status == "waiting":
+        return ProgressRead(stage="waiting", done=0, total=0)
     return ProgressRead(stage="running", done=0, total=0)
 
 
@@ -229,15 +238,6 @@ async def _lock_or_409(db: AsyncSession, automation: Automation) -> None:
         raise HTTPException(status_code=409, detail="Automation already running")
 
 
-async def _history_loaded_or_409(db: AsyncSession, automation: Automation) -> None:
-    """A manual run waits for the first full load (ADR 0001), and leaves no history row."""
-    user = await db.get(User, automation.user_id)
-    if user is None or user.scrobbles_complete_at is None:
-        # Restarts an interrupted first load; a no-op while one runs.
-        start_scrobble_sync(automation.user_id, automation.lastfm_username)
-        raise HTTPException(status_code=409, detail="Your listening history is still loading. Run this when it finishes.")
-
-
 async def _run_and_commit(
     db: AsyncSession,
     automation: Automation,
@@ -245,7 +245,6 @@ async def _run_and_commit(
     attempt: int,
     body: RunRequest | None,
 ):
-    await _history_loaded_or_409(db, automation)
     token = body.progress_token if body and body.progress_token else None
     progress_key = f"run:{token}" if token else f"run:{automation.id}"
     progress_store.start(progress_key)
@@ -270,7 +269,8 @@ async def run_automation_now(
 ):
     """Trigger one manual run now (same pipeline as the scheduled sweep).
 
-    A manual trigger starts a fresh chain (attempt = 1) and supersedes any
+    During the first load it waits on its row and starts by itself once the
+    listens are in (see run_automation). A manual trigger starts a fresh chain (attempt = 1) and supersedes any
     pending auto-retry of an older chain (only the latest row retries). With a
     schedule it covers the last period the schedule closed; without one, up to now.
 

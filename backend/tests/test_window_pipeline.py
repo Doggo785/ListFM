@@ -15,6 +15,7 @@ from repositories.tags import mark_artist_tags_fetched, upsert_artist_tag
 from services import automation_runner
 from services.automation_runner import (
     HistoryLoading,
+    _check_ready,
     _sync_before_run,
     run_automation,
     run_automation_pipeline_cached,
@@ -174,9 +175,8 @@ async def test_run_waits_for_the_first_full_sync():
     with patch.object(automation_runner, "start_scrobble_sync") as start:
         async with _TestSessionLocal() as db:
             with pytest.raises(HistoryLoading):
-                await _sync_before_run(db, automation)
+                await _check_ready(db, automation)
     start.assert_called_once_with(user_id, "u")
-    assert "still loading" in automation_runner._public_error(HistoryLoading())
 
 
 @pytest.mark.asyncio

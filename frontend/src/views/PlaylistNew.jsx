@@ -49,6 +49,7 @@ const ROW_MOVE = { layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] } };
 const ROW_EXIT = { opacity: 0, transition: { duration: 0.12, ease: (t) => Math.ceil(t * 3) / 3 } };
 const ROW_STAGGER_LIMIT = 14; // Past the visible rows, waiting would only delay what's off-screen.
 const MOBILE_ROWS = 8; // Keep in step with the nth-child below: the page must not end after 200 rows on a phone.
+const READ_BACK_TO = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
 
 const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_9rem]";
 
@@ -142,6 +143,12 @@ function Preview({ preview, draft, linked, saved }) {
         </p>
       </div>
       {result?.period && <p className="pb-2 text-sm text-(--text-muted)">Covers {describePeriod(result.period)}.</p>}
+      {result?.history_partial && (
+        <p className="pb-2 text-sm text-(--text-muted)">
+          {result.history_read_from ? `Your listens are read back to ${READ_BACK_TO.format(new Date(result.history_read_from))} so far` : "Your listens are still arriving"}
+          : this preview will change as the rest comes in.
+        </p>
+      )}
       {result && result.total > 0 && (
         <p className="flex justify-between pr-2 pb-1 pl-11 text-sm text-(--text-muted)">
           <span>Track</span>
