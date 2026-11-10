@@ -300,7 +300,7 @@ function drawTrack(gl, uniforms, track, weight) {
  */
 export function waveCentre(x, track, wander, width = window.innerWidth, height = window.innerHeight) {
   const qx = (x - width / 2) / height;
-  const reach = (x - track.x0) / Math.max(1e-6, track.perMonth * track.end);
+  const reach = (x - track.x0) / Math.max(Number.EPSILON, track.perMonth * track.end);
   const sweep = smoothstep(TRACK_RISE_FROM, 1, reach) * Math.max(track.y / height, 0) * TRACK_RISE
     * (1 + 0.2 * Math.sin(qx * 3 + wander * 0.21) + 0.1 * Math.sin(qx * 7 - wander * 0.31)) * (1 - (track.importing ?? 0));
   const curve = (1 - track.zoom) * (TRACK_CURVE * Math.sin(qx * 2 + wander * 0.1) + sweep);
