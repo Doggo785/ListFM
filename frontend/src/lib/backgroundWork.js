@@ -7,6 +7,16 @@ const MAX_AHEAD_SECONDS = 6; // Two missed reads at most: past that the front wa
 const OLD_YEARS_SHARE = 0.4; // Of the band, while a first import still reads the years before the one shown.
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Sent on window when a run ends: the pages showing runs and playlists read them again. */
+export const RUNS_DONE = "listfm:runs-done";
+
+/** Whether a run in `previous` is no longer in `next`: one ended, its playlist is there to read. */
+export function runEnded(previous, next) {
+  if (previous?.kind !== "run") return false;
+  const still = new Set(next?.kind === "run" ? next.runs : []);
+  return previous.runs.some((id) => !still.has(id));
+}
+
 /** "about 6 min left", from the server's estimate. Null while it cannot tell yet. */
 export function timeLeft(seconds) {
   if (seconds == null) return null;
@@ -28,6 +38,7 @@ export function workFrom(task, previous, now) {
   const moved = same && until != null && previous.until != null && until !== previous.until;
   return {
     kind: task.kind,
+    runs: task.runs ?? [],
     share: task.share,
     perSecond: task.eta ? (1 - task.share) / task.eta : 0,
     at: now,

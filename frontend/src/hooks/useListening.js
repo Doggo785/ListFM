@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getListeningStory, getListeningTotals, getLatestRuns } from "@/lib/api";
+import { RUNS_DONE } from "@/lib/backgroundWork";
 
 const POLL_MS = 3000;
 const MAX_ART_POLLS = 20; // A pass that keeps failing must not keep the page asking.
@@ -53,6 +54,13 @@ export function useListening(username) {
       clearTimeout(timer);
     };
   }, [username, attempt]);
+
+  // A run that ends changes the latest runs: read everything again.
+  useEffect(() => {
+    const again = () => setAttempt((n) => n + 1);
+    window.addEventListener(RUNS_DONE, again);
+    return () => window.removeEventListener(RUNS_DONE, again);
+  }, []);
 
   const retry = useCallback(() => {
     setFailed(false);

@@ -10,11 +10,13 @@ from schemas import (
     KnownTag,
     ListeningStory,
     ListeningTotals,
+    RunInFlight,
     ScrobbleSyncStatus,
     UserInfo,
 )
 from services.activity_log import log_activity
 from services.album_covers import start_album_covers
+from services.automation_runner import next_run_at, runs_in_flight
 from services.lastfm import get_user_info
 from services.listening_story import build_story
 from services.progress import store as progress_store
@@ -39,7 +41,7 @@ def user_info(username: str = Depends(get_current_user_lastfm_username)):
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
 
-def _sync_status(user: User) -> ScrobbleSyncStatus:
+async def _sync_status(db: AsyncSession, user: User) -> ScrobbleSyncStatus:
     progress = progress_store.read(progress_key(user.id))
     tags = progress_store.read(tags_progress_key(user.id))
     tags_running = tags is not None and tags.stage == "tags"
@@ -56,6 +58,11 @@ def _sync_status(user: User) -> ScrobbleSyncStatus:
         tags_done=tags.done if tags and tags_running else 0,
         tags_total=tags.total if tags and tags_running else 0,
         tags_eta_seconds=tags.eta_seconds() if tags and tags_running else None,
+        runs=[
+            RunInFlight(automation_id=automation_id, name=name, stage=stage, done=done, total=total)
+            for automation_id, name, stage, done, total in runs_in_flight(user.id)
+        ],
+        next_run_at=await next_run_at(db, user.id, user.timezone or "UTC"),
     )
 
 
@@ -64,9 +71,12 @@ def _instant(uts: float | None) -> datetime | None:
 
 
 @router.get("/scrobbles/sync", response_model=ScrobbleSyncStatus)
-async def scrobble_sync_status(current_user: User = Depends(get_current_active_user)):
-    """Listening history sync status, for the progress bar and the partial-data banner."""
-    return _sync_status(current_user)
+async def scrobble_sync_status(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The background work: history sync, tag pass and runs, for the top line and the ribbon."""
+    return await _sync_status(db, current_user)
 
 
 @router.get("/scrobbles/totals", response_model=ListeningTotals)
@@ -98,11 +108,12 @@ async def listening_story(
 async def start_sync(
     username: str = Depends(get_current_user_lastfm_username),
     current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Start a sync, unless one ran in the last minutes or is already running."""
     if not is_fresh(current_user):
         start_scrobble_sync(current_user.id, username)
-    return _sync_status(current_user)
+    return await _sync_status(db, current_user)
 
 
 @router.get("/tags", response_model=list[KnownTag])

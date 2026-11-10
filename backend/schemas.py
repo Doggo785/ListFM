@@ -301,6 +301,16 @@ class KnownTag(BaseModel):
     artists: int
 
 
+class RunInFlight(BaseModel):
+    """An automation's run at work now, manual or scheduled, with its pipeline stage."""
+
+    automation_id: str
+    name: str
+    stage: str
+    done: int = 0
+    total: int = 0
+
+
 class ScrobbleSyncStatus(BaseModel):
     """Listening history sync: live progress, and whether the first full load is done."""
 
@@ -319,6 +329,9 @@ class ScrobbleSyncStatus(BaseModel):
     tags_done: int = 0
     tags_total: int = 0
     tags_eta_seconds: int | None = None
+    # Runs at work now, and when the next one should start: the app reads the status then, not every minute.
+    runs: list[RunInFlight] = []
+    next_run_at: datetime | None = None
 
 
 class ListeningTotals(BaseModel):

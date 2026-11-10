@@ -78,6 +78,46 @@ describe("BackgroundTasks", () => {
     expect(container.querySelector('[role="status"]').textContent).not.toContain("1,200");
   });
 
+  it("shows a run at work, scheduled or not, with its stage, and wakes up for the next one", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-10T12:00:00Z"));
+    startScrobbleSync.mockResolvedValue({ stage: "done", complete: true, tags_total: 0, runs: [], next_run_at: "2026-11-10T12:00:20Z" });
+    getScrobbleSync.mockResolvedValue({
+      stage: "done", complete: true, tags_total: 0,
+      runs: [{ automation_id: "a", name: "Monthly", stage: "filter", done: 40, total: 900 }],
+    });
+    await render();
+    expect(container.textContent).toBe("");
+    // Not a minute later: at the run's time.
+    await act(async () => vi.advanceTimersByTimeAsync(20000));
+    expect(getScrobbleSync).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Running “Monthly”: filtering the tracks.");
+    expect(ribbonStage.work).toMatchObject({ kind: "run", share: 0.85 });
+    // It ends: the pages showing runs and playlists are told.
+    const ended = vi.fn();
+    window.addEventListener("listfm:runs-done", ended);
+    getScrobbleSync.mockResolvedValue({ stage: "done", complete: true, tags_total: 0, runs: [] });
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toBe("");
+    window.removeEventListener("listfm:runs-done", ended);
+  });
+
+  it("names several runs at once", async () => {
+    startScrobbleSync.mockResolvedValue({
+      stage: "done", complete: true, tags_total: 0,
+      runs: [{ name: "A", stage: "source" }, { name: "B", stage: "sync" }],
+    });
+    await render();
+    expect(container.textContent).toContain("Running “A” and “B”. Their playlists show up in Playlists when they are done.");
+  });
+
+  it("says a run's playlist is ready while it delivers", async () => {
+    startScrobbleSync.mockResolvedValue({ stage: "done", complete: true, tags_total: 0, runs: [{ name: "A", stage: "done" }] });
+    await render();
+    expect(container.textContent).toContain("Running “A”: delivering. Its playlist is ready in Playlists.");
+  });
+
   it("stays silent during a routine sync and a small tag pass", async () => {
     startScrobbleSync.mockResolvedValue({ stage: "sync", done: 1, total: 2, complete: true, tags_done: 3, tags_total: 12 });
     await render();

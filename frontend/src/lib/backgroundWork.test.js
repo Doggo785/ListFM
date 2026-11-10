@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frontAt, historyBand, monthsSince, monthStart, timeLeft, workFrom } from "@/lib/backgroundWork";
+import { frontAt, historyBand, monthsSince, monthStart, runEnded, timeLeft, workFrom } from "@/lib/backgroundWork";
 
 describe("timeLeft", () => {
   it("says nothing until the server can tell, then rounds to what a person reads", () => {
@@ -66,5 +66,17 @@ describe("the history band", () => {
     const since = new Date(2026, 3, 10).getTime();
     const origin = monthStart(since);
     expect(historyBand({ since, until: new Date(2026, 4, 1).getTime(), yearStart, origin, width: 1200 })).toEqual({ yearX: 0, perMonth: 100, frontX: 100 });
+  });
+});
+
+describe("runEnded", () => {
+  it("is true when a run of the last read is no longer there", () => {
+    const two = { kind: "run", runs: ["a", "b"] };
+    expect(runEnded(two, { kind: "run", runs: ["a", "b"] })).toBe(false);
+    expect(runEnded(two, { kind: "run", runs: ["b"] })).toBe(true);
+    expect(runEnded(two, null)).toBe(true);
+    expect(runEnded(two, { kind: "tags" })).toBe(true);
+    expect(runEnded({ kind: "tags", runs: [] }, null)).toBe(false);
+    expect(runEnded(null, null)).toBe(false);
   });
 });

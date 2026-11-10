@@ -60,6 +60,12 @@ RETRY_DELAYS = {
 }
 MAX_ATTEMPT = 4
 
+# Runs in flight per user (single worker, see AGENTS.md): user_id -> {history_id: [automation_id, name, progress key,
+# ended at]}. The app reads them through the sync status, so a scheduled run shows on the ribbon like a manual one.
+_in_flight: dict[str, dict[str, list]] = {}
+# A run often lasts a second, less than the app's 3 s between reads: an ended one stays listed this long, delivering.
+RUN_LINGER_SECONDS = 5
+
 
 # Tracks returned to the client next to the result, for the builder preview.
 # shortcut: the client refilters these; drop the field with filter-engine.js (phase C).
@@ -456,7 +462,23 @@ async def run_automation(
     )
 
     label = automation_label(automation.name)
+    # A run started by the sweep has no ticket from a client: it gets its own, so the app can follow it.
+    key = progress_key or f"run:{automation.id}:{history.id}"
+    if progress_key is None:
+        progress_store.start(key)
+    entry = [automation.id, automation.name, key, None]
+    _in_flight.setdefault(automation.user_id, {})[history.id] = entry
     try:
+        return await _run_and_record(db, automation, history, key, label, scheduled_for)
+    finally:
+        entry[3] = monotonic()
+
+
+async def _run_and_record(
+    db: AsyncSession, automation: Automation, history: AutomationHistory, key: str, label: str, scheduled_for: datetime
+) -> AutomationHistory:
+    try:
+        progress_store.report(key, "sync", 0, 0)
         await _sync_before_run(db, automation)
         pipeline_started = monotonic()
         result = await run_automation_pipeline_cached(
@@ -473,7 +495,7 @@ async def run_automation(
             no_repeat_playlists=automation.output_no_repeat_playlists,
             automation_id=automation.id,
             at=scheduled_for,
-            progress_key=progress_key,
+            progress_key=key,
         )
     except Exception as exc:
         if isinstance(exc, HistoryLoading):
@@ -482,8 +504,7 @@ async def run_automation(
             logger.exception("run failed for automation %s", automation.id)
             log_activity("run", label, f"échec : {type(exc).__name__}")
         await _mark_failure(db, history, exc, automation)
-        if progress_key is not None:
-            progress_store.finish(progress_key, error=_public_error(exc))
+        progress_store.finish(key, error=_public_error(exc))
         return history
 
     log_activity("run", label, pipeline_summary(result, monotonic() - pipeline_started))
@@ -491,9 +512,59 @@ async def run_automation(
         playlist = await _persist_result_playlist(db, automation, result)
         history.generated_playlist_id = playlist.id
     await _mark_success(db, history, result, automation)
-    if progress_key is not None:
-        progress_store.finish(progress_key)
+    progress_store.finish(key)
     return history
+
+
+def runs_in_flight(user_id: str) -> list[tuple[str, str, str, int, int]]:
+    """This user's runs at work now, as (automation_id, name, stage, done, total). One just ended is delivering."""
+    entries = _in_flight.get(user_id, {})
+    for history_id, (*_, ended) in list(entries.items()):
+        if ended is not None and monotonic() - ended > RUN_LINGER_SECONDS:
+            del entries[history_id]
+    if not entries:
+        _in_flight.pop(user_id, None)
+    runs = []
+    for automation_id, name, key, ended in entries.values():
+        progress = progress_store.read(key)
+        stage = "done" if ended is not None else progress.stage if progress else "queued"
+        runs.append((automation_id, name, stage, progress.done if progress else 0, progress.total if progress else 0))
+    return runs
+
+
+async def next_run_at(db: AsyncSession, user_id: str, timezone: str, now: datetime | None = None) -> datetime | None:
+    """When this user's next run should start: now if one is due and waits for the sweep, else the soonest
+    scheduled date or retry. The app wakes up for it instead of reading the status every minute."""
+    now = now or datetime.now(UTC)
+    automations = (
+        await db.execute(
+            select(Automation).where(
+                Automation.user_id == user_id, Automation.enabled.is_(True), Automation.deleted_at.is_(None)
+            )
+        )
+    ).scalars().all()
+    times = []
+    for automation in automations:
+        if is_due(automation, now, timezone):
+            times.append(now)
+        elif automation.cron and (fire := next_fire_time(automation.cron, now, timezone)) is not None:
+            times.append(fire)
+    if automations:
+        # Each automation's latest run: a failure not yet at its last attempt is retried after its backoff.
+        latest = (
+            await db.execute(
+                select(AutomationHistory)
+                .where(AutomationHistory.automation_id.in_([a.id for a in automations]))
+                .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
+                .distinct(AutomationHistory.automation_id)
+            )
+        ).scalars().all()
+        times += [
+            max(now, row.started_at + RETRY_DELAYS[row.attempt])
+            for row in latest
+            if row.status == "failed" and row.attempt < MAX_ATTEMPT
+        ]
+    return min(times, default=None)
 
 
 async def _persist_result_playlist(

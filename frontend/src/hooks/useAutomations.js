@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getAutomations, getGeneratedPlaylists } from "@/lib/api";
+import { RUNS_DONE } from "@/lib/backgroundWork";
 
 export function countByAutomation(generatedPlaylists = []) {
   const counts = new Map();
@@ -70,7 +71,11 @@ export function useAutomations(username) {
   );
 
   useEffect(() => {
-    if (username) load();
+    if (!username) return undefined;
+    load();
+    // A run that ends, scheduled or not, brings a playlist: read the lists again.
+    window.addEventListener(RUNS_DONE, load);
+    return () => window.removeEventListener(RUNS_DONE, load);
   }, [username, load]);
 
   if (!username) {

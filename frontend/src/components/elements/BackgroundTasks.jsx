@@ -2,13 +2,29 @@ import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScrobbleSync } from "@/hooks/useScrobbleSync";
 import { startScrobbleSync } from "@/lib/api";
-import { timeLeft, workFrom } from "@/lib/backgroundWork";
+import { RUNS_DONE, runEnded, timeLeft, workFrom } from "@/lib/backgroundWork";
 import { ribbonStage } from "@/lib/pixelRibbon";
 
 // Below this a tag pass is routine: it ends in moments and changes nothing the person would notice.
 const MIN_VISIBLE_TAG_PASS = 50;
 
 const count = (n) => n.toLocaleString("en-US");
+const NAMES = new Intl.ListFormat("en", { type: "conjunction" });
+// A run's pipeline in its own words, and how far along each stage puts it: a run has no estimate, it lasts seconds.
+const RUN_STAGES = {
+  queued: ["starting", 0.05],
+  sync: ["catching up with Last.fm", 0.15],
+  source: ["gathering your tracks", 0.4],
+  enrich: ["looking up details", 0.6],
+  filter: ["filtering the tracks", 0.85],
+  done: ["delivering", 1],
+};
+const runStage = (run) => RUN_STAGES[run.stage] ?? RUN_STAGES.queued;
+const runsNote = (runs) => {
+  const ready = runs.every((run) => run.stage === "done");
+  if (runs.length === 1) return ready ? "Its playlist is ready in Playlists." : "Its playlist shows up in Playlists when it is done.";
+  return ready ? "Their playlists are ready in Playlists." : "Their playlists show up in Playlists when they are done.";
+};
 const MONTH = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 
 function currentTask(status) {
@@ -26,6 +42,18 @@ function currentTask(status) {
       eta: status.eta_seconds,
       since: status.since,
       until: status.until,
+    };
+  }
+  if (status.runs?.length) {
+    const names = status.runs.map((run) => `“${run.name || "Untitled"}”`);
+    return {
+      kind: "run",
+      runs: status.runs.map((run) => run.automation_id),
+      progress: status.runs.length === 1 ? `Running ${names[0]}: ${runStage(status.runs[0])[0]}` : `Running ${NAMES.format(names)}`,
+      left: null,
+      note: runsNote(status.runs),
+      share: Math.min(...status.runs.map((run) => runStage(run)[1])),
+      eta: null,
     };
   }
   if (status.tags_total >= MIN_VISIBLE_TAG_PASS) {
@@ -52,6 +80,7 @@ export default function BackgroundTasks() {
   useEffect(() => {
     const next = currentTask(status);
     const work = ribbonStage.work;
+    if (runEnded(work, next)) window.dispatchEvent(new Event(RUNS_DONE));
     if (next?.kind) ribbonStage.work = workFrom(next, work, performance.now());
     // A failure just goes. A finished task reaches the end and flares: the ribbon lets it go after.
     else if (next) ribbonStage.work = null;

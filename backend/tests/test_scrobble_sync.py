@@ -279,7 +279,7 @@ async def test_sync_status_reports_progress(client: AsyncClient):
     assert resp.json() == {
         "stage": None, "done": 0, "total": 0, "error": None, "complete": False, "synced_at": None,
         "eta_seconds": None, "since": None, "until": None,
-        "tags_done": 0, "tags_total": 0, "tags_eta_seconds": None,
+        "tags_done": 0, "tags_total": 0, "tags_eta_seconds": None, "runs": [], "next_run_at": None,
     }
 
 
