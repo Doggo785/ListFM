@@ -5,6 +5,7 @@ import TopNav from "./components/ui/TopNav";
 import PixelRibbon from "./components/ui/PixelRibbon";
 import ScrollToTop from "./components/elements/ScrollToTop";
 import AuthGuard from "./components/AuthGuard";
+import Guide from "./components/elements/Guide";
 
 // Each page in its own file, all fetched just after the first one: a later change of page waits for nothing.
 const pageLoaders = [];
@@ -52,6 +53,7 @@ function App() {
       <div id="under-ribbon" className="under-ribbon" />
       <PixelRibbon />
       {showNav && <TopNav />}
+      {showNav && <Guide />}
       <div className="app-main">
         <div className="min-w-0 flex-1">
           {/* The new page is there at once: nothing waits for the old one to leave. */}

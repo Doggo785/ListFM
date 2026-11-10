@@ -30,6 +30,7 @@ from routers.deps import (
 )
 from schemas import (
     AccountDelete,
+    GuideUpdate,
     PasswordChange,
     TimezoneUpdate,
     TokenResponse,
@@ -276,7 +277,24 @@ async def me(
         "is_lastfm_linked": lastfm_username is not None,
         "timezone": current_user.timezone,
         "has_password": current_user.password_hash is not None,
+        "guide_done_at": current_user.guide_done_at,
     }
+
+
+@router.put("/me/guide")
+async def set_guide(
+    body: GuideUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remember the newcomer's guide as done, so it never starts by itself again on any device."""
+    current_user.guide_done_at = datetime.now(UTC) if body.done else None
+    try:
+        await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save the guide")
+    return {"guide_done_at": current_user.guide_done_at}
 
 
 @router.put("/me/timezone")

@@ -20,6 +20,10 @@ _Avoid_ : Exécution, génération, job
 La liste des runs d'une automation : quand, combien de morceaux, et l'erreur en cas d'échec.
 _Avoid_ : Historique d'écoute (dire Écoutes)
 
+**Run en attente** :
+Un run demandé pendant le premier import, ou pendant la recherche de tags s'il filtre par tags : il attend sur sa ligne d'historique et part tout seul quand c'est prêt. Ce n'est ni un échec ni un essai.
+_Avoid_ : Run bloqué, run en échec
+
 **Run vide** :
 Un run qui ne trouve aucun morceau : il ne crée pas de playlist, ce n'est pas un échec et il n'est pas retenté.
 _Avoid_ : Échec, erreur
@@ -38,12 +42,16 @@ _Avoid_ : Historique, source, scrobbles
 La mise à jour des écoutes d'un utilisateur depuis Last.fm : complète la première fois, puis seulement les nouvelles.
 _Avoid_ : Import, fetch, refresh
 
+**Guide** :
+Le pas à pas des nouveaux arrivants sur les vrais écrans, du Dashboard à leur première automation, pendant le premier import. Fini ou passé, il ne repart que depuis les Réglages.
+_Avoid_ : Tutoriel, onboarding, visite
+
 **Catalogue de tags** :
 Les tags connus par artiste, partagés entre utilisateurs et remplis en tâche de fond. Un artiste absent du catalogue a des tags inconnus, ce qui diffère d'un artiste sans tag.
 _Avoid_ : Cache, enrichissement
 
 **Fil** :
-Le ruban tel que la page d'accueil le présente : une présence vivante qui écoute et travaille, sans visage ni voix. « The thread » dans les textes.
+Le ruban tel que la page d'accueil et le guide le présentent : une présence vivante qui écoute et travaille, sans visage ni voix. « The thread » dans les textes ; sur le Dashboard il brûle en flamme.
 _Avoid_ : Mascotte, ligne, vague
 
 ## La chaîne d'une automation

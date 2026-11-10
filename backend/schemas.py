@@ -111,6 +111,12 @@ class AccountDelete(BaseModel):
     confirm: str
 
 
+class GuideUpdate(BaseModel):
+    """The newcomer's guide finished or skipped (done), or asked for again from the settings."""
+
+    done: bool
+
+
 class TimezoneUpdate(BaseModel):
     timezone: str
 

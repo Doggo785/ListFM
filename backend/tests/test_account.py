@@ -145,3 +145,15 @@ async def test_an_account_with_no_email_confirms_with_a_word(client: AsyncClient
         user.email = None
         await db.commit()
     assert (await client.post("/api/auth/me/delete", json={"confirm": "delete"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_the_guide_is_remembered_on_the_account(client: AsyncClient):
+    await _register_and_login(client, _unique_email())
+    assert (await client.get("/api/auth/me")).json()["guide_done_at"] is None
+    done = await client.put("/api/auth/me/guide", json={"done": True})
+    assert done.status_code == 200
+    assert (await client.get("/api/auth/me")).json()["guide_done_at"] == done.json()["guide_done_at"] is not None
+    # Asked for again from the settings: it may start by itself once more.
+    await client.put("/api/auth/me/guide", json={"done": False})
+    assert (await client.get("/api/auth/me")).json()["guide_done_at"] is None

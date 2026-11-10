@@ -553,6 +553,151 @@ html, body, #root {
   }
 }
 
+/* The newcomer's guide: a bubble beside what it shows and an ember frame around it, nothing dimmed.
+   Above the pages and the editor's bar, under an open select's list (z 50). */
+.guide-frame {
+  position: fixed;
+  z-index: 46;
+  pointer-events: none;
+  border: 2px solid var(--ember);
+  transition-property: left, top, width, height;
+  transition-duration: var(--duration-slide);
+  transition-timing-function: var(--ease-out);
+  animation: guide-breathe 1.6s steps(4) infinite alternate;
+}
+@keyframes guide-breathe {
+  to { border-color: var(--ember-6); }
+}
+.guide {
+  position: fixed;
+  z-index: 48;
+  padding: 16px 18px 14px;
+  border: 2px solid var(--ember);
+  background: var(--ground);
+  color: var(--text);
+  text-align: left;
+  transition-property: left, top, bottom;
+  transition-duration: var(--duration-slide);
+  transition-timing-function: var(--ease-out);
+}
+/* Phones: docked at the bottom, or at the top when what it shows is down there (the editor's buttons). */
+.guide--bottom,
+.guide--top {
+  left: 0;
+  right: 0;
+  padding: 14px 16px 16px;
+  border-width: 2px 0 0;
+}
+.guide--bottom { bottom: 0; }
+.guide--top {
+  top: 0;
+  border-width: 0 0 2px;
+}
+/* A stepped triangle, three pixel rows. */
+.guide__arrow {
+  position: absolute;
+  width: 20px;
+  height: 12px;
+  margin-left: -10px;
+  background: var(--ember);
+}
+.guide__arrow--up {
+  top: -14px;
+  clip-path: polygon(8px 0, 12px 0, 12px 4px, 16px 4px, 16px 8px, 20px 8px, 20px 12px, 0 12px, 0 8px, 4px 8px, 4px 4px, 8px 4px);
+}
+.guide__arrow--down {
+  bottom: -14px;
+  clip-path: polygon(0 0, 20px 0, 20px 4px, 16px 4px, 16px 8px, 12px 8px, 12px 12px, 8px 12px, 8px 8px, 4px 8px, 4px 4px, 0 4px);
+}
+.guide__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+}
+.guide__button {
+  height: 40px;
+  padding: 0 16px;
+  border: 2px solid transparent;
+  background: var(--ember);
+  color: var(--on-ember);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  transition: background-color var(--duration-quick);
+}
+.guide__button:hover { background: var(--ember-9); }
+.guide__button--outline {
+  border-color: var(--control);
+  background: transparent;
+  color: var(--text);
+}
+.guide__button--outline:hover {
+  border-color: var(--ember);
+  background: transparent;
+}
+.guide__skip {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.guide__skip:hover { color: var(--ember); }
+/* What the user has to do on the page, led by a blinking pixel. */
+.guide__hint {
+  color: var(--ember);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.guide__hint::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--ember);
+  animation: guide-blink 1s steps(2, jump-none) infinite;
+}
+@keyframes guide-blink {
+  50% { opacity: 0; }
+}
+.guide-resume {
+  position: fixed;
+  z-index: 48;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  height: 40px;
+  padding: 0 16px;
+  border: 2px solid var(--ember);
+  background: var(--ground);
+  color: var(--ember);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+.guide-resume:hover {
+  background: var(--ember);
+  color: var(--on-ember);
+}
+.guide__button:focus-visible,
+.guide__skip:focus-visible,
+.guide-resume:focus-visible {
+  outline: 2px solid var(--ember-9);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .guide__button,
+  .guide-resume { height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-frame,
+  .guide__hint::before { animation: none; }
+  .guide-frame,
+  .guide { transition: none; }
+}
+
 /* The landing page. Its canvas lies over the content, on the ribbon's grid, and draws around text by itself. */
 .landing {
   position: relative;
