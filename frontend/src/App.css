@@ -100,6 +100,13 @@ html, body, #root {
 .settings {
   max-width: 880px;
 }
+.privacy {
+  max-width: 720px;
+}
+.privacy__part {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
 .settings__row {
   display: grid;
   grid-template-columns: minmax(0, 320px) minmax(0, 1fr);

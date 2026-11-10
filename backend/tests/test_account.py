@@ -10,7 +10,12 @@ from config import get_settings
 from httpx import AsyncClient
 from models.auth_provider import AuthProvider
 from models.automation import Automation
+from models.automation_history import AutomationHistory
+from models.generated_playlist import GeneratedPlaylist
+from models.playlist_track import PlaylistTrack
+from models.refresh_token import RefreshToken
 from models.scrobble import Scrobble
+from models.track import Track
 from models.user import User
 from models.user_track import UserTrack
 from repositories.scrobbles import store_scrobbles
@@ -108,6 +113,13 @@ async def test_deleting_erases_listens_frees_the_email_and_stops_runs(client: As
         user_id = (await db.execute(select(User.id))).scalars().one()
         await store_scrobbles(db, user_id, [("A", "X", datetime(2026, 1, 1, tzinfo=UTC))])
         db.add(Automation(id="a1", user_id=user_id, lastfm_username="leaving", name="One", window={"length": {"amount": 3, "unit": "month"}}, sort="random"))
+        await db.flush()
+        now = datetime.now(UTC)
+        db.add(GeneratedPlaylist(id="p1", user_id=user_id, automation_id="a1", lastfm_username="leaving", name="One", track_count=1, generated_at=now))
+        await db.flush()
+        track_id = await db.scalar(select(Track.id))
+        db.add(PlaylistTrack(playlist_id="p1", track_id=track_id, position=1))
+        db.add(AutomationHistory(id="h1", automation_id="a1", generated_playlist_id="p1", status="completed", scheduled_for=now, started_at=now))
         await db.commit()
 
     scrobble_sync._running[user_id] = "leaving"
@@ -123,12 +135,13 @@ async def test_deleting_erases_listens_frees_the_email_and_stops_runs(client: As
         for model in (Scrobble, UserTrack):
             assert await db.scalar(select(func.count()).select_from(model).where(model.user_id == user_id)) == 0
         assert await db.scalar(select(func.count()).select_from(AuthProvider).where(AuthProvider.user_id == user_id)) == 0
-        automation = await db.get(Automation, "a1")
-        assert automation.deleted_at is not None
+        for model in (Automation, GeneratedPlaylist, RefreshToken):
+            assert await db.scalar(select(func.count()).select_from(model).where(model.user_id == user_id)) == 0
+        assert await db.get(AutomationHistory, "h1") is None
+        assert await db.scalar(select(func.count()).select_from(PlaylistTrack).where(PlaylistTrack.playlist_id == "p1")) == 0
         user = await db.get(User, user_id)
         assert user.deleted_at is not None
-        assert user.email is None
-        assert user.password_hash is None
+        assert (user.email, user.password_hash, user.display_name, user.timezone) == (None, None, None, None)
 
     assert (await client.get("/api/auth/me")).status_code == 401
     client.cookies.clear()

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { FormError, MaskedField, TextField } from "@/components/elements/AuthScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -246,7 +246,7 @@ function DeleteRow({ email, onDeleted }) {
   };
 
   return (
-    <Row title="Delete account" note="Your listens are erased, your automations stop and your playlists disappear. This cannot be undone.">
+    <Row title="Delete account" note="Everything goes at once: your listens, automations and playlists. This cannot be undone.">
       <Button variant="danger" onClick={() => setAsking(true)}>Delete account</Button>
       <Modal
         open={asking}
@@ -294,6 +294,9 @@ export default function Settings() {
           >
             Replay the guide
           </Button>
+        </Row>
+        <Row title="Your data" note="What ListFM keeps, and what it never does.">
+          <Link to="/privacy" className="text-(--text) underline underline-offset-4 hover:text-(--ember)">Read the privacy page</Link>
         </Row>
         <DeleteRow
           email={user.email}

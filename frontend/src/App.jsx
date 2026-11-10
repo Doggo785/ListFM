@@ -33,8 +33,9 @@ const Playlists = page(() => import("./views/Playlists"));
 const Playlist = page(() => import("./views/Playlist"));
 const Settings = page(() => import("./views/Settings"));
 const LastfmReturn = page(() => import("./views/LastfmReturn"));
+const Privacy = page(() => import("./views/Privacy"));
 
-const NO_NAV_PATHS = ["/", "/login", "/register", "/auth/callback", "/auth/lastfm", "/link-lastfm"];
+const NO_NAV_PATHS = ["/", "/privacy", "/login", "/register", "/auth/callback", "/auth/lastfm", "/link-lastfm"];
 
 function App() {
   const location = useLocation();
@@ -134,6 +135,7 @@ function App() {
                   </AuthGuard>
                 }
               />
+              <Route path="/privacy" element={<Privacy />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/auth/callback" element={<AuthCallback />} />

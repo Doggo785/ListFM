@@ -54,6 +54,7 @@ export default function Register() {
       <div className="mt-6 flex flex-col gap-4 border-t border-(--line) pt-6">
         <ProviderButtons verb="Sign up" disabled={loading} />
         <p className="text-(--text-muted)">Already have an account? <Link to="/login" className="text-(--text) underline underline-offset-4">Log in</Link></p>
+        <p className="text-(--text-muted)">What ListFM keeps, and never does: <Link to="/privacy" className="text-(--text) underline underline-offset-4">Privacy</Link></p>
       </div>
     </AuthScreen>
   );

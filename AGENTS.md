@@ -27,7 +27,7 @@ Lire avant d'agir :
 - `filter_groups` est validé à la lecture en base : retirer un champ ou un opérateur demande une migration qui réécrit les automations stockées.
 - Le pipeline et les filtres ne font aucun appel Last.fm (ADR 0003) : ils lisent les écoutes et le catalogue de tags en base. Un champ jamais cherché reste absent de la piste et ne passe aucun filtre, pas même `not_contains`.
 - Les repositories ne commitent pas : l'appelant commit, et rattrape `SQLAlchemyError` avec un rollback.
-- Soft-delete par `deleted_at` sur `User`, `Automation`, `GeneratedPlaylist` : chaque requête filtre `deleted_at IS NULL`.
+- Soft-delete par `deleted_at` sur `User`, `Automation`, `GeneratedPlaylist` : chaque requête filtre `deleted_at IS NULL`. La suppression d'un compte, elle, efface pour de vrai tout ce qu'il contient (`erase_user_automations`, `delete_user`) : seule reste une ligne `users` vide.
 - Les modèles ne déclarent aucun `relationship()` ; les jointures sont des `select().join()` explicites.
 - `Automation.output` est stocké à plat (`output_max_size`) et reconstruit par un `model_validator`.
 - Tokens de provider : aucune colonne en clair. Les rajouter seulement chiffrées au repos.
@@ -55,6 +55,7 @@ Lire avant d'agir :
 - La page d'accueil a son propre canvas (`lib/landing/stage.js`) et le shader se tait sous elle (`silent` dans sa scène) : c'est la seule exception au ruban unique, parce que le fil doit pouvoir se défaire en pixels. Le spectacle suit le scroll avec un léger retard lissé, et quand le scroll s'arrête la page glisse jusqu'à l'étape suivante dans le sens du geste (`storyBeats`, `beatToSettle`), à l'envers aussi. Pas de `scroll-snap` CSS : il saccade avec les trackpads.
 - `lib/landing/demo.json` sort de `scripts/landing_demo.py`, à travers le vrai moteur, et il est public à vie une fois commité : l'owner le relit avant. Ne pas le modifier à la main.
 - Le guide des nouveaux arrivants (`components/elements/Guide.jsx`, étapes dans `lib/guide.js`) pointe les vrais écrans par `data-guide-step` et par des classes existantes (`.background-task`, `.poster__line`) : renommer l'une demande de changer l'étape. Pendant ses étapes, l'éditeur affiche ses champs vides (le brouillon garde ses valeurs par défaut dessous) et cache les recettes. La mascotte s'appelle « the thread » partout, comme sur la page d'accueil ; sur le Dashboard elle brûle en flamme.
+- `views/Privacy.jsx` décrit ce que le site garde et à qui il parle : une nouvelle donnée stockée, un cookie, un service tiers ou un journal doit y être ajouté dans la même PR, sinon la page ment. Elle promet aussi qu'aucune IP n'est gardée (pas de journal d'accès sur disque en prod).
 - `DESIGN.md` décrit le monde visuel, écrit depuis le Créateur. Les écrans pas encore refaits ne sont pas une référence.
 
 ## Base de données locale

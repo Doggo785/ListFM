@@ -2,8 +2,11 @@ import uuid
 from datetime import UTC, datetime
 
 from models.automation import Automation
+from models.automation_history import AutomationHistory
+from models.generated_playlist import GeneratedPlaylist
+from models.playlist_track import PlaylistTrack
 from schemas import AutomationCreate, AutomationUpdate
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -130,12 +133,14 @@ async def delete_automation(db: AsyncSession, automation_id: str, user_id: str) 
     return True
 
 
-async def delete_user_automations(db: AsyncSession, user_id: str) -> None:
-    await db.execute(
-        update(Automation)
-        .where(Automation.user_id == user_id, Automation.deleted_at.is_(None))
-        .values(deleted_at=datetime.now(UTC))
-    )
+async def erase_user_automations(db: AsyncSession, user_id: str) -> None:
+    """For a deleted account: its automations, their runs and playlists go for good, soft-deleted ones too."""
+    automations = select(Automation.id).where(Automation.user_id == user_id)
+    playlists = select(GeneratedPlaylist.id).where(GeneratedPlaylist.user_id == user_id)
+    await db.execute(delete(AutomationHistory).where(AutomationHistory.automation_id.in_(automations)))
+    await db.execute(delete(PlaylistTrack).where(PlaylistTrack.playlist_id.in_(playlists)))
+    await db.execute(delete(GeneratedPlaylist).where(GeneratedPlaylist.user_id == user_id))
+    await db.execute(delete(Automation).where(Automation.user_id == user_id))
 
 
 async def set_automations_lastfm_username(

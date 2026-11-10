@@ -170,6 +170,7 @@ function Page({ still }) {
         </div>
         <footer data-quiet className="landing__footer text-sm text-(--text-muted)">
           <a href={REPOSITORY} target="_blank" rel="noopener noreferrer" className="underline hover:text-(--ember)">ListFM is open source</a>
+          <span> · </span><Link to="/privacy" className="underline hover:text-(--ember)">Privacy</Link>
           <span> · ListFM isn't affiliated with Last.fm, Spotify or the other services named here.</span>
           <span> · The example is {demo.name}'s real history, as of {new Date(demo.asOf).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.</span>
         </footer>
