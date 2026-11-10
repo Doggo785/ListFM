@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime
 
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
@@ -49,9 +50,17 @@ def _sync_status(user: User) -> ScrobbleSyncStatus:
         error=progress.error if progress else None,
         complete=user.scrobbles_complete_at is not None,
         synced_at=user.scrobbles_synced_at,
+        eta_seconds=progress.eta_seconds() if progress and progress.stage == "sync" else None,
+        since=_instant(progress.since if progress else None),
+        until=_instant(progress.until if progress else None),
         tags_done=tags.done if tags and tags_running else 0,
         tags_total=tags.total if tags and tags_running else 0,
+        tags_eta_seconds=tags.eta_seconds() if tags and tags_running else None,
     )
+
+
+def _instant(uts: float | None) -> datetime | None:
+    return datetime.fromtimestamp(uts, tz=UTC) if uts is not None else None
 
 
 @router.get("/scrobbles/sync", response_model=ScrobbleSyncStatus)

@@ -84,7 +84,10 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
         )
         await store_track_albums(db, [(title, artist, album) for title, artist, _, album in listens])
         await db.commit()
-        progress_store.report(key, "sync", done, total_pages)
+        times = [uts for _, _, uts, _ in listens]
+        progress_store.report(
+            key, "sync", done, total_pages, since=min(times, default=None), until=max(times, default=None)
+        )
         progress_store.bump_calls(key)
         log_activity("sync", username, f"page {done}/{total_pages}  +{len(listens)} écoutes")
 

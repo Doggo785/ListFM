@@ -310,9 +310,15 @@ class ScrobbleSyncStatus(BaseModel):
     error: str | None = None
     complete: bool
     synced_at: datetime | None = None
+    # Time left at the pace so far, unknown until the first page is in.
+    eta_seconds: int | None = None
+    # The span of listening history read so far: oldest listen, then the newest reached.
+    since: datetime | None = None
+    until: datetime | None = None
     # The tag catalogue's pass for this user, zero when none is running.
     tags_done: int = 0
     tags_total: int = 0
+    tags_eta_seconds: int | None = None
 
 
 class ListeningTotals(BaseModel):

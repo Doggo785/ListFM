@@ -21,6 +21,18 @@ class Progress:
     calls: int = 0
     error: str | None = None
     updated_at: float = field(default_factory=time.monotonic)
+    started_at: float = field(default_factory=lambda: time.monotonic())  # Called late, so a test can patch the clock.
+    # How far in time the work has read, as Unix seconds: the oldest item it started from and the newest so far.
+    since: float | None = None
+    until: float | None = None
+
+    def eta_seconds(self) -> int | None:
+        """Time left at the pace so far. Unknown before the first item, or once nothing is left."""
+        if self.done <= 0 or self.done >= self.total:
+            return None
+        per_item = (self.updated_at - self.started_at) / self.done
+        left = per_item * (self.total - self.done) - (time.monotonic() - self.updated_at)
+        return max(0, round(left))
 
 
 class ProgressStore:
@@ -40,7 +52,7 @@ class ProgressStore:
             self._entries[key] = progress
             return progress
 
-    def report(self, key: str, stage: str, done: int, total: int) -> None:
+    def report(self, key: str, stage: str, done: int, total: int, *, since: float | None = None, until: float | None = None) -> None:
         with self._lock:
             progress = self._entries.get(key)
             if progress is None:
@@ -53,6 +65,11 @@ class ProgressStore:
             progress.done = done
             progress.total = total
             progress.updated_at = time.monotonic()
+            # The first item read sets where the work started; a retry after it keeps that start.
+            if since is not None and progress.since is None:
+                progress.since = since
+            if until is not None:
+                progress.until = until
 
     def read(self, key: str) -> Progress | None:
         with self._lock:

@@ -278,8 +278,26 @@ async def test_sync_status_reports_progress(client: AsyncClient):
     assert resp.status_code == 200
     assert resp.json() == {
         "stage": None, "done": 0, "total": 0, "error": None, "complete": False, "synced_at": None,
-        "tags_done": 0, "tags_total": 0,
+        "eta_seconds": None, "since": None, "until": None,
+        "tags_done": 0, "tags_total": 0, "tags_eta_seconds": None,
     }
+
+
+@pytest.mark.asyncio
+async def test_sync_status_says_how_far_and_how_long(client: AsyncClient):
+    email = _unique_email()
+    await _register_and_login(client, email)
+    async with _TestSessionLocal() as db:
+        user_id = await db.scalar(select(User.id).where(User.email == email))
+    key = scrobble_sync.progress_key(user_id)
+    scrobble_sync.progress_store.start(key)
+    scrobble_sync.progress_store.report(key, "sync", 1, 4, since=1_600_000_000, until=1_650_000_000)
+    body = (await client.get("/api/scrobbles/sync")).json()
+    assert body["since"].startswith("2020-09-13")
+    assert body["until"].startswith("2022-04-15")
+    assert isinstance(body["eta_seconds"], int)
+    scrobble_sync.progress_store.finish(key)
+    assert (await client.get("/api/scrobbles/sync")).json()["eta_seconds"] is None
 
 
 async def _run_in_background(user_id, fake):
@@ -301,6 +319,13 @@ async def test_background_sync_reports_done():
     progress = await _run_in_background(user_id, FakeLastfm([_listen(1), _listen(2)]))
     assert (progress.stage, progress.done, progress.total) == ("done", 1, 1)
     assert await _count(user_id) == 2
+
+
+@pytest.mark.asyncio
+async def test_background_sync_records_the_span_it_read():
+    user_id = await _new_user()
+    progress = await _run_in_background(user_id, FakeLastfm([_listen(n) for n in range(5)]))
+    assert (progress.since, progress.until) == (_listen(0)[2], _listen(4)[2])
 
 
 @pytest.mark.asyncio
