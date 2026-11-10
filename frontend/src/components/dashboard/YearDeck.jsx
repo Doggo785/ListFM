@@ -25,6 +25,7 @@ const HERO_FLAME = 0.9;
 const EMPTY_YEAR = { series: new Uint8Array(SAMPLES_PER_MONTH), end: 0, count: 1 };
 const WORK_EASE = 0.5; // Seconds: how fast the flame goes into an import's band, and back to its year after.
 const IMPORT_FLARE = 0.6; // Of the flame: its last roar when an import ends.
+const random = Math.random; // Where sparks fly: noise for the eye, never a secret.
 const DECK_FLAME = 1;
 const HERO_HALF_SHARE = 0.78; // Of the poster's line: the wave keeps inside it downward, only its flames leave, upward.
 const DECK_HALF_SHARE = 0.4; // Of a card: only its tongues rise past the cards' top.
@@ -286,7 +287,7 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       ribbonStage.track = track;
       ribbonStage.embers = Math.min(MAX_EMBERS, story.listens_last_day);
       // The front spits sparks where the work is landing; an import ends in one last roar.
-      if (!reducedMotion && lead > 0.5 && zoom < 0.5) ribbonStage.burst(heroHead + (Math.random() - 0.5) * 24, track.y - Math.random() * track.half * 0.6);
+      if (!reducedMotion && lead > 0.5 && zoom < 0.5) ribbonStage.burst(heroHead + (random() - 0.5) * 24, track.y - random() * track.half * 0.6);
       if (work?.kind === "listens" && work.doneAt != null) track.flame += IMPORT_FLARE * Math.exp(-(now - work.doneAt) / 700);
     };
     drive();
