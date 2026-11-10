@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CELL, chainShape, createRibbon, hexToRgb, openingRect, quietRects, rampFor, ribbonStage, sceneFor } from "./pixelRibbon";
+import { CELL, chainShape, createRibbon, hexToRgb, openingRect, quietRects, rampFor, ribbonStage, sceneFor, waveCentre } from "./pixelRibbon";
 
 const PALETTE = ["#000000", "#010101", "#020202", "#030303", "#040404", "#050505", "#060606", "#070707", "#080808"];
 
@@ -239,7 +239,7 @@ describe("createRibbon", () => {
     tick(32);
     expect(lastPull(gl)).toBe(0);
     // The time uniform is the first float of each frame: it must not advance.
-    const times = gl.calls.uniform1f.filter((_, i) => i % 10 === 0).map(([, v]) => v);
+    const times = gl.calls.uniform1f.filter((_, i) => i % 9 === 0).map(([, v]) => v);
     expect(new Set(times)).toEqual(new Set([0]));
   });
 
@@ -249,7 +249,8 @@ describe("createRibbon", () => {
     ribbon.setScene(sceneFor("/automations"));
     ribbonStage.work = { kind: "tags", share: 0.4, perSecond: 0, at: 0, until: null, doneAt: null };
     tick(16);
-    expect(lastCall(gl, "uniform3f").slice(1)).toEqual([0.4, 1, 0]);
+    // uFront, then uWork: the front is the frame's second vec3.
+    expect(gl.calls.uniform3f.at(-2).slice(1)).toEqual([0.4, 1, 0]);
     ribbonStage.work.doneAt = performance.now(); // tick reads the real clock: a fixed time would expire on a slow run.
     tick(32);
     expect(ribbonStage.work.shown).toBe(1);
@@ -420,5 +421,18 @@ describe("the landing page's scene", () => {
   it("keeps the ribbon silent there, and nowhere else", () => {
     expect(sceneFor("/").silent).toBe(true);
     expect(sceneFor("/login").silent).toBeUndefined();
+  });
+});
+
+describe("waveCentre", () => {
+  const track = { y: 400, x0: 0, perMonth: 100, end: 12, zoom: 0, cx: 640, importing: 0, layout: { radius: 500, perspective: 1000, bow: 80, step: 0.3 } };
+
+  it("lies on the line on the left, and rises with the wave toward the year's end", () => {
+    expect(Math.abs(waveCentre(100, track, 0, 1200, 800) - 400)).toBeLessThan(10);
+    expect(waveCentre(1190, track, 0, 1200, 800)).toBeLessThan(300);
+  });
+
+  it("stays on the line while an import brings the year in: its end does not rise yet", () => {
+    expect(Math.abs(waveCentre(1190, { ...track, importing: 1 }, 0, 1200, 800) - 400)).toBeLessThan(10);
   });
 });

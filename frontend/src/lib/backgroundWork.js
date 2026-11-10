@@ -6,6 +6,9 @@
 const MAX_AHEAD_SECONDS = 6; // Two missed reads at most: past that the front waits for news rather than guess.
 const OLD_YEARS_SHARE = 0.4; // Of the band, while a first import still reads the years before the one shown.
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HEAD_FADE_SECONDS = 0.25; // To go back the head goes out, moves, and lights up again: it never sweeps back across.
+const HEAD_EASE = 10; // Per second, forward: enough to soften a run's steps, too fast to trail a front.
+const HEAD_JUMP = 48; // Pixels. Further back than this the head jumps instead of gliding.
 
 /** Sent on window when a run ends: the pages showing runs and playlists read them again. */
 export const RUNS_DONE = "listfm:runs-done";
@@ -47,6 +50,8 @@ export function workFrom(task, previous, now) {
     untilAt: moved || !same ? now : previous.untilAt,
     untilPerSecond: moved ? Math.max(0, (until - previous.until) / Math.max(1, (now - previous.untilAt) / 1000)) : same ? previous.untilPerSecond : 0,
     doneAt: null,
+    // What the ribbon has drawn so far: kept across reads, so the front glides on instead of restarting from each.
+    ...(same && { shown: previous.shown, shownUntil: previous.shownUntil, shownKind: previous.shownKind }),
   };
 }
 
@@ -57,6 +62,19 @@ export function frontAt(work, now) {
   if (work.until == null) return { share, until: null };
   const untilAhead = Math.min(Math.max(0, now - work.untilAt) / 1000, MAX_AHEAD_SECONDS);
   return { share, until: work.until + work.untilPerSecond * untilAhead };
+}
+
+/**
+ * The Dashboard flame's head on its way to `wanted`, `dt` seconds on: it glides forward, and to go back
+ * (a new task starting, the next one starting over) it fades, jumps, then lights up there.
+ */
+export function moveHead(head, wanted, dt) {
+  if (head.x == null) return { x: wanted, glow: 1 };
+  if (wanted < head.x - HEAD_JUMP) {
+    const glow = Math.max(0, head.glow - dt / HEAD_FADE_SECONDS);
+    return { x: glow > 0 ? head.x : wanted, glow };
+  }
+  return { x: head.x + (wanted - head.x) * (1 - Math.exp(-dt * HEAD_EASE)), glow: Math.min(1, head.glow + dt / HEAD_FADE_SECONDS) };
 }
 
 /** The first instant of the month `back` months before the one holding `ms`, in local time. */

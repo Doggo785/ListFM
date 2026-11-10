@@ -2,7 +2,7 @@
 
 import { burstEmber, createEmberLayer, linkProgram, stepEmbers } from "@/lib/ribbonEmbers";
 import { frontAt } from "@/lib/backgroundWork";
-import { monthAt, smoothstep } from "@/lib/ribbonTrack";
+import { drumAngle, monthAt, smoothstep } from "@/lib/ribbonTrack";
 
 export const CELL = 4; // CSS pixels per ribbon pixel: rendering one fragment per cell keeps it cheap.
 const MAX_QUIET = 12;
@@ -24,6 +24,9 @@ const QUIET_FADE = 130;
 const MAX_HOLES = 4;
 const WORK_GLOW_MS = 2500; // A finished task's front stays this long, for its last flare, then the ribbon lets it go.
 const FRONT_EASE = 2.5; // Per second: how fast the drawn front catches up with where it should be.
+const IMPORT_TIP = 0.6; // Months: how long the wave's tip tapers while an import brings it in.
+const SPARK_BEHIND = 20; // CSS pixels: sparks leave from the flame just behind its head, never from past its tip.
+const random = Math.random; // Where embers leave: noise for the eye, never a secret.
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
 const PHONE_WIDTH = 860; // Where the auth screens stack, and the free space moves under the form.
@@ -125,7 +128,7 @@ precision highp float;
 uniform vec2 uRes;uniform float uT,uWander,uAngle,uOff,uPull,uCalm,uEdge,uClip;uniform vec2 uPoint,uBand;
 uniform float uCols[${COLUMNS}];uniform vec3 uRamp[4];uniform vec4 uQuiet[${MAX_QUIET}];uniform int uN;
 uniform vec3 uHot[2];uniform vec4 uMap,uWave,uDrum,uDrumB;uniform sampler2D uSeries;
-uniform vec3 uFront;uniform float uImport;
+uniform vec3 uFront,uWork;
 uniform vec4 uHoles[${MAX_HOLES}],uCut,uBurn;uniform vec3 uEdges[${MAX_HOLES * 4}],uInk;uniform float uFade;
 out vec4 o;
 float b2(vec2 a){a=floor(a);return fract(a.x/2.+a.y*a.y*.75);}
@@ -159,12 +162,14 @@ void main(){
     // Past the year's ends the drum's fire keeps burning, low, so one side of the deck is never bare.
     float beyond=smoothstep(uMap.z-.2,uMap.z+.5,mo)+smoothstep(.2,-.5,mo);
     amount=max(amount,.5*uDrum.x*min(beyond,1.));
-    float past=uDrum.x*1.8;float ends=smoothstep(-past,.3-past*.5,mo)*smoothstep(uMap.z+past,uMap.z-.14+past*.5,mo);
+    float past=uDrum.x*1.8;
+    // An arriving year's tip thins out like a tongue, instead of stopping on a wall where the reading is.
+    float ends=smoothstep(-past,.3-past*.5,mo)*smoothstep(uMap.z+past,uMap.z-.14-${IMPORT_TIP.toFixed(2)}*uWork.x+past*.5,mo);
     // A first import reads the years before the one shown: left of the year, a low line lit up to the front.
-    float early=uImport*step(px,uMap.x);
+    float early=uWork.x*step(px,uMap.x);
     amount*=1.-early;
-    ends=mix(ends,clamp((uWave.z-px)/8.,0.,1.),early);
-    heat=track*exp(-pow((px-uWave.z)/90.,2.));
+    ends=mix(ends,clamp((uWork.y-px)/8.,0.,1.),early);
+    heat=track*uWork.z*exp(-pow((px-uWave.z)/90.,2.));
     amount=max(amount,.6*heat); // The playhead stands out even over a quiet day.
     float wave=uWave.y*(.17+.83*amount)*ends*(1.+.22*heat);
     wave+=.005*(sin(s*9.+uT*.5)*.5+sin(s*17.-uT*.35+1.3)*.25)*ends;
@@ -172,7 +177,7 @@ void main(){
     hw=mix(hw,wave,track);
     // Upward only: the name leaves room on the right, and below the line there is text.
     float sweep=smoothstep(${TRACK_RISE_FROM.toFixed(2)},1.,(px-uMap.x)/(uMap.y*uMap.z))*max(.5-uWave.x,0.)*${TRACK_RISE.toFixed(2)}*(1.+.2*sin(q.x*3.+uWander*.21)+.1*sin(q.x*7.-uWander*.31));
-    sweep*=1.-uImport; // The arriving year's end is not the year's end: it does not rise yet.
+    sweep*=1.-uWork.x; // The arriving year's end is not the year's end: it does not rise yet.
     float curve=(1.-uDrum.x)*(${TRACK_CURVE.toFixed(3)}*sin(q.x*2.+uWander*.1)+sweep); // The slow bend of the site's ribbon.
     c=mix(c,uWave.x+curve-uDrum.x*uDrumB.z*(1.-cos(th))*scale,track);
     // A flame climbs: its tongues reach upward from the core and barely below it.
@@ -232,7 +237,7 @@ void main(){
   o=vec4(tone<4?uRamp[tone]:uHot[tone-4],1.);
 }`;
 
-const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN", "uHot", "uMap", "uWave", "uDrum", "uDrumB", "uSeries", "uHoles", "uCut", "uBurn", "uEdges", "uInk", "uFade", "uFront", "uImport"];
+const UNIFORMS = ["uRes", "uT", "uWander", "uAngle", "uOff", "uPull", "uCalm", "uEdge", "uClip", "uPoint", "uBand", "uCols", "uRamp", "uQuiet", "uN", "uHot", "uMap", "uWave", "uDrum", "uDrumB", "uSeries", "uHoles", "uCut", "uBurn", "uEdges", "uInk", "uFade", "uFront", "uWork"];
 
 function compile(gl) {
   const program = linkProgram(gl, VERTEX, FRAGMENT);
@@ -289,14 +294,29 @@ function drawTrack(gl, uniforms, track, weight) {
   gl.uniform4f(uniforms.uBurn, ...burns);
 }
 
+/**
+ * The wave's centre line at `x`, in CSS pixels from the top: the shader's own sums for a settled track,
+ * so what leaves the flame leaves from where it is drawn.
+ */
+export function waveCentre(x, track, wander, width = window.innerWidth, height = window.innerHeight) {
+  const qx = (x - width / 2) / height;
+  const reach = (x - track.x0) / Math.max(1e-6, track.perMonth * track.end);
+  const sweep = smoothstep(TRACK_RISE_FROM, 1, reach) * Math.max(track.y / height, 0) * TRACK_RISE
+    * (1 + 0.2 * Math.sin(qx * 3 + wander * 0.21) + 0.1 * Math.sin(qx * 7 - wander * 0.31)) * (1 - (track.importing ?? 0));
+  const curve = (1 - track.zoom) * (TRACK_CURVE * Math.sin(qx * 2 + wander * 0.1) + sweep);
+  const angle = drumAngle(x - track.cx, track.layout);
+  const { radius, perspective, bow } = track.layout;
+  const drum = track.zoom * (bow / height) * (1 - Math.cos(angle)) * (perspective / (perspective + radius * (1 - Math.cos(angle))));
+  return track.y - (curve - drum) * height;
+}
+
 /** A place on the wave where an ember can leave: above the core, along what is on screen. */
-function emberOrigin(track) {
-  const x = Math.random() * window.innerWidth;
+function emberOrigin(track, wander) {
+  const x = random() * window.innerWidth;
   const months = monthAt(x, track);
   // Wrapped on the drum the flame carries on past both ends of the year, and so do its embers.
   if (track.zoom < 0.5 && (months < 0 || months > track.end)) return null;
-  const sweep = (1 - track.zoom) * smoothstep(TRACK_RISE_FROM, 1, x / window.innerWidth) * track.y * TRACK_RISE;
-  return { x, y: track.y - sweep - Math.random() * track.half * 0.7 };
+  return { x, y: waveCentre(x, track, wander) - random() * track.half * 0.7 };
 }
 
 /**
@@ -370,6 +390,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
   let drawn = false;
   let loaderRect;
   let frontStrength = 0;
+  let sparkDebt = 0;
   const opening = new WeakMap();
   const frame = (time) => {
     // A frame's timestamp can precede the last one: a negative step would make the easing diverge.
@@ -386,8 +407,11 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
       // Read before the page draws: the Dashboard's flame puts the same front on its wave.
       const wanted = frontAt(work, time);
       const fresh = work.shownKind !== work.kind;
-      work.shown = fresh ? wanted.share : work.shown + (wanted.share - work.shown) * ease(FRONT_EASE);
-      work.shownUntil = fresh || wanted.until == null ? wanted.until : work.shownUntil + (wanted.until - work.shownUntil) * ease(FRONT_EASE);
+      // Forward only: a read behind the guess holds the front until the work catches up, it never walks back.
+      work.shown = fresh ? wanted.share : work.shown + Math.max(0, wanted.share - work.shown) * ease(FRONT_EASE);
+      work.shownUntil = fresh || wanted.until == null ? wanted.until : work.shownUntil + Math.max(0, wanted.until - work.shownUntil) * ease(FRONT_EASE);
+      // Another task starts elsewhere on the ribbon: its head lights up there, it does not leap.
+      if (fresh && work.shownKind) frontStrength = 0;
       work.shownKind = work.kind;
     }
     ribbonStage.beforeDraw?.();
@@ -470,7 +494,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     frontStrength += ((shown && !track ? 1 : 0) - frontStrength) * ease(3);
     const flare = shown?.doneAt != null ? Math.exp(-(time - shown.doneAt) / 700) : 0;
     gl.uniform3f(uniforms.uFront, shown?.shown ?? 0, frontStrength, flare);
-    gl.uniform1f(uniforms.uImport, track?.importing ?? 0);
+    gl.uniform3f(uniforms.uWork, track?.importing ?? 0, track?.lineEnd ?? 0, track?.glow ?? 1);
     gl.uniform1f(uniforms.uFade, (track ? TRACK_QUIET_FADE : QUIET_FADE) / CELL);
     gl.uniform1f(uniforms.uWander, wander);
     gl.uniform1f(uniforms.uAngle, now.angle);
@@ -496,7 +520,13 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     if (!reducedMotion) {
       // Embers stop at content, and at the covers' faces: they are never specks on the art.
       const solid = track ? [...rects, ...track.holes] : rects;
-      embers = stepEmbers(embers, dt, track ? ribbonStage.embers : 0, () => (track ? emberOrigin(track) : null), solid, clock);
+      embers = stepEmbers(embers, dt, track ? ribbonStage.embers : 0, () => (track ? emberOrigin(track, wander) : null), solid, clock);
+      // The head of the work spits sparks, so many a second whatever the frame rate, from inside its flame.
+      sparkDebt = track?.sparks ? sparkDebt + dt * track.sparks : 0;
+      for (; sparkDebt >= 1; sparkDebt -= 1) {
+        const x = track.head - random() * SPARK_BEHIND;
+        embers.push(burstEmber(x, waveCentre(x, track, wander) - random() * track.half * 0.6));
+      }
       emberLayer.draw(embers, CELL, window.innerHeight, canvas.width, canvas.height);
     }
     frameId = window.requestAnimationFrame(frame);

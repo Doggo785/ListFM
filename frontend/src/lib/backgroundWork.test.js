@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frontAt, historyBand, monthsSince, monthStart, runEnded, timeLeft, workFrom } from "@/lib/backgroundWork";
+import { frontAt, historyBand, monthsSince, monthStart, moveHead, runEnded, timeLeft, workFrom } from "@/lib/backgroundWork";
 
 describe("timeLeft", () => {
   it("says nothing until the server can tell, then rounds to what a person reads", () => {
@@ -78,5 +78,33 @@ describe("runEnded", () => {
     expect(runEnded(two, { kind: "tags" })).toBe(true);
     expect(runEnded({ kind: "tags", runs: [] }, null)).toBe(false);
     expect(runEnded(null, null)).toBe(false);
+  });
+});
+
+describe("the drawn front across reads", () => {
+  it("keeps what the ribbon drew through a read of the same task, and starts over for another", () => {
+    const first = { ...workFrom({ kind: "listens", share: 0.1, eta: 10 }, null, 0), shown: 0.12, shownKind: "listens" };
+    expect(workFrom({ kind: "listens", share: 0.2, eta: 8 }, first, 3000)).toMatchObject({ shown: 0.12, shownKind: "listens" });
+    expect(workFrom({ kind: "tags", share: 0, eta: 8 }, first, 3000).shown).toBeUndefined();
+  });
+});
+
+describe("moveHead", () => {
+  it("starts where it is wanted, and glides forward without overshooting", () => {
+    expect(moveHead({ x: null, glow: 1 }, 300, 0.016)).toEqual({ x: 300, glow: 1 });
+    const head = moveHead({ x: 100, glow: 1 }, 400, 0.1);
+    expect(head.x).toBeGreaterThan(100);
+    expect(head.x).toBeLessThan(400);
+    expect(head.glow).toBe(1);
+  });
+
+  it("goes out before going back, jumps once dark, then lights up there", () => {
+    let head = { x: 1200, glow: 1 };
+    head = moveHead(head, 50, 0.1);
+    expect(head).toEqual({ x: 1200, glow: expect.closeTo(0.6) });
+    head = moveHead(head, 50, 0.2);
+    expect(head).toEqual({ x: 50, glow: 0 });
+    head = moveHead(head, 50, 0.125);
+    expect(head.glow).toBeCloseTo(0.5);
   });
 });
