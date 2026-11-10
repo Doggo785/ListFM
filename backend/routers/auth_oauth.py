@@ -205,7 +205,6 @@ async def _extract_oauth_profile(
 
 async def _finalize_oauth_login(
     db: AsyncSession,
-    request: Request,
     user: User,
     is_new: bool,
     settings: Settings,
@@ -216,7 +215,7 @@ async def _finalize_oauth_login(
 
     family = str(uuid.uuid4())
     await revoke_all_user_refresh_tokens(db, user.id)
-    await store_refresh_token(db, user.id, jwt_refresh, family, request)
+    await store_refresh_token(db, user.id, jwt_refresh, family)
 
     try:
         await db.commit()
@@ -314,7 +313,7 @@ async def oauth_callback(
         user, is_new = await get_or_create_user_from_google(
             db, provider_user_id=provider_id, email=email, display_name=display_name, email_verified=email_verified
         )
-        return await _finalize_oauth_login(db, request, user, is_new, settings)
+        return await _finalize_oauth_login(db, user, is_new, settings)
 
     username = profile.get("username") or email
 
@@ -323,14 +322,14 @@ async def oauth_callback(
             db, provider_user_id=provider_id, email=None, display_name=username, email_verified=False
         )
         if user.email is not None:
-            return await _finalize_oauth_login(db, request, user, is_new=False, settings=settings)
-        return await _finalize_oauth_login(db, request, user, is_new=is_new, settings=settings, needs_email=True)
+            return await _finalize_oauth_login(db, user, is_new=False, settings=settings)
+        return await _finalize_oauth_login(db, user, is_new=is_new, settings=settings, needs_email=True)
 
     user, is_new = await get_or_create_user_from_discord(
         db, provider_user_id=provider_id, email=email, display_name=username, email_verified=email_verified
     )
 
-    return await _finalize_oauth_login(db, request, user, is_new, settings)
+    return await _finalize_oauth_login(db, user, is_new, settings)
 
 
 @router.get("/discord/login")

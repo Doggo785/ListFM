@@ -2,7 +2,6 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from config import get_settings
-from fastapi import Request
 from models.refresh_token import RefreshToken
 from services.auth import hash_refresh_token
 from sqlalchemy import select, update
@@ -14,7 +13,6 @@ async def create_refresh_token(
     user_id: str,
     token: str,
     family: str,
-    request: Request,
 ) -> RefreshToken:
     settings = get_settings()
     now = datetime.now(UTC)
@@ -24,8 +22,6 @@ async def create_refresh_token(
         token_hash=hash_refresh_token(token),
         family=family,
         expires_at=now + timedelta(days=settings.refresh_token_expire_days),
-        user_agent=request.headers.get("user-agent", "")[:500] or None,
-        ip_address=request.client.host if request.client else None,
     )
     db.add(rt)
     await db.flush()

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 from models.auth_provider import AuthProvider
+from models.refresh_token import RefreshToken
 from models.user import User
 from schemas import UserCreate, UserUpdate
 from services.rate_limit import DUPLICATE_EMAIL_MESSAGE
@@ -234,9 +235,11 @@ async def delete_user(db: AsyncSession, user_id: str) -> bool:
     if user is None:
         return False
     await db.execute(delete(AuthProvider).where(AuthProvider.user_id == user_id))
+    await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
     user.email = None
     user.password_hash = None
     user.display_name = None
+    user.timezone = None
     user.deleted_at = datetime.now(UTC)
     await db.flush()
     return True

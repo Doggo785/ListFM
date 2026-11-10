@@ -7,8 +7,7 @@ from database import get_db
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from models.refresh_token import RefreshToken
 from models.user import User
-from repositories.automations import delete_user_automations
-from repositories.generated_playlists import delete_user_playlists
+from repositories.automations import erase_user_automations
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     get_refresh_token_by_hash,
@@ -73,7 +72,6 @@ def _build_token_response() -> TokenResponse:
 async def _establish_session(
     db: AsyncSession,
     user: User,
-    request: Request,
     response: Response,
     *,
     error_detail: str,
@@ -89,7 +87,7 @@ async def _establish_session(
 
     family = str(uuid.uuid4())
     await revoke_all_user_refresh_tokens(db, user.id)
-    await store_refresh_token(db, user.id, refresh_token, family, request)
+    await store_refresh_token(db, user.id, refresh_token, family)
 
     try:
         await db.commit()
@@ -124,7 +122,7 @@ async def register(
     user = await create_user(db, user_data, password_hash)
 
     await _establish_session(
-        db, user, request, response, error_detail="Failed to create account"
+        db, user, response, error_detail="Failed to create account"
     )
 
     return _build_token_response()
@@ -148,7 +146,7 @@ async def login(
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     await _establish_session(
-        db, user, request, response, error_detail="Failed to log in"
+        db, user, response, error_detail="Failed to log in"
     )
 
     return _build_token_response()
@@ -219,7 +217,7 @@ async def refresh(
     new_access_token = create_access_token(user_id)
     new_refresh_token = create_refresh_token(user_id)
 
-    new_rt = await store_refresh_token(db, user_id, new_refresh_token, family, request)
+    new_rt = await store_refresh_token(db, user_id, new_refresh_token, family)
 
     stored_token.revoked = True
     stored_token.replaced_by = new_rt.id
@@ -328,7 +326,7 @@ async def change_password(
     if not verify_password(body.current_password, current_user.password_hash):
         raise HTTPException(status_code=400, detail="Your current password is wrong")
     current_user.password_hash = hash_password(body.password)
-    await _establish_session(db, current_user, request, response, error_detail="Failed to change password")
+    await _establish_session(db, current_user, response, error_detail="Failed to change password")
     return {"detail": "Password changed"}
 
 
@@ -339,16 +337,14 @@ async def delete_account(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Listens and play counts are erased; the rest follows the soft-delete rule and stops running."""
+    """Everything the account holds is erased; only an empty, soft-deleted users row stays."""
     # A Discord account can have no email to type back.
     if body.confirm.strip().lower() != (current_user.email or "delete").lower():
         raise HTTPException(status_code=400, detail="That does not match")
     stop_scrobble_sync(current_user.id)
     await delete_scrobbles(db, current_user.id)
     await delete_user_tracks(db, current_user.id)
-    await delete_user_automations(db, current_user.id)
-    await delete_user_playlists(db, current_user.id)
-    await revoke_all_user_refresh_tokens(db, current_user.id)
+    await erase_user_automations(db, current_user.id)
     await delete_user(db, current_user.id)
     try:
         await db.commit()
