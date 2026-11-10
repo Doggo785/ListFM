@@ -239,8 +239,23 @@ describe("createRibbon", () => {
     tick(32);
     expect(lastPull(gl)).toBe(0);
     // The time uniform is the first float of each frame: it must not advance.
-    const times = gl.calls.uniform1f.filter((_, i) => i % 9 === 0).map(([, v]) => v);
+    const times = gl.calls.uniform1f.filter((_, i) => i % 10 === 0).map(([, v]) => v);
     expect(new Set(times)).toEqual(new Set([0]));
+  });
+
+  it("draws the work's front, and lets a finished one go after its flare", () => {
+    const gl = fakeGl();
+    const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE, reducedMotion: true });
+    ribbon.setScene(sceneFor("/automations"));
+    ribbonStage.work = { kind: "tags", share: 0.4, perSecond: 0, at: 0, until: null, doneAt: null };
+    tick(16);
+    expect(lastCall(gl, "uniform3f").slice(1)).toEqual([0.4, 1, 0]);
+    ribbonStage.work.doneAt = 20;
+    tick(32);
+    expect(ribbonStage.work.shown).toBe(1);
+    tick(3000);
+    expect(ribbonStage.work).toBeNull();
+    ribbon.destroy();
   });
 
   it("lies straight in a chain's band, and returns to the page's scene without it", () => {

@@ -497,7 +497,8 @@ html, body, #root {
   }
 
   .top-nav__marker,
-  .top-nav__links a {
+  .top-nav__links a,
+  .background-task__fill {
     transition: none;
   }
 }
@@ -533,6 +534,8 @@ html, body, #root {
 
 .background-task__fill {
   background-image: repeating-linear-gradient(90deg, var(--ember) 0 4px, transparent 4px 8px);
+  /* Each read moves it on: it glides there instead of jumping. */
+  transition: width var(--duration-slide) var(--ease-out);
 }
 
 /* Below this the row no longer fits it: it takes its own line under the links. */
