@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { TrackList } from "@/components/landing/Scenes";
 import ForgedName from "@/components/dashboard/ForgedName";
 import { FormError } from "@/components/elements/AuthScreen";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,6 @@ import { buttonVariants } from "@/components/ui/buttonVariants";
 import { Input } from "@/components/ui/input";
 import { getListenerGlimpse, readableError } from "@/lib/api";
 import { FUSE_SECONDS } from "@/lib/landing/show";
-import { plural } from "@/lib/playlists";
 
 function Glimpse({ glimpse, reducedMotion, headX, onSpark }) {
   if (!glimpse.artist && glimpse.tracks.length === 0) {
@@ -25,14 +25,7 @@ function Glimpse({ glimpse, reducedMotion, headX, onSpark }) {
         {glimpse.tracks.length > 0 ? (
           <>
             <p className="pb-2 text-xl">The same month, a year ago: {glimpse.month}.</p>
-            <ol>
-              {glimpse.tracks.map((track, i) => (
-                <li key={`${track.artist}|${track.title}`} className="flex items-baseline justify-between gap-4 border-t border-(--line) py-1">
-                  <span className="min-w-0 truncate"><span className="pr-2 text-(--ember)">{i + 1}</span>{track.artist} - {track.title}</span>
-                  <span className="shrink-0 text-(--text-muted)">{plural(track.plays, "play")}</span>
-                </li>
-              ))}
-            </ol>
+            <TrackList tracks={glimpse.tracks} />
           </>
         ) : (
           <p className="text-xl">A year ago, you weren't here yet.</p>

@@ -22,11 +22,11 @@ function Ticks({ demo, walker }) {
   );
 }
 
-function TrackList({ tracks }) {
+export function TrackList({ tracks }) {
   return (
     <ol>
       {tracks.map((track, i) => (
-        <li key={track.title} className="flex items-baseline justify-between gap-4 border-t border-(--line) py-1">
+        <li key={`${track.artist}|${track.title}`} className="flex items-baseline justify-between gap-4 border-t border-(--line) py-1">
           <span className="min-w-0 truncate"><span className="pr-2 text-(--ember)">{i + 1}</span>{track.artist} - {track.title}</span>
           <span className="shrink-0 text-(--text-muted)">{plural(track.plays, "play")}</span>
         </li>
