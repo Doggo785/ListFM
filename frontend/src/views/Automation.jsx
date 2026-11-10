@@ -20,6 +20,7 @@ import {
   retryRun,
   runAutomationNow,
 } from "@/lib/api";
+import { RUNS_DONE } from "@/lib/backgroundWork";
 import { describeAutomation, describeSchedule, describeWaiting } from "@/lib/automation-rules";
 import { RUN_TONES, chainsOf, daysOf, describeRun, timeOf } from "@/lib/runs";
 import { FOCUS } from "@/lib/utils";
@@ -172,6 +173,8 @@ export default function Automation() {
 
   useEffect(() => {
     loadHistory();
+    window.addEventListener(RUNS_DONE, loadHistory);
+    return () => window.removeEventListener(RUNS_DONE, loadHistory);
   }, [loadHistory]);
 
   // The sweep works without anyone watching: a line that is about to change follows it.

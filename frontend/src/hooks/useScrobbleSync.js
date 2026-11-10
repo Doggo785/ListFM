@@ -6,9 +6,16 @@ const POLL_MS = 3000; // --duration-poll in index.css follows it.
 const IDLE_POLL_MS = 60000;
 
 const isWorking = (status) =>
-  status.stage !== "error" && (!status.complete || status.stage === "sync" || status.tags_total > 0);
+  status.runs?.length > 0 || (status.stage !== "error" && (!status.complete || status.stage === "sync" || status.tags_total > 0));
 
-/** The listening history and tag pass status, polled while the page is open. Null until known. */
+/** Until the next read: soon while work goes on, else at the next run's time (the sweep may start it a minute late). */
+export function nextReadIn(status, now = Date.now()) {
+  if (isWorking(status)) return POLL_MS;
+  if (!status.next_run_at) return IDLE_POLL_MS;
+  return Math.min(IDLE_POLL_MS, Math.max(POLL_MS, Date.parse(status.next_run_at) - now));
+}
+
+/** The background work's status (history sync, tag pass, runs), polled while the page is open. Null until known. */
 export function useScrobbleSync(enabled, firstCall = getScrobbleSync) {
   const [status, setStatus] = useState(null);
 
@@ -21,7 +28,7 @@ export function useScrobbleSync(enabled, firstCall = getScrobbleSync) {
         const next = await load();
         if (stopped) return;
         setStatus(next);
-        timer = setTimeout(() => poll(getScrobbleSync), isWorking(next) ? POLL_MS : IDLE_POLL_MS);
+        timer = setTimeout(() => poll(getScrobbleSync), nextReadIn(next));
       } catch {
         // An unreadable status stays as it was: the app works without it.
       }
