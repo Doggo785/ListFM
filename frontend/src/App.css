@@ -516,10 +516,17 @@ html, body, #root {
 }
 
 .background-task {
-  flex: 0 1 auto;
+  flex: 1 1 0;
   text-align: left;
   min-width: 0;
   color: var(--text-muted);
+}
+
+/* One line whatever the text says: a wrap would change the header's height, and the whole page would jump with it. */
+.background-task p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .background-task__track,
