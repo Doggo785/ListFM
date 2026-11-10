@@ -63,89 +63,6 @@ html, body, #root {
   display: flex;
 }
 
-.homepage {
-  position: relative;
-  flex: 1;
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #0a0a0a;
-  overflow: hidden;
-}
-
-.homepage__bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.45;
-}
-
-.homepage__content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rem;
-  width: 100%;
-  max-width: 480px;
-  padding: 2rem;
-}
-
-.homepage__hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.homepage__brand {
-  font-family: var(--font-display);
-  font-size: 64px;
-  color: #ffffff;
-  margin: 0;
-  line-height: 1;
-}
-
-.homepage__tagline {
-  font-size: 20px;
-  font-weight: 400;
-  color: #a3a3a3;
-  margin: 0;
-  text-align: center;
-  max-width: 320px;
-  line-height: 1.5;
-}
-
-.homepage__search {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.homepage__hint {
-  font-size: 17px;
-  color: #737373;
-  margin: 0;
-}
-
-@media (max-width: 640px) {
-  .homepage__brand {
-    font-size: 48px;
-  }
-
-  .homepage__tagline {
-    font-size: 20px;
-  }
-
-  .homepage__content {
-    gap: 1.5rem;
-    padding: 1.5rem;
-  }
-}
-
 /* The screens before the site proper: the name on the ribbon, one task beside it. */
 .auth {
   min-height: 100vh;
@@ -623,5 +540,386 @@ html, body, #root {
   .background-task {
     order: 3;
     flex-basis: 100%;
+  }
+}
+
+/* The landing page. Its canvas lies over the content, on the ribbon's grid, and draws around text by itself. */
+.landing {
+  position: relative;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  text-align: left;
+}
+.landing__stage {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+.landing__bar {
+  position: fixed;
+  top: 16px;
+  right: 24px;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: var(--ink);
+}
+.landing__hero {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 72px 32px 48px;
+}
+.landing__name {
+  flex: none;
+  min-width: 0;
+}
+.landing__line {
+  flex: none;
+  height: clamp(88px, 15vh, 150px);
+}
+.landing__promise {
+  width: fit-content;
+  max-width: 760px;
+}
+.landing__story {
+  position: relative;
+}
+.landing__rail {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  z-index: 4;
+  transform: translateY(-50%);
+}
+.landing__rail ol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.landing__rail-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0 4px 8px;
+  color: var(--text-muted);
+  background: var(--ink);
+}
+.landing__rail-step[aria-current] {
+  color: var(--ember);
+}
+/* Out of the rail's box until the rail opens: its quiet box stays the dots, and the thread only steps around the label shown. */
+.landing__rail-label {
+  position: absolute;
+  right: 100%;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  background: var(--ink);
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.landing__rail-step[aria-current] .landing__rail-label {
+  opacity: 1;
+}
+.landing__rail:hover .landing__rail-label,
+.landing__rail:focus-within .landing__rail-label {
+  position: static;
+  opacity: 1;
+}
+.landing__rail-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: currentColor;
+}
+.landing__rail-step[aria-current] .landing__rail-dot {
+  height: 24px;
+}
+.landing__progress {
+  display: none;
+}
+/* A phone has no room beside the text for a rail: the story fills a line along the bottom instead. */
+@media (max-width: 767px) {
+  .landing__rail {
+    display: none;
+  }
+  .landing__progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 4;
+    display: block;
+    width: 100%;
+    height: 4px;
+    background: var(--ember);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  /* The bar spans the width, so the text scrolling under it never shows around its buttons. */
+  .landing__bar {
+    top: 0;
+    right: 0;
+    left: 0;
+    justify-content: flex-end;
+    padding: 12px 16px;
+  }
+}
+.landing__pin {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+.landing__scene {
+  position: absolute;
+  inset: 0;
+  padding: 72px 32px 56px;
+}
+.landing__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  width: fit-content;
+  min-width: min(100%, 1100px);
+  margin-inline: auto;
+}
+.landing__recipe {
+  font-size: var(--text-lg);
+  line-height: 28px;
+}
+.landing__count {
+  white-space: nowrap;
+}
+.landing__ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.landing__tick {
+  position: absolute;
+  top: calc(62% + 16px);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.landing__marker {
+  position: absolute;
+  top: calc(32% - 40px);
+  left: 0;
+  margin-left: -48px;
+  font-size: var(--text-lg);
+  white-space: nowrap;
+}
+.landing__covers {
+  position: absolute;
+  inset: calc(32% - 104px) 0 auto;
+  height: 96px;
+}
+.landing__cover {
+  position: absolute;
+  width: 96px;
+  margin-left: -48px;
+}
+.landing__stages {
+  position: absolute;
+  left: 50%;
+  bottom: 64px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 140px));
+  gap: 16px;
+  width: min(calc(100% - 64px), 640px);
+  transform: translateX(-50%);
+}
+.landing__stages li {
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.landing__delivered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+}
+.landing__made {
+  flex: none;
+  width: 320px;
+}
+.landing__delivered > :last-child {
+  max-width: 640px;
+}
+.landing__keeps {
+  display: flex;
+  flex-direction: column;
+}
+.landing__keeps-line {
+  flex: none;
+  height: 24px;
+  margin-top: auto;
+}
+.landing__shelf {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 128px));
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+}
+.landing__runs {
+  width: min(100%, 640px);
+  margin: 24px auto auto;
+}
+.landing__obeys {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.landing__obeys > * {
+  width: min(100%, 880px);
+}
+.landing__recipe-card {
+  margin-top: auto;
+}
+.landing__also {
+  padding-top: 16px;
+}
+.landing__turn {
+  max-width: 1100px;
+  margin-inline: auto;
+  padding: 96px 32px 64px;
+}
+.landing__ask {
+  width: min(100%, 560px);
+  padding-bottom: 16px;
+}
+.landing__end {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 64px 32px 32px;
+}
+.landing__end-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.landing__end-line {
+  flex: 1;
+  height: 48px;
+}
+.landing__footer {
+  padding-top: 32px;
+}
+.landing--still .landing__story {
+  padding: 32px;
+}
+.landing--still .landing__pin {
+  position: static;
+  height: auto;
+  overflow: visible;
+}
+.landing--still .landing__scene {
+  position: static;
+  height: auto;
+  padding: 32px 0;
+}
+.landing--still .landing__covers,
+.landing--still .landing__stages {
+  position: static;
+  height: auto;
+  transform: none;
+}
+.landing--still .landing__covers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+}
+.landing--still .landing__cover {
+  position: static;
+  margin-left: 0;
+}
+.landing--still .landing__stages {
+  margin: 24px 0 0;
+}
+/* Every scene on one left edge when they all sit one after the other. */
+.landing--still .landing__scene {
+  max-width: 1100px;
+  margin-inline: auto;
+}
+.landing--still .landing__delivered {
+  justify-content: flex-start;
+}
+.landing--still .landing__shelf {
+  justify-content: start;
+}
+.landing--still .landing__runs {
+  margin-inline: 0;
+}
+.landing--still .landing__obeys {
+  align-items: flex-start;
+}
+@media (max-width: 860px) {
+  .landing__hero,
+  .landing__scene,
+  .landing__turn,
+  .landing__end {
+    padding-inline: 16px;
+  }
+  .landing__head {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .landing__stages {
+    bottom: 56px;
+    gap: 8px;
+    width: calc(100% - 32px);
+  }
+  .landing__delivered {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .landing__made {
+    width: 192px;
+  }
+  .landing__shelf {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+  /* Too narrow for a month's name: the runs below say which month each cover is. */
+  .landing__shelf p {
+    display: none;
+  }
+  .landing__marker {
+    top: calc(62% + 44px);
+  }
+  .landing__covers {
+    inset: calc(62% + 76px) 0 auto;
+    height: 56px;
+  }
+  .landing__cover {
+    width: 56px;
+    margin-left: -28px;
+  }
+  .landing__cover:nth-child(even) {
+    display: none;
+  }
+}
+/* Four Tiny5 counters don't fit side by side on a narrow phone: two by two. */
+@media (max-width: 479px) {
+  .landing__stages {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 12px;
   }
 }

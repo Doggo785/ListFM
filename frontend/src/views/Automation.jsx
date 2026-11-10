@@ -161,14 +161,14 @@ export default function Automation() {
     if (automation?.name) document.title = `${automation.name} - ListFM`;
   }, [automation?.name]);
 
-  const loadHistory = useCallback(async () => {
-    try {
-      setRows(await getAutomationHistory(id));
+  const loadHistory = useCallback(() => getAutomationHistory(id)
+    .then((list) => {
+      setRows(list);
       setHistoryFailed(false);
-    } catch {
+    })
+    .catch(() => {
       setHistoryFailed(true);
-    }
-  }, [id]);
+    }), [id]);
 
   useEffect(() => {
     loadHistory();

@@ -70,6 +70,11 @@ export async function request(path, options = {}) {
   return res.json();
 }
 
+/** What a public Last.fm profile shows. Needs no account, and spends the budget of everyone's syncs: the server limits it. */
+export function getListenerGlimpse(username) {
+  return request("/api/public/listener", { method: "POST", body: JSON.stringify({ username }) });
+}
+
 /** A server's message as a person should read it: without the status it was thrown with. */
 export const readableError = (err) => err.message.replace(/^API \d+: /, "");
 

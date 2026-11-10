@@ -7,9 +7,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const checkSession = useCallback(async () => {
-    try {
-      const data = await request("/api/auth/me");
+  const checkSession = useCallback(() => request("/api/auth/me")
+    .then((data) => {
       setUser(data);
       // The first browser sets the zone. After that only Settings does: a trip must not shift the schedules.
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -19,12 +18,9 @@ export function AuthProvider({ children }) {
           body: JSON.stringify({ timezone }),
         }).catch(() => {});
       }
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    })
+    .catch(() => setUser(null))
+    .finally(() => setLoading(false)), []);
 
   useEffect(() => {
     checkSession();
@@ -77,14 +73,12 @@ export function AuthProvider({ children }) {
 
   const isLastfmLinked = !!user?.lastfm_username;
   const lastfmUsername = user?.lastfm_username;
-  const [avatar, setAvatar] = useState(null);
+  const [loadedAvatar, setAvatar] = useState(null);
+  const avatar = lastfmUsername ? loadedAvatar : null;
 
   // One profile call per linked account, shared by the sidebar and dashboard.
   useEffect(() => {
-    if (!lastfmUsername) {
-      setAvatar(null);
-      return;
-    }
+    if (!lastfmUsername) return undefined;
     let active = true;
     request("/api/info")
       .then((data) => active && setAvatar(data?.image || null))

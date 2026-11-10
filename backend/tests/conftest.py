@@ -19,6 +19,8 @@ from models.user_track import UserTrack
 from services.rate_limit import (
     complete_email_limiter,
     link_lastfm_limiter,
+    listener_limiter,
+    listener_total_limiter,
     login_limiter,
     oauth_login_limiter,
     refresh_limiter,
@@ -83,6 +85,8 @@ async def _cleanup_db():
     tables, so no post-test pass is needed.
     """
     for limiter in (
+        listener_limiter,
+        listener_total_limiter,
         login_limiter,
         register_limiter,
         register_email_limiter,

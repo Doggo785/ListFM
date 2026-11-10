@@ -42,6 +42,10 @@ _Avoid_ : Import, fetch, refresh
 Les tags connus par artiste, partagés entre utilisateurs et remplis en tâche de fond. Un artiste absent du catalogue a des tags inconnus, ce qui diffère d'un artiste sans tag.
 _Avoid_ : Cache, enrichissement
 
+**Fil** :
+Le ruban tel que la page d'accueil le présente : une présence vivante qui écoute et travaille, sans visage ni voix. « The thread » dans les textes.
+_Avoid_ : Mascotte, ligne, vague
+
 ## La chaîne d'une automation
 
 **Fenêtre** :

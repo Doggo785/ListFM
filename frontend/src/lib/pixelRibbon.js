@@ -35,6 +35,8 @@ const SCENES = {
   playlist: { shape: [0.08, 0.09, 0.1, 0.12, 0.14, 0.17, 0.2, 0.22, 0.2, 0.17, 0.14, 0.12], angle: 1.45, offset: 0.46, heat: 3 },
   // Under the name, where the Dashboard's wave will lie, so logging in barely moves it.
   auth: { shape: [0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15, 0.14, 0.13, 0.12], angle: 0.05, offset: -0.24, phoneOffset: -0.36, heat: 2 },
+  // Silent: the landing page draws its own thread. Lying where that thread lies, so leaving the page morphs from there.
+  landing: { shape: [0.04, 0.04, 0.04, 0.05, 0.05, 0.06, 0.07, 0.09, 0.12, 0.14, 0.15, 0.15], angle: -0.14, offset: 0.1, heat: 3, silent: true },
   settings: { shape: [0.08, 0.09, 0.1, 0.11, 0.12, 0.12, 0.12, 0.13, 0.14, 0.15, 0.16, 0.18], angle: 1.45, offset: -0.42, heat: 0 },
   other: { shape: [0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14, 0.12, 0.14, 0.16, 0.14], angle: -0.3, offset: -0.28, heat: 0 },
 };
@@ -43,9 +45,10 @@ const SCENES = {
  * What a page asks of the ribbon, read at every frame. Only the Dashboard sets it:
  * track is the wave of listens (see drawTrack below), embers how many pixels climb from it.
  */
-export const ribbonStage = { track: null, embers: 0, beforeDraw: null, alive: false, burst() {} };
+export const ribbonStage = { track: null, embers: 0, beforeDraw: null, alive: false, silent: false, burst() {} };
 
 export function sceneFor(pathname) {
+  if (pathname === "/") return SCENES.landing;
   if (pathname.startsWith("/dashboard")) return SCENES.dashboard;
   if (pathname === "/automations/new" || pathname.endsWith("/edit")) return SCENES.creator;
   if (pathname === "/automations") return SCENES.automations;
@@ -409,6 +412,11 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     now.px += (target.px - now.px) * glow;
     now.py += (target.py - now.py) * glow;
     now.pull += (target.pull - now.pull) * glow;
+    if (ribbonStage.silent) {
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      frameId = window.requestAnimationFrame(frame);
+      return;
+    }
 
     clock += dt;
     const loader = document.querySelector("[data-loader]")?.getBoundingClientRect();
@@ -469,6 +477,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
 
   return {
     setScene(next) {
+      ribbonStage.silent = Boolean(next.silent) && !reducedMotion;
       scene = { cols: next.shape, angle: next.angle, off: (window.innerWidth <= PHONE_WIDTH && next.phoneOffset) || next.offset };
       sceneHeat = heat = next.heat;
       Object.assign(target, scene, { ramp: rampFor(next.heat, palette) });
@@ -480,6 +489,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     },
     destroy() {
       ribbonStage.alive = false;
+      ribbonStage.silent = false;
       ribbonStage.burst = () => {};
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);

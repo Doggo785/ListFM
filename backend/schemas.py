@@ -523,3 +523,21 @@ class SyncStatus(BaseModel):
     last_synced_at: datetime | None = None
     tracks_synced: int
     tags_synced: int
+
+
+class ListenerRequest(BaseModel):
+    username: str
+
+
+class ListenerTrack(BaseModel):
+    artist: str
+    title: str
+    plays: int
+
+
+class ListenerGlimpse(BaseModel):
+    """What the landing page shows from a public Last.fm profile. Not a run: nothing has been synced."""
+
+    artist: str | None
+    month: str
+    tracks: list[ListenerTrack]

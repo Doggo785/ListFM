@@ -25,7 +25,10 @@ const LICK_DROP_SECONDS = 0.22;
 
 // An 8x8 ordered dither, the same family as the ribbon's.
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21].map((n) => n / 64);
-const dither = (x, y) => BAYER[(y % 8) * 8 + (x % 8)];
+export const dither = (x, y) => BAYER[(y % 8) * 8 + (x % 8)];
+
+/** The names that finished burning in this page load: the slow burn is for the first look. */
+export const forgedNames = new Set();
 
 /** Parsed from "#rrggbb" to [r, g, b]. */
 export const rgb = (hex) => [0, 2, 4].map((i) => parseInt(hex.trim().slice(1 + i, 3 + i), 16));

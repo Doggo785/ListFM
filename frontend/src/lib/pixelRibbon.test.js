@@ -400,3 +400,10 @@ describe("chainShape", () => {
     for (const counts of [[], [0, 0, 0]]) expect(new Set(chainShape(counts)).size).toBe(1);
   });
 });
+
+describe("the landing page's scene", () => {
+  it("keeps the ribbon silent there, and nowhere else", () => {
+    expect(sceneFor("/").silent).toBe(true);
+    expect(sceneFor("/login").silent).toBeUndefined();
+  });
+});

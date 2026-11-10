@@ -28,6 +28,7 @@ PAGE_ERRORS = (pylast.WSError, httpx.HTTPError, KeyError, TypeError, ValueError)
 NO_IMAGE_HASH = "2a96cbd8b46e442fc41c2b86b821562f"
 # Last.fm returns up to 100 tags per artist, the long tail being noise.
 ARTIST_TAGS_KEPT = 10
+LISTENER_TRACKS = 5
 
 
 def _throttled_call() -> None:
@@ -205,6 +206,22 @@ def get_artist_tags(artist: str) -> list[dict]:
         raise
     return _normalize_tags(
         [{"name": t["name"], "count": int(t["count"])} for t in _as_list(data.get("tag"))[:ARTIST_TAGS_KEPT]]
+    )
+
+
+def get_listener_glimpse(username: str, time_from: int, time_to: int) -> tuple[str | None, list[dict]]:
+    """What a public profile shows without any account: its artist of the last month, and its top tracks between two dates.
+
+    Two calls, whoever asks. Raises pylast.WSError on a Last.fm error body (6 = unknown user, 17 = private).
+    """
+    _throttled_call()
+    artists = _as_list(_lastfm_json("user.getTopArtists", user=username, period="1month", limit="1")["topartists"].get("artist"))
+    _throttled_call()
+    chart = _lastfm_json("user.getWeeklyTrackChart", user=username, limit=str(LISTENER_TRACKS), **{"from": str(time_from), "to": str(time_to)})
+    tracks = _as_list(chart["weeklytrackchart"].get("track"))[:LISTENER_TRACKS]
+    return (
+        artists[0]["name"] if artists else None,
+        [{"artist": track["artist"]["#text"], "title": track["name"], "plays": int(track["playcount"])} for track in tracks],
     )
 
 
