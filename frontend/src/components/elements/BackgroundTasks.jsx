@@ -96,7 +96,7 @@ export default function BackgroundTasks() {
   if (!task) return null;
   return (
     <div className="background-task page-enter text-xs" data-quiet>
-      <p>
+      <p title={[task.progress && `${task.progress}${task.left ? ` · ${task.left}` : ""}.`, task.note].filter(Boolean).join(" ")}>
         {task.progress && <span className="text-(--text)">{task.progress}{task.left && ` · ${task.left}`}. </span>}
         {/* Only this part is announced: reading the counter aloud every few seconds would be noise. */}
         <span role="status">{task.note}</span>
