@@ -250,7 +250,7 @@ describe("createRibbon", () => {
     ribbonStage.work = { kind: "tags", share: 0.4, perSecond: 0, at: 0, until: null, doneAt: null };
     tick(16);
     expect(lastCall(gl, "uniform3f").slice(1)).toEqual([0.4, 1, 0]);
-    ribbonStage.work.doneAt = 20;
+    ribbonStage.work.doneAt = performance.now(); // tick reads the real clock: a fixed time would expire on a slow run.
     tick(32);
     expect(ribbonStage.work.shown).toBe(1);
     tick(3000);
