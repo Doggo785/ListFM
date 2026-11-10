@@ -166,11 +166,17 @@ describe("Automation actions", () => {
     expect(host.querySelector('[data-testid="where"]').textContent).toBe("/automations/a1|");
   });
 
-  it("waits for the listening history before running", async () => {
-    sync.value = { complete: false, stage: "fetching" };
+  it("runs during the first import too: the run waits, and says for how long", async () => {
+    sync.value = { complete: false, stage: "sync", eta_seconds: 720 };
+    const started = new Date().toISOString();
+    getAutomationHistory.mockResolvedValue([{
+      id: "h1", status: "waiting", attempt: 1, started_at: started, scheduled_for: started,
+      error_message: "Your listening history is still loading.",
+    }]);
     await show();
-    expect(button("Run now").disabled).toBe(true);
-    expect(text()).toContain("finished loading");
+    expect(button("Run now").disabled).toBe(false);
+    expect(text()).toContain("Waiting");
+    expect(text()).toContain("Your listening history is still loading. It starts by itself, about 12 min left.");
   });
 
   it("pauses and resumes", async () => {

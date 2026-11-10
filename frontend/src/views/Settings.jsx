@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/contexts/AuthContext";
 import { connectLastfm, readableError, request } from "@/lib/api";
+import { guide } from "@/lib/guide";
 
 const MIN_PASSWORD = 8;
 const MAX_ZONES = 8;
@@ -283,6 +284,17 @@ export default function Settings() {
         <TimezoneRow stored={user.timezone} onSaved={refreshUser} />
         <LastfmRow username={user.lastfm_username} />
         {user.has_password && <PasswordRow />}
+        <Row title="Guide" note="Walk through ListFM again, from your flame to a new automation.">
+          <Button
+            variant="outline"
+            onClick={() => {
+              guide.start();
+              navigate("/dashboard");
+            }}
+          >
+            Replay the guide
+          </Button>
+        </Row>
         <DeleteRow
           email={user.email}
           onDeleted={() => {

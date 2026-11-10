@@ -7,6 +7,7 @@ sync: finished artists are no longer due.
 
 import asyncio
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from database import async_session
@@ -31,6 +32,8 @@ LOG_EVERY = 100
 # references so running tasks are not collected.
 _running: set[str] = set()
 _background_tasks: set[asyncio.Task] = set()
+# Called with the user id once a pass ends: runs filtering by tags wait for it.
+after_pass: list[Callable[[str], None]] = []
 
 
 def tags_progress_key(user_id: str) -> str:
@@ -79,6 +82,12 @@ async def _fill_in_background(user_id: str, username: str) -> None:
     finally:
         progress_store.finish(tags_progress_key(user_id))
         _running.discard(user_id)
+        for callback in after_pass:
+            callback(user_id)
+
+
+def is_tagging(user_id: str) -> bool:
+    return user_id in _running
 
 
 def start_tag_catalogue(user_id: str, username: str) -> None:

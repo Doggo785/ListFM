@@ -13,7 +13,7 @@ describe("timeLeft", () => {
 });
 
 describe("workFrom and frontAt", () => {
-  const task = (share, until, eta = 100) => ({ kind: "listens", share, eta, since: "2020-01-01T00:00:00Z", until });
+  const task = (share, reached, eta = 100) => ({ kind: "listens", share, eta, since: "2020-01-01T00:00:00Z", reached });
 
   it("moves the front on at the pace the estimate gives, and stops guessing after two missed reads", () => {
     const work = workFrom(task(0.5, null), null, 0);
@@ -28,21 +28,27 @@ describe("workFrom and frontAt", () => {
     expect(frontAt({ ...work, doneAt: 5000 }, 5000).share).toBe(1);
   });
 
-  it("measures the date's speed between two reads that moved it, and keeps it through a read that did not", () => {
-    const first = workFrom(task(0.1, "2021-01-01T00:00:00Z"), null, 0);
-    expect(first.untilPerSecond).toBe(0);
-    const second = workFrom(task(0.2, "2021-01-02T00:00:00Z"), first, 3000);
-    expect(second.untilPerSecond).toBeCloseTo((24 * 3600 * 1000) / 3);
-    const still = workFrom(task(0.2, "2021-01-02T00:00:00Z"), second, 6000);
-    expect(still.untilPerSecond).toBe(second.untilPerSecond);
-    expect(still.untilAt).toBe(3000);
-    expect(frontAt(still, 4500).until).toBe(Date.parse("2021-01-02T12:00:00Z"));
+  it("measures how fast the reading goes back in time between two reads that moved it, and keeps it through one that did not", () => {
+    const first = workFrom(task(0.1, "2021-01-02T00:00:00Z"), null, 0);
+    expect(first.reachedPerSecond).toBe(0);
+    const second = workFrom(task(0.2, "2021-01-01T00:00:00Z"), first, 3000);
+    expect(second.reachedPerSecond).toBeCloseTo((24 * 3600 * 1000) / 3);
+    const still = workFrom(task(0.2, "2021-01-01T00:00:00Z"), second, 6000);
+    expect(still.reachedPerSecond).toBe(second.reachedPerSecond);
+    expect(still.reachedAt).toBe(3000);
+    expect(frontAt(still, 4500).reached).toBe(Date.parse("2020-12-31T12:00:00Z"));
+  });
+
+  it("never guesses the reading past the start of the history", () => {
+    const first = workFrom(task(0.1, "2020-01-03T00:00:00Z"), null, 0);
+    const second = workFrom(task(0.2, "2020-01-02T00:00:00Z"), first, 1000);
+    expect(frontAt(second, 6000).reached).toBe(Date.parse("2020-01-01T00:00:00Z"));
   });
 
   it("starts over when the work changes kind", () => {
     const listens = workFrom(task(0.9, "2021-01-01T00:00:00Z"), null, 0);
     const tags = workFrom({ kind: "tags", share: 0.1, eta: 50 }, listens, 1000);
-    expect(tags).toMatchObject({ kind: "tags", until: null, untilPerSecond: 0 });
+    expect(tags).toMatchObject({ kind: "tags", reached: null, reachedPerSecond: 0 });
   });
 });
 
@@ -58,14 +64,18 @@ describe("the history band", () => {
   it("gives the years before the one shown a first part of the band, then the year", () => {
     const since = new Date(2020, 0, 1).getTime();
     const middle = since + (yearStart - since) / 2;
-    expect(historyBand({ since, until: middle, yearStart, origin: yearStart, width: 1000 })).toEqual({ yearX: 400, perMonth: 50, frontX: 200 });
-    expect(historyBand({ since, until: new Date(2026, 5, 1).getTime(), yearStart, origin: yearStart, width: 1000 }).frontX).toBe(700);
+    expect(historyBand({ since, reached: middle, yearStart, origin: yearStart, width: 1000 })).toEqual({ yearX: 400, perMonth: 50, frontX: 200 });
+    expect(historyBand({ since, reached: new Date(2026, 5, 1).getTime(), yearStart, origin: yearStart, width: 1000 }).frontX).toBe(700);
   });
 
-  it("spreads a history younger than a year over the whole band", () => {
+  it("starts at the right end, where today is, before the first page is in", () => {
+    const since = new Date(2020, 0, 1).getTime();
+    expect(historyBand({ since, reached: null, yearStart, origin: yearStart, width: 1000 }).frontX).toBe(1000);
+  });
+
+  it("keeps today at the right end for a history younger than a year", () => {
     const since = new Date(2026, 3, 10).getTime();
-    const origin = monthStart(since);
-    expect(historyBand({ since, until: new Date(2026, 4, 1).getTime(), yearStart, origin, width: 1200 })).toEqual({ yearX: 0, perMonth: 100, frontX: 100 });
+    expect(historyBand({ since, reached: new Date(2026, 4, 1).getTime(), yearStart, origin: yearStart, width: 1200 })).toEqual({ yearX: 0, perMonth: 100, frontX: 500 });
   });
 });
 

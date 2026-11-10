@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { guide } from "@/lib/guide";
 import Settings from "./Settings";
 
 const auth = vi.hoisted(() => ({ value: {} }));
@@ -31,6 +32,7 @@ describe("Settings", () => {
           <Routes>
             <Route path="/settings" element={<Settings />} />
             <Route path="/" element={<output>home</output>} />
+            <Route path="/dashboard" element={<output>dashboard</output>} />
           </Routes>
         </MemoryRouter>,
       );
@@ -231,5 +233,14 @@ describe("Settings", () => {
     expect(auth.value.forgetUser).not.toHaveBeenCalled();
     await click("Cancel");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("replays the newcomer's guide from the Dashboard", async () => {
+    guide.set({ on: false, step: 7, endedFor: "u1" });
+    await show();
+    await click("Replay the guide");
+    expect(guide.get()).toMatchObject({ on: true, step: 0 });
+    expect(document.querySelector("output").textContent).toBe("dashboard");
+    guide.set({ on: false });
   });
 });

@@ -84,8 +84,8 @@ async def test_full_then_incremental_sync():
     fake = FakeLastfm([_listen(n) for n in range(5)])
     await _sync(user_id, fake, page_size=2)
     assert await _count(user_id) == 5
-    # Oldest page first, so an interruption resumes after the newest stored listen.
-    assert [page for page, _, _ in fake.calls] == [1, 3, 2, 1]
+    # A first load reads newest first; the last page, fetched second, dates the start of the history.
+    assert [page for page, _, _ in fake.calls] == [1, 3, 2]
 
     async with _TestSessionLocal() as db:
         user = await db.get(User, user_id)
@@ -205,14 +205,14 @@ async def test_stored_listens_never_clobber_a_users_stats(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_sync_prints_a_line_per_page_oldest_first(activity_lines):
+async def test_sync_prints_a_line_per_page(activity_lines):
     user_id = await _new_user()
     await _sync(user_id, FakeLastfm([_listen(n) for n in range(3)], loved=[("Song 1", "Artist")]), page_size=2)
     lines = activity_lines()
     assert lines[:4] == [
         "sync   someone   début, 2 pages",
-        "sync   someone   page 1/2  +1 écoutes",
-        "sync   someone   page 2/2  +2 écoutes",
+        "sync   someone   page 1/2  +2 écoutes",
+        "sync   someone   page 2/2  +1 écoutes",
         "sync   someone   1 morceaux aimés",
     ]
     assert lines[4].startswith("sync   someone   terminé  ")
@@ -278,7 +278,7 @@ async def test_sync_status_reports_progress(client: AsyncClient):
     assert resp.status_code == 200
     assert resp.json() == {
         "stage": None, "done": 0, "total": 0, "error": None, "complete": False, "synced_at": None,
-        "eta_seconds": None, "since": None, "until": None,
+        "eta_seconds": None, "since": None, "reached": None,
         "tags_done": 0, "tags_total": 0, "tags_eta_seconds": None, "runs": [], "next_run_at": None,
     }
 
@@ -291,10 +291,10 @@ async def test_sync_status_says_how_far_and_how_long(client: AsyncClient):
         user_id = await db.scalar(select(User.id).where(User.email == email))
     key = scrobble_sync.progress_key(user_id)
     scrobble_sync.progress_store.start(key)
-    scrobble_sync.progress_store.report(key, "sync", 1, 4, since=1_600_000_000, until=1_650_000_000)
+    scrobble_sync.progress_store.report(key, "sync", 1, 4, since=1_600_000_000, reached=1_650_000_000)
     body = (await client.get("/api/scrobbles/sync")).json()
     assert body["since"].startswith("2020-09-13")
-    assert body["until"].startswith("2022-04-15")
+    assert body["reached"].startswith("2022-04-15")
     assert isinstance(body["eta_seconds"], int)
     scrobble_sync.progress_store.finish(key)
     assert (await client.get("/api/scrobbles/sync")).json()["eta_seconds"] is None
@@ -322,10 +322,71 @@ async def test_background_sync_reports_done():
 
 
 @pytest.mark.asyncio
-async def test_background_sync_records_the_span_it_read():
+async def test_first_load_says_where_the_history_starts_and_how_far_back_it_is():
     user_id = await _new_user()
-    progress = await _run_in_background(user_id, FakeLastfm([_listen(n) for n in range(5)]))
-    assert (progress.since, progress.until) == (_listen(0)[2], _listen(4)[2])
+    reports = []
+    real_report = scrobble_sync.progress_store.report
+
+    def spy(key, stage, done, total, **span):
+        reports.append(span)
+        real_report(key, stage, done, total, **span)
+
+    with patch.object(scrobble_sync.progress_store, "report", spy):
+        await _sync(user_id, FakeLastfm([_listen(n) for n in range(5)]), page_size=2)
+    start = _listen(0)[2]
+    # The start is known before any page is read; the reach walks back page by page.
+    assert reports == [
+        {"since": start, "reached": None},
+        {"since": start, "reached": _listen(3)[2]},
+        {"since": start, "reached": _listen(1)[2]},
+        {"since": start, "reached": start},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_interrupted_first_load_resumes_newer_then_older():
+    user_id = await _new_user()
+    fake = FakeLastfm([_listen(n) for n in range(6)])
+    real_page = fake.scrobble_page
+
+    def cut_at_page_two(username, page, limit, time_from, time_to):
+        if page == 2:
+            raise pylast.NetworkError(None, "cut")
+        return real_page(username, page, limit, time_from, time_to)
+
+    fake.scrobble_page = cut_at_page_two
+    with pytest.raises(pylast.NetworkError):
+        await _sync(user_id, fake, page_size=2)
+    # The newest page is in: a playlist of the last days already has its listens.
+    assert await _count(user_id) == 2
+
+    fake.scrobble_page = real_page
+    fake.listens = sorted(fake.listens + [_listen(20)], key=lambda listen: -listen[2])
+    fake.calls.clear()
+    await _sync(user_id, fake, page_size=2)
+    assert await _count(user_id) == 7
+    newer, older = fake.calls[0], fake.calls[1]
+    assert newer[2] == _listen(5)[2] + 1  # After the newest stored listen first...
+    assert older[2] is None  # ...then everything before the oldest one.
+    async with _TestSessionLocal() as db:
+        assert (await db.get(User, user_id)).scrobbles_complete_at is not None
+
+
+@pytest.mark.asyncio
+async def test_older_pages_never_replace_a_newer_album():
+    user_id = await _new_user()
+    track = f"Song {uuid.uuid4()}"
+    await _sync(user_id, FakeLastfm([_listen(1, track, "Single"), _listen(2, track, "Album")]), page_size=1)
+    assert await _album_of(track) == "Album"
+
+
+@pytest.mark.asyncio
+async def test_a_sync_ending_well_calls_back():
+    user_id = await _new_user()
+    called = []
+    with patch.object(scrobble_sync, "after_sync", [called.append]):
+        await _run_in_background(user_id, FakeLastfm([_listen(1)]))
+    assert called == [user_id]
 
 
 @pytest.mark.asyncio

@@ -30,9 +30,10 @@ export default function CronEditor({ value, onChange, zone }) {
   // What the custom box last wrote: a half-typed cron keeps it open, and a value from elsewhere, a preset say, closes it.
   const [typed, setTyped] = useState(null);
   const custom = typed === value;
-  const schedule = readSchedule(value);
-  const frequency = custom ? "custom" : schedule.frequency;
-  const description = describeCron(value);
+  const schedule = readSchedule(value ?? "");
+  // Null is a schedule not picked yet (the guide's blank editor), not "only when you run it".
+  const frequency = value == null ? null : custom ? "custom" : schedule.frequency;
+  const description = describeCron(value ?? "");
   const invalid = Boolean(value) && !isValidCron(value);
   const shownZone = zone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -51,7 +52,7 @@ export default function CronEditor({ value, onChange, zone }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <CustomSelect label="How often" value={frequency} onChange={pickFrequency} options={FREQUENCIES} className="w-48" />
+        <CustomSelect label="How often" value={frequency} onChange={pickFrequency} options={FREQUENCIES} placeholder="Choose when" className="w-48" />
 
         {frequency === "weekly" && (
           <CustomSelect label="Weekday" value={String(schedule.weekday)} onChange={(v) => set({ weekday: Number(v) })} options={asOptions(WEEKDAYS)} className="w-40" />
@@ -65,7 +66,7 @@ export default function CronEditor({ value, onChange, zone }) {
             <CustomSelect label="Day of the month" value={String(schedule.day)} onChange={(v) => set({ day: Number(v) })} options={DAY_OPTIONS} className="w-20" />
           </>
         )}
-        {!["none", "custom"].includes(frequency) && (
+        {frequency && !["none", "custom"].includes(frequency) && (
           <>
             <span className="text-sm text-(--text-muted)">at</span>
             <CustomSelect label="Hour" value={String(schedule.hour)} onChange={(v) => set({ hour: Number(v) })} options={HOUR_OPTIONS} className="w-28" />

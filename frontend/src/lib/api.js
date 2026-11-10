@@ -92,6 +92,11 @@ export async function getScrobbleSync() {
   return request("/api/scrobbles/sync");
 }
 
+/** The newcomer's guide finished or skipped: it never starts by itself again, on any device. */
+export async function setGuideDone(done) {
+  return request("/api/auth/me/guide", { method: "PUT", body: JSON.stringify({ done }) });
+}
+
 export async function getListeningTotals() {
   return request("/api/scrobbles/totals");
 }

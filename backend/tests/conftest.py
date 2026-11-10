@@ -127,9 +127,10 @@ def _no_background_sync():
         patch("routers.auth_oauth.start_scrobble_sync") as start,
         patch("services.scrobble_sync.start_tag_catalogue"),
         patch("routers.generated_playlists.start_album_covers"),
-        # Runs sync listens first; tests feed the window directly instead.
+        # Runs sync listens first, and wait for a first load; tests feed the window directly instead.
         patch("services.automation_runner._sync_before_run"),
-        patch("routers.automations._history_loaded_or_409"),
+        patch("services.automation_runner._check_ready"),
+        patch("services.automation_runner.start_waiting_runs"),
     ):
         yield start
 

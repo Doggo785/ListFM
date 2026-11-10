@@ -4,8 +4,9 @@ import { IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 export default function CustomSelect({ value, onChange, options, placeholder, label, className = "" }) {
+  // An empty value shows the placeholder: the guide's editor starts with nothing picked.
   return (
-    <Select.Root value={value} onValueChange={onChange}>
+    <Select.Root value={value ?? ""} onValueChange={onChange}>
       <Select.Trigger
         aria-label={label}
         className={cn(

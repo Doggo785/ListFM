@@ -1,19 +1,26 @@
 """Listening history sync (ADR 0001).
 
 The first sync loads every listen, later ones only what is newer than the
-last stored listen. Pages are read oldest first and committed one by one,
-so an interrupted sync resumes where it stopped: the next one starts after
-the newest stored listen. The loved list has no date order, so it is read
-in full each time.
+last stored listen. Pages are committed one by one, and the stored listens
+always form one unbroken stretch, so an interrupted sync resumes where it
+stopped:
+
+- what is newer than the newest stored listen is read oldest first;
+- a first load reads the rest newest first, from before the oldest stored
+  listen: the recent months a playlist asks for are in within seconds.
+
+The loved list has no date order, so it is read in full each time.
 """
 
 import asyncio
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from database import async_session
 from models.user import User
 from repositories.scrobbles import (
+    get_earliest_played_at,
     get_latest_played_at,
     replace_loved,
     store_scrobbles,
@@ -43,6 +50,8 @@ PREVIEW_SYNC_INTERVAL = timedelta(minutes=10)
 # AGENTS.md), and strong references so running tasks are not collected.
 _running: dict[str, str] = {}
 _background_tasks: set[asyncio.Task] = set()
+# Called with the user id after a background sync ends well: runs waiting for the listens start then.
+after_sync: list[Callable[[str], None]] = []
 
 
 class SyncSuperseded(Exception):
@@ -65,31 +74,68 @@ def _check_current(user_id: str, username: str) -> None:
         raise SyncSuperseded
 
 
-async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size: int) -> None:
-    latest = await get_latest_played_at(db, user_id)
-    time_from = int(latest.timestamp()) + 1 if latest else None
-    # A fixed upper bound keeps page numbers stable while new listens arrive.
-    time_to = int(datetime.now(UTC).timestamp())
-    key = progress_key(user_id)
+async def _stretches(db: AsyncSession, user_id: str) -> tuple[list[tuple[int | None, int, bool]], float | None]:
+    """What to read, as (time_from, time_to, older), and the oldest stored listen. Older stretches predate it."""
+    user = await db.get(User, user_id)
+    first_load = user is None or user.scrobbles_complete_at is None
+    newest = await get_latest_played_at(db, user_id)
+    oldest = await get_earliest_played_at(db, user_id)
+    # Fixed upper bounds keep page numbers stable while new listens arrive.
+    now = int(datetime.now(UTC).timestamp())
+    stretches = []
+    if newest is not None or not first_load:
+        stretches.append((int(newest.timestamp()) + 1 if newest else None, now, False))
+    if first_load:
+        stretches.append((None, int(oldest.timestamp()) - 1 if oldest else now, True))
+    return stretches, oldest.timestamp() if oldest else None
 
-    _, total_pages = await call_retrying_rate_limit(get_scrobble_page, username, 1, page_size, time_from, time_to)
-    log_activity("sync", username, f"début, {total_pages} pages")
-    for done, page in enumerate(range(total_pages, 0, -1), start=1):
-        listens, _ = await call_retrying_rate_limit(get_scrobble_page, username, page, page_size, time_from, time_to)
-        _check_current(user_id, username)
-        await store_scrobbles(
-            db,
-            user_id,
-            [(title, artist, datetime.fromtimestamp(uts, tz=UTC)) for title, artist, uts, _ in listens],
-        )
-        await store_track_albums(db, [(title, artist, album) for title, artist, _, album in listens])
-        await db.commit()
-        times = [uts for _, _, uts, _ in listens]
-        progress_store.report(
-            key, "sync", done, total_pages, since=min(times, default=None), until=max(times, default=None)
-        )
-        progress_store.bump_calls(key)
-        log_activity("sync", username, f"page {done}/{total_pages}  +{len(listens)} écoutes")
+
+async def _plan(username: str, page_size: int, stretches: list) -> list:
+    """Each stretch with its page count and the pages already read: page 1 to count them,
+    and an older stretch's last one, which dates the start of the history."""
+    plans = []
+    for time_from, time_to, older in stretches:
+        first, pages = await call_retrying_rate_limit(get_scrobble_page, username, 1, page_size, time_from, time_to)
+        read = {1: first}
+        if older and pages > 1:
+            read[pages] = (await call_retrying_rate_limit(get_scrobble_page, username, pages, page_size, time_from, time_to))[0]
+        plans.append((time_from, time_to, older, pages, read))
+    return plans
+
+
+async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size: int) -> None:
+    stretches, oldest = await _stretches(db, user_id)
+    plans = await _plan(username, page_size, stretches)
+    total = sum(pages for _, _, _, pages, _ in plans)
+    # How far back the stored history reaches, and where the whole history starts: said before the start
+    # is read, so the app can lay the years out.
+    reached = since = oldest
+    for _, _, older, pages, read in plans:
+        if older and pages:
+            since = min((uts for _, _, uts, _ in read[pages]), default=since)
+    key = progress_key(user_id)
+    progress_store.report(key, "sync", 0, total, since=since, reached=reached)
+    log_activity("sync", username, f"début, {total} pages")
+    done = 0
+    for time_from, time_to, older, pages, read in plans:
+        for page in range(1, pages + 1) if older else range(pages, 0, -1):
+            listens = read.pop(page, None)
+            if listens is None:
+                listens, _ = await call_retrying_rate_limit(get_scrobble_page, username, page, page_size, time_from, time_to)
+            _check_current(user_id, username)
+            await store_scrobbles(
+                db,
+                user_id,
+                [(title, artist, datetime.fromtimestamp(uts, tz=UTC)) for title, artist, uts, _ in listens],
+            )
+            await store_track_albums(db, [(title, artist, album) for title, artist, _, album in listens], older=older)
+            await db.commit()
+            done += 1
+            if older:
+                reached = min((uts for _, _, uts, _ in listens), default=reached)
+            progress_store.report(key, "sync", done, total, since=since, reached=reached)
+            progress_store.bump_calls(key)
+            log_activity("sync", username, f"page {done}/{total}  +{len(listens)} écoutes")
 
 
 async def _sync_loved(db: AsyncSession, user_id: str, username: str) -> None:
@@ -137,6 +183,8 @@ async def _sync_in_background(user_id: str, username: str) -> None:
         async with async_session() as db:
             await sync_scrobbles(db, user_id, username)
         progress_store.finish(key)
+        for callback in after_sync:
+            callback(user_id)
     except SyncSuperseded:
         log_activity("sync", username, "annulé, un autre compte Last.fm a été lié")
     except (*PAGE_ERRORS, SQLAlchemyError) as exc:

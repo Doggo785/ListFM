@@ -32,13 +32,14 @@ export function timeLeft(seconds) {
 
 /**
  * The work as the ribbon reads it, from a task and the work it replaces: the share done, how fast it moves,
- * and for a history being read the dates it spans. The date's speed is measured between two reads that moved it.
+ * and for a history being read (newest first) where it starts and how far back it is read. The reach's speed,
+ * back in time, is measured between two reads that moved it.
  */
 export function workFrom(task, previous, now) {
   const since = task.since ? Date.parse(task.since) : null;
-  const until = task.until ? Date.parse(task.until) : null;
+  const reached = task.reached ? Date.parse(task.reached) : null;
   const same = previous?.kind === task.kind;
-  const moved = same && until != null && previous.until != null && until !== previous.until;
+  const moved = same && reached != null && previous.reached != null && reached !== previous.reached;
   return {
     kind: task.kind,
     runs: task.runs ?? [],
@@ -46,12 +47,14 @@ export function workFrom(task, previous, now) {
     perSecond: task.eta ? (1 - task.share) / task.eta : 0,
     at: now,
     since,
-    until,
-    untilAt: moved || !same ? now : previous.untilAt,
-    untilPerSecond: moved ? Math.max(0, (until - previous.until) / Math.max(1, (now - previous.untilAt) / 1000)) : same ? previous.untilPerSecond : 0,
+    reached,
+    reachedAt: moved || !same ? now : previous.reachedAt,
+    reachedPerSecond: moved
+      ? Math.max(0, (previous.reached - reached) / Math.max(1, (now - previous.reachedAt) / 1000))
+      : same ? previous.reachedPerSecond : 0,
     doneAt: null,
     // What the ribbon has drawn so far: kept across reads, so the front glides on instead of restarting from each.
-    ...(same && { shown: previous.shown, shownUntil: previous.shownUntil, shownKind: previous.shownKind }),
+    ...(same && { shown: previous.shown, shownReached: previous.shownReached, shownKind: previous.shownKind }),
   };
 }
 
@@ -59,9 +62,9 @@ export function workFrom(task, previous, now) {
 export function frontAt(work, now) {
   const ahead = Math.min(Math.max(0, now - work.at) / 1000, MAX_AHEAD_SECONDS);
   const share = work.doneAt == null ? Math.min(1, work.share + work.perSecond * ahead) : 1;
-  if (work.until == null) return { share, until: null };
-  const untilAhead = Math.min(Math.max(0, now - work.untilAt) / 1000, MAX_AHEAD_SECONDS);
-  return { share, until: work.until + work.untilPerSecond * untilAhead };
+  if (work.reached == null) return { share, reached: null };
+  const reachedAhead = Math.min(Math.max(0, now - work.reachedAt) / 1000, MAX_AHEAD_SECONDS);
+  return { share, reached: Math.max(work.since ?? -Infinity, work.reached - work.reachedPerSecond * reachedAhead) };
 }
 
 /**
@@ -95,12 +98,13 @@ export function monthsSince(origin, ms) {
 /**
  * The band of a first import, oldest on the left: the years before the one shown as a low line on its first part,
  * then the year itself, one twelfth of the rest per month, starting at `origin` (its first month on screen).
- * Returns where that year starts and where the date `until` lies, in pixels.
+ * Returns where that year starts and where the date `reached` lies, in pixels: the reading walks right to left,
+ * and before its first page it has not left the right end.
  */
-export function historyBand({ since, until, yearStart, origin, width }) {
+export function historyBand({ since, reached, yearStart, origin, width }) {
   const yearX = since != null && since < yearStart ? OLD_YEARS_SHARE * width : 0;
   const perMonth = (width - yearX) / 12;
-  if (until == null) return { yearX, perMonth, frontX: 0 };
-  const frontX = until < yearStart ? (yearX * (until - since)) / Math.max(1, yearStart - since) : yearX + monthsSince(origin, until) * perMonth;
+  if (reached == null) return { yearX, perMonth, frontX: width };
+  const frontX = reached < yearStart ? (yearX * (reached - since)) / Math.max(1, yearStart - since) : yearX + monthsSince(origin, reached) * perMonth;
   return { yearX, perMonth, frontX: Math.min(width, Math.max(0, frontX)) };
 }

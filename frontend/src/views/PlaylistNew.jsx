@@ -35,6 +35,7 @@ import {
   usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
+import { EDITOR_START, guide, guidesEditor, useGuide } from "@/lib/guide";
 import { useAuth } from "../contexts/AuthContext";
 
 const CUSTOM = "custom";
@@ -49,6 +50,7 @@ const ROW_MOVE = { layout: { duration: 0.24, ease: [0.16, 1, 0.3, 1] } };
 const ROW_EXIT = { opacity: 0, transition: { duration: 0.12, ease: (t) => Math.ceil(t * 3) / 3 } };
 const ROW_STAGGER_LIMIT = 14; // Past the visible rows, waiting would only delay what's off-screen.
 const MOBILE_ROWS = 8; // Keep in step with the nth-child below: the page must not end after 200 rows on a phone.
+const READ_BACK_TO = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
 
 const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 sm:grid-cols-[8rem_minmax(0,1fr)_9rem]";
 
@@ -62,9 +64,9 @@ function Count({ value, unit }) {
 }
 
 /** One link of the chain: its name, its control, what it leaves. */
-function Stage({ label, count, children, below }) {
+function Stage({ label, count, children, below, step }) {
   return (
-    <section className="py-3">
+    <section data-guide-step={step} className="py-3">
       <div className={ROW}>
         <h2 className="font-sans text-base">{label}</h2>
         {count ?? <span className="sm:order-last" />}
@@ -76,9 +78,9 @@ function Stage({ label, count, children, below }) {
 }
 
 /** A stage folded by default, whose closed state still says what it holds. */
-function FoldedStage({ label, state, count, children }) {
+function FoldedStage({ label, state, count, children, step }) {
   return (
-    <details className="group py-3">
+    <details data-guide-step={step} className="group py-3">
       <summary className={`${ROW} cursor-pointer list-none outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--ember-9) [&::-webkit-details-marker]:hidden`}>
         <span className="flex items-center gap-2 text-base">
           {label}
@@ -142,6 +144,12 @@ function Preview({ preview, draft, linked, saved }) {
         </p>
       </div>
       {result?.period && <p className="pb-2 text-sm text-(--text-muted)">Covers {describePeriod(result.period)}.</p>}
+      {result?.history_partial && (
+        <p className="pb-2 text-sm text-(--text-muted)">
+          {result.history_read_from ? `Your listens are read back to ${READ_BACK_TO.format(new Date(result.history_read_from))} so far` : "Your listens are still arriving"}
+          : this preview will change as the rest comes in.
+        </p>
+      )}
       {result && result.total > 0 && (
         <p className="flex justify-between pr-2 pb-1 pl-11 text-sm text-(--text-muted)">
           <span>Track</span>
@@ -223,6 +231,16 @@ function Creator({ saved }) {
     document.title = `${saved ? "Edit automation" : "New automation"} - ListFM`;
   }, [saved]);
 
+  // In the guide the fields look blank until the user fills each one; the draft keeps its defaults underneath.
+  const g = useGuide();
+  const guided = !saved && guidesEditor(g);
+  const blank = (key) => guided && !g.filled[key];
+  const fill = (key) => guided && guide.fill(key);
+  useEffect(() => {
+    // A reload or a return starts the editor blank: so does its part of the guide.
+    if (guidesEditor(guide.get()) && !saved) guide.set({ step: EDITOR_START, filled: {} });
+  }, [saved]);
+
   const suggestion = suggestName(draft);
   const name = typedName?.trim() || suggestion;
   const update = (patch) => setDraft((d) => ({ ...d, ...patch }));
@@ -230,11 +248,17 @@ function Creator({ saved }) {
 
   const payload = toPayload(draft);
   // The schedule sets the period a run covers; a half-typed cron must not fail the preview.
-  const preview = useLivePreview(linked ? { ...payload, name, cron: isValidCron(draft.cron) ? draft.cron : "", id: undefined, createdAt: undefined, updatedAt: undefined } : null, saved?.id);
+  const preview = useLivePreview(linked && !blank("window") ? { ...payload, name, cron: isValidCron(draft.cron) ? draft.cron : "", id: undefined, createdAt: undefined, updatedAt: undefined } : null, saved?.id);
   const { result } = preview;
+  const empty = result?.total === 0;
+  const partial = Boolean(result?.history_partial);
+  useEffect(() => {
+    if (guided) guide.set({ preview: { empty, partial } });
+  }, [guided, empty, partial]);
 
   const windowIsCustom = customWindow || !windowOption(draft.window);
   const pickWindow = (value) => {
+    fill("window");
     setCustomWindow(value === CUSTOM);
     update({ window: value === CUSTOM ? { length: { amount: 2, unit: "week" }, ago: null } : WINDOW_OPTIONS.find((o) => o.value === value).window });
   };
@@ -282,9 +306,12 @@ function Creator({ saved }) {
         <header data-quiet className="pt-4">
           <h1 className="text-4xl">{saved ? "Edit automation" : "New automation"}</h1>
           <p className="pt-1 text-base text-(--text-muted)">
-            {saved ? "Change what goes in its next playlists, and when they get made. The ones already made stay as they are." : "Choose what goes in a playlist, and when it gets made. Start from a recipe or set everything yourself."}
+            {saved
+              ? "Change what goes in its next playlists, and when they get made. The ones already made stay as they are."
+              : `Choose what goes in a playlist, and when it gets made.${guided ? "" : " Start from a recipe or set everything yourself."}`}
           </p>
-          <div className="flex flex-wrap gap-2 pt-3">
+          {/* The guide leaves the recipes out: one click would fill every field it asks for. */}
+          <div className={`flex flex-wrap gap-2 pt-3 ${guided ? "hidden" : ""}`}>
             {PRESETS.map((preset) => (
               <Button
                 key={preset.id}
@@ -313,7 +340,7 @@ function Creator({ saved }) {
                 </button>
               </>
             ) : (
-              selectedPreset?.description
+              !guided && selectedPreset?.description
             )}
           </p>
         </header>
@@ -325,26 +352,26 @@ function Creator({ saved }) {
           {/* Below lg the three blocks stack as settings, preview, actions. */}
           <div className="min-w-0 max-lg:contents lg:space-y-4">
           <div data-quiet className="min-w-0 divide-y divide-(--line)">
-            <Stage label="Window" count={<Count value={result?.before_filter} unit="tracks" />} below={windowIsCustom && <CustomWindow window={draft.window} onChange={(window) => update({ window })} />}>
-              <CustomSelect label="Window" value={windowIsCustom ? CUSTOM : windowOption(draft.window).value} onChange={pickWindow} options={WINDOW_CHOICES} />
+            <Stage step="window" label="Window" count={<Count value={result?.before_filter} unit="tracks" />} below={windowIsCustom && <CustomWindow window={draft.window} onChange={(window) => update({ window })} />}>
+              <CustomSelect label="Window" placeholder="Choose a window" value={blank("window") ? null : windowIsCustom ? CUSTOM : windowOption(draft.window).value} onChange={pickWindow} options={WINDOW_CHOICES} />
             </Stage>
 
-            <FoldedStage label="Refine" state={ruleState} count={<Count value={result?.after_filter} unit="kept" />}>
+            <FoldedStage step="refine" label="Refine" state={ruleState} count={<Count value={result?.after_filter} unit="kept" />}>
               <FilterBuilder value={draft.filterGroups} onChange={(filterGroups) => update({ filterGroups })} />
             </FoldedStage>
 
-            <Stage label="Sort">
+            <Stage step="sort" label="Sort">
               <div className="space-y-2">
-                <CustomSelect label="Sort" value={draft.sort} onChange={(sort) => update({ sort })} options={SORT_OPTIONS.map(({ value, label }) => ({ value, label }))} />
+                <CustomSelect label="Sort" placeholder="Choose an order" value={blank("sort") ? null : draft.sort} onChange={(sort) => { fill("sort"); update({ sort }); }} options={SORT_OPTIONS.map(({ value, label }) => ({ value, label }))} />
                 {COUNTS_PLAYS.includes(draft.sort) && usesMomentFilter(draft.filterGroups) && (
                   <CustomSelect label="Count plays" value={draft.sortCounts ?? "window"} onChange={(sortCounts) => update({ sortCounts })} options={PLAYS_FROM} />
                 )}
               </div>
             </Stage>
 
-            <Stage label="Size" count={<Count value={result?.total} unit="in playlist" />}>
+            <Stage step="size" label="Size" count={<Count value={result?.total} unit="in playlist" />}>
               <div className="flex items-center gap-2">
-                <NumberInput aria-label="Playlist size" min={1} max={200} value={draft.output.maxSize} onChange={(maxSize) => setOutput({ maxSize })} />
+                <NumberInput aria-label="Playlist size" min={1} max={200} placeholder="50" value={blank("size") ? null : draft.output.maxSize} onChange={(maxSize) => { if (maxSize != null) fill("size"); setOutput({ maxSize }); }} />
                 <Muted>tracks at most</Muted>
               </div>
             </Stage>
@@ -357,12 +384,12 @@ function Creator({ saved }) {
               </div>
             </FoldedStage>
 
-            <Stage label="Schedule">
-              <CronEditor zone={user?.timezone} value={draft.cron} onChange={(cron) => update({ cron })} />
+            <Stage step="schedule" label="Schedule">
+              <CronEditor zone={user?.timezone} value={blank("schedule") ? null : draft.cron} onChange={(cron) => { fill("schedule"); update({ cron }); }} />
             </Stage>
 
-            <Stage label="Name">
-              <Input aria-label="Name" value={typedName ?? suggestion} placeholder={suggestion} onChange={(e) => setTypedName(e.target.value)} className="w-full" />
+            <Stage step="name" label="Name">
+              <Input aria-label="Name" value={typedName ?? (blank("name") ? "" : suggestion)} placeholder={suggestion} onChange={(e) => { if (e.target.value.trim()) fill("name"); setTypedName(e.target.value); }} className="w-full" />
             </Stage>
 
             <Stage label="Description">
@@ -378,7 +405,7 @@ function Creator({ saved }) {
               {outcome}
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <Button size="lg" onClick={() => create({ run: true })} disabled={creating || !linked || badSchedule}>
+              <Button data-guide-step="create" size="lg" onClick={() => create({ run: true })} disabled={creating || !linked || badSchedule}>
                 {saved ? (creating ? "Saving" : "Save and run") : creating ? "Creating" : "Create and run"}
               </Button>
               <Button size="lg" variant="outline" onClick={() => create()} disabled={creating || !linked || badSchedule}>
@@ -392,7 +419,7 @@ function Creator({ saved }) {
           </div>
           </div>
 
-          <aside data-quiet className="flex min-h-0 min-w-0 flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:self-start">
+          <aside data-guide-step="preview" data-quiet className="flex min-h-0 min-w-0 flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:self-start">
             <Preview preview={preview} draft={draft} linked={linked} saved={Boolean(saved)} />
           </aside>
         </div>

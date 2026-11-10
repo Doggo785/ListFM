@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import PlaylistCover from "@/components/ui/PlaylistCover";
 import { describeAutomation, describeSchedule } from "@/lib/automation-rules";
-import { historyBand, monthStart, moveHead } from "@/lib/backgroundWork";
+import { historyBand, monthsSince, monthStart, moveHead } from "@/lib/backgroundWork";
 import { ribbonStage } from "@/lib/pixelRibbon";
 import { plural } from "@/lib/playlists";
 import { cardCorners, cardPose, deckLayout, mix, monthsEnd, monthSeries, runsSeries, SAMPLES_PER_MONTH, smoothstep, sweepAt, SWEEP_SECONDS } from "@/lib/ribbonTrack";
@@ -239,11 +239,12 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       }
 
       // The ribbon: the whole year across the poster, then wrapped on the drum.
-      // Background work: a first import shows the history being read, oldest on the left; any task leads the head.
+      // Background work: a first import shows the history being read, oldest on the left, newest first, so its
+      // front walks right to left; any task leads the head.
       const work = ribbonStage.work;
       const reading = work?.kind === "listens" && work.doneAt == null && work.since != null;
       const state = working.current;
-      if (reading) state.span = { since: work.since, until: work.shownUntil ?? work.since };
+      if (reading) state.span = { since: work.since, reached: work.shownReached ?? null };
       const dt = state.at ? Math.max(0, now - state.at) / 1000 : 0;
       const step = reducedMotion || !state.at ? 1 : 1 - Math.exp(-dt / WORK_EASE);
       state.at = now;
@@ -252,13 +253,16 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       const { band, span } = state;
       const source = band > 0 ? (months.length ? monthsTrack : EMPTY_YEAR) : zoom > 0.5 || !months.length ? cardsTrack : monthsTrack;
       const yearStart = monthStart(Date.now(), 11);
-      const origin = firstMonth ? new Date(`${firstMonth}-01T00:00:00`).getTime() : span ? Math.max(yearStart, monthStart(span.since)) : yearStart;
-      const history = span ? historyBand({ ...span, yearStart, origin, width }) : { yearX: 0, perMonth: width / 12, frontX: 0 };
+      // The band's months stay put while older ones arrive, today at the right end where the reading starts.
+      const history = span ? historyBand({ ...span, yearStart, origin: yearStart, width }) : { yearX: 0, perMonth: width / 12, frontX: width };
+      const firstAt = firstMonth ? new Date(`${firstMonth}-01T00:00:00`).getTime() : yearStart;
+      const seriesX = history.yearX + Math.max(0, monthsSince(yearStart, firstAt)) * history.perMonth;
       const lineRect = line.getBoundingClientRect();
       const seconds = reducedMotion ? SWEEP_SECONDS : (now - startedAt.current) / 1000;
       const perMonth = mix(width / (source.end > 0.5 ? source.end : 12), history.perMonth, band);
       const rest = width - 28 + (reducedMotion ? 0 : Math.sin(now / 420) * 10);
-      const frontX = reading ? history.frontX : (work?.shown ?? 1) * width;
+      // A first import reads newest first: before its first page its front waits at the right end, where today is.
+      const frontX = reading ? history.frontX : work?.kind === "listens" ? width : (work?.shown ?? 1) * width;
       // On a task the head is its front, to its last flare; then back to the playhead's rest at the year's end.
       const wantedHead = work ? frontX : seconds < SWEEP_SECONDS ? sweepAt(seconds) * width : rest;
       state.head = reducedMotion ? { x: wantedHead, glow: 1 } : moveHead(state.head, wantedHead, dt);
@@ -268,10 +272,10 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       const deckHalf = card * DECK_HALF_SHARE;
       Object.assign(track, {
         series: source.series,
-        // While the year arrives its wave ends at the gliding front, not at the last page in: it grows, never jumps.
-        end: mix(source.end, (history.frontX - history.yearX) / history.perMonth, band),
+        end: source.end,
         count: source.count,
-        x0: history.yearX * band,
+        // While the year arrives its wave starts at the gliding front (lineStart), not at the last page in.
+        x0: seriesX * band,
         perMonth,
         zoom,
         cx,
@@ -286,7 +290,8 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
         bandBottom: zoom < BAND_ENDS ? lineRect.bottom : zoom > 1 - BAND_ENDS ? cy + card / 2 + layout.bow * 0.5 : NO_BAND,
         holes: holes.sort((a, b) => a.away - b.away),
         importing: band,
-        lineEnd: history.frontX,
+        lineStart: history.frontX,
+        trail: reading ? 1 : -1,
         glow: mix(state.head.glow, 1, zoom),
         // The front spits sparks where the work is landing, on the poster only.
         sparks: work && work.doneAt == null && !reducedMotion ? SPARKS_PER_SECOND * state.head.glow * Math.max(0, 1 - zoom * 2) : 0,

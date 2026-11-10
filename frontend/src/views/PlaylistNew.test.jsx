@@ -8,6 +8,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PlaylistNew from "@/views/PlaylistNew";
 import { createAutomation, getAutomation, previewAutomation, updateAutomation } from "@/lib/api";
+import { EDITOR_START, guide } from "@/lib/guide";
 
 vi.mock("@/lib/api", () => ({
   previewAutomation: vi.fn(),
@@ -417,3 +418,40 @@ describe("editing an automation", () => {
   });
 });
 
+
+describe("during a first import", () => {
+  it("says how far back the listens are read, when the window reaches past it", async () => {
+    previewAutomation.mockImplementation(async () => result({ history_partial: true, history_read_from: "2024-03-15T12:00:00Z" }));
+    const container = await render();
+    await wait(400);
+    expect(container.textContent).toContain("Your listens are read back to March 2024 so far: this preview will change as the rest comes in.");
+  });
+});
+
+describe("in the newcomer's guide", () => {
+  afterEach(() => guide.set({ on: false, step: 0, filled: {} }));
+
+  it("starts blank, leaves the recipes out, and previews once a window is picked", async () => {
+    guide.set({ on: true, step: EDITOR_START + 3, filled: { window: true } });
+    const container = await render();
+    // Opened again: its part of the guide starts over with the fields.
+    expect(guide.get()).toMatchObject({ step: EDITOR_START, filled: {} });
+    await wait(400);
+    expect(previewAutomation).not.toHaveBeenCalled();
+    for (const blank of ["Choose a window", "Choose an order", "Choose when"]) expect(container.textContent).toContain(blank);
+    expect(container.querySelector('input[aria-label="Playlist size"]').value).toBe("");
+    expect(container.querySelector('input[aria-label="Name"]').value).toBe("");
+    expect(container.querySelector("[aria-pressed]").parentElement.className).toContain("hidden");
+    await act(async () => guide.fill("window"));
+    await wait(400);
+    expect(previewAutomation).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the guide its field is filled", async () => {
+    guide.set({ on: true, step: EDITOR_START, filled: {} });
+    const container = await render();
+    await type(container.querySelector('input[aria-label="Playlist size"]'), "40");
+    await type(container.querySelector('input[aria-label="Name"]'), "Mine");
+    expect(guide.get().filled).toEqual({ size: true, name: true });
+  });
+});

@@ -20,7 +20,7 @@ import {
   retryRun,
   runAutomationNow,
 } from "@/lib/api";
-import { RUNS_DONE } from "@/lib/backgroundWork";
+import { RUNS_DONE, timeLeft } from "@/lib/backgroundWork";
 import { describeAutomation, describeSchedule, describeWaiting } from "@/lib/automation-rules";
 import { RUN_TONES, chainsOf, daysOf, describeRun, timeOf } from "@/lib/runs";
 import { FOCUS } from "@/lib/utils";
@@ -59,7 +59,14 @@ function Tries({ tries }) {
   );
 }
 
-function RunRow({ chain, progress, retryable, busy, onRetry }) {
+/** What a waiting run waits for, with the time the server expects it to take. */
+function waitingFor(head, listens) {
+  const eta = !listens ? null : listens.complete ? listens.tags_eta_seconds : listens.eta_seconds;
+  const left = timeLeft(eta);
+  return left ? `${head.error_message} It starts by itself, ${left}.` : `${head.error_message} It starts by itself.`;
+}
+
+function RunRow({ chain, progress, retryable, busy, onRetry, listens }) {
   const { head, tries } = chain;
   const { label, tone } = describeRun(head);
   const time = <span className="text-sm text-(--text-muted) tabular-nums leading-6">{timeOf(head.started_at)}</span>;
@@ -84,6 +91,7 @@ function RunRow({ chain, progress, retryable, busy, onRetry }) {
         <p className={`text-base ${RUN_TONES[tone]}`}>{label}</p>
         {head.status === "running" && progress && <RunningDetail progress={progress} />}
         {head.status === "failed" && head.error_message && <p className="text-sm text-(--text-muted)">{head.error_message}</p>}
+        {head.status === "waiting" && <p className="text-sm text-(--text-muted)">{waitingFor(head, listens)}</p>}
         {head.status !== "running" && <Tries tries={tries} />}
       </div>
       {retryable ? <Button variant="outline" size="sm" onClick={onRetry} disabled={busy}>Re-run</Button> : <span />}
@@ -91,7 +99,7 @@ function RunRow({ chain, progress, retryable, busy, onRetry }) {
   );
 }
 
-function History({ rows, failed, onReload, run, listensLoading, onRetry, automation }) {
+function History({ rows, failed, onReload, run, listens, onRetry, automation }) {
   if (failed && !rows) return <LoadFailed subject="The history" onRetry={onReload} />;
   if (!rows) return <p role="status" className="text-sm text-(--text-muted)">Loading history</p>;
 
@@ -124,8 +132,9 @@ function History({ rows, failed, onReload, run, listensLoading, onRetry, automat
                   chain={chain}
                   progress={run}
                   retryable={chain.head.id === latest?.id && chain.head.status === "failed"}
-                  busy={Boolean(run) || listensLoading}
+                  busy={Boolean(run)}
                   onRetry={() => onRetry(chain.head.id)}
+                  listens={listens}
                 />
               </li>
             ))}
@@ -148,9 +157,8 @@ export default function Automation() {
   const username = user?.lastfm_username;
   const { automation, isLoading, error, update, refetch } = useAutomation(username ? id : null);
   const { generatedPlaylists } = useAutomations(username);
+  // A run waiting for the listens or the tags says how long they should take.
   const listensSync = useScrobbleSync(Boolean(username));
-  // After a failed load the button stays usable: a click starts the load again.
-  const listensLoading = listensSync !== null && !listensSync.complete && listensSync.stage !== "error";
 
   const [rows, setRows] = useState(null);
   const [historyFailed, setHistoryFailed] = useState(false);
@@ -179,7 +187,7 @@ export default function Automation() {
 
   // The sweep works without anyone watching: a line that is about to change follows it.
   const latest = rows?.[0];
-  const moving = latest?.status === "running" || Boolean(latest?.next_retry_at);
+  const moving = latest?.status === "running" || latest?.status === "waiting" || Boolean(latest?.next_retry_at);
   useEffect(() => {
     if (!moving) return undefined;
     const timer = setInterval(loadHistory, REFRESH_MS);
@@ -268,7 +276,7 @@ export default function Automation() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2 pt-4">
-            <Button onClick={runNow} disabled={Boolean(run) || listensLoading}>{run ? "Running" : "Run now"}</Button>
+            <Button onClick={runNow} disabled={Boolean(run)}>{run ? "Running" : "Run now"}</Button>
             <Link to={`/automations/${id}/edit`} className={buttonVariants({ variant: "outline" })}>Edit</Link>
             <Button variant="outline" onClick={togglePaused} disabled={pausing}>{paused ? "Resume" : "Pause"}</Button>
             <DeleteAction
@@ -281,14 +289,13 @@ export default function Automation() {
               onFailed={(err) => setActionError(apiMessage(err, "This automation could not be deleted. Try again."))}
             />
           </div>
-          {listensLoading && <p className="pt-2 text-sm text-(--text-muted)">Runs can start once your listening history has finished loading.</p>}
           {arrival?.notice && !actionError && <p role="status" className="pt-2 text-sm text-(--ember)">{arrival.notice}</p>}
           {actionError && <p role="alert" className="pt-2 text-sm text-(--ember)">{actionError}</p>}
         </header>
 
         <section data-quiet aria-labelledby="history-title" className="min-w-0 max-w-2xl">
           <h2 id="history-title" className="pb-3 text-2xl">History</h2>
-          <History rows={rows} failed={historyFailed} onReload={loadHistory} run={run} listensLoading={listensLoading} onRetry={retry} automation={automation} />
+          <History rows={rows} failed={historyFailed} onReload={loadHistory} run={run} listens={listensSync} onRetry={retry} automation={automation} />
         </section>
       </div>
     </main>

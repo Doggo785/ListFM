@@ -197,16 +197,21 @@ async def test_background_pass_runs_once_per_user_and_then_allows_another():
         asked.append(name)
         return []
 
+    ended = []
     with (
         patch.object(tag_catalogue, "async_session", _TestSessionLocal),
         patch.object(tag_catalogue, "get_artist_tags", fake),
+        patch.object(tag_catalogue, "after_pass", [ended.append]),
     ):
         tag_catalogue.start_tag_catalogue(user_id, "someone")
         tag_catalogue.start_tag_catalogue(user_id, "someone")
         assert len(tag_catalogue._background_tasks) == 1
+        assert tag_catalogue.is_tagging(user_id)
         await asyncio.gather(*tag_catalogue._background_tasks)
     assert asked == [artist]
-    assert user_id not in tag_catalogue._running
+    assert not tag_catalogue.is_tagging(user_id)
+    # Runs filtering by tags wait for this moment.
+    assert ended == [user_id]
 
 
 def _tags_response(payload):

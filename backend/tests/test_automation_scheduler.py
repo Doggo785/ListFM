@@ -20,8 +20,13 @@ from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from models.user import User
 from repositories.automation_history import create_automation_history
-from routers.automations import _history_loaded_or_409
-from services.automation_runner import MAX_ATTEMPT, run_due_automations
+from services import automation_runner
+from services.automation_runner import (
+    MAX_ATTEMPT,
+    _check_ready,
+    run_due_automations,
+    run_waiting,
+)
 from sqlalchemy import delete, func, select
 
 from .conftest import (
@@ -354,7 +359,7 @@ async def test_run_now_triggers_manual_run(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_manual_run_waits_for_the_first_load_and_leaves_no_row(client: AsyncClient):
+async def test_a_run_during_the_first_load_waits_then_starts_by_itself(client: AsyncClient):
     email = _unique_email()
     try:
         await _register_login_link(client, email)
@@ -364,24 +369,75 @@ async def test_manual_run_waits_for_the_first_load_and_leaves_no_row(client: Asy
 
         tracks = [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
         with (
-            patch("routers.automations._history_loaded_or_409", _history_loaded_or_409),
-            patch("routers.automations.start_scrobble_sync") as start,
+            patch("services.automation_runner._check_ready", _check_ready),
+            patch("services.automation_runner.start_scrobble_sync") as start,
             patch("services.automation_runner.get_window_tracks", return_value=tracks),
         ):
-            for path in ("run", f"history/{failed_id}/retry"):
-                resp = await client.post(f"/api/automations/{automation_id}/{path}")
-                assert resp.status_code == 409
-                assert "still loading" in resp.json()["detail"]
-            assert start.call_count == 2
-            history = await client.get(f"/api/automations/{automation_id}/history")
-            assert [row["id"] for row in history.json()] == [failed_id]
+            waited = await client.post(f"/api/automations/{automation_id}/run")
+            assert waited.status_code == 200
+            assert waited.json()["status"] == "waiting"
+            assert "listening history" in waited.json()["error_message"]
+            # Asking again, or retrying the old failure, joins the same wait: one wait, one line.
+            again = await client.post(f"/api/automations/{automation_id}/run")
+            assert again.json()["id"] == waited.json()["id"]
+            assert start.call_count == 2  # An interrupted first load starts again.
+            history = (await client.get(f"/api/automations/{automation_id}/history")).json()
+            assert [row["id"] for row in history] == [waited.json()["id"], failed_id]
+            assert history[0]["next_retry_at"] is None
 
+            user_id = _get_user_id_from_cookies(client)
             async with _TestSessionLocal() as db:
-                user = await db.get(User, _get_user_id_from_cookies(client))
+                user = await db.get(User, user_id)
                 user.scrobbles_complete_at = datetime.now(UTC)
                 await db.commit()
-            resp = await client.post(f"/api/automations/{automation_id}/run")
-        assert resp.json()["status"] == "completed"
+            await run_waiting(user_id, _TestSessionLocal)
+        history = (await client.get(f"/api/automations/{automation_id}/history")).json()
+        assert [(row["id"], row["status"]) for row in history[:1]] == [(waited.json()["id"], "completed")]
+        assert history[0]["error_message"] is None
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_a_run_filtering_by_tags_waits_for_the_tag_pass(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        tagged = {**_create_body(), "filterGroups": [{"id": "g", "logic": "AND", "conditions": [
+            {"id": "c", "field": "tags", "operator": "contains", "value": "rock"},
+        ]}]}
+        by_tags = (await client.post("/api/automations", json=tagged)).json()["id"]
+        plain = (await client.post("/api/automations", json=_create_body())).json()["id"]
+        async with _TestSessionLocal() as db:
+            user = await db.get(User, _get_user_id_from_cookies(client))
+            user.scrobbles_complete_at = datetime.now(UTC)
+            await db.commit()
+
+        with (
+            patch("services.automation_runner._check_ready", _check_ready),
+            patch.object(automation_runner, "is_tagging", return_value=True),
+            patch("services.automation_runner.get_window_tracks", return_value=[]),
+        ):
+            waiting = (await client.post(f"/api/automations/{by_tags}/run")).json()
+            ran = (await client.post(f"/api/automations/{plain}/run")).json()
+        assert (waiting["status"], waiting["error_message"]) == ("waiting", "The tag lookup is still running.")
+        assert ran["status"] == "empty"
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
+
+@pytest.mark.asyncio
+async def test_the_sweep_starts_waiting_runs_again(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        automation_id = (await client.post("/api/automations", json=_create_body())).json()["id"]
+        with patch("services.automation_runner._check_ready", side_effect=automation_runner.HistoryLoading):
+            assert (await client.post(f"/api/automations/{automation_id}/run")).json()["status"] == "waiting"
+        with patch("services.automation_runner.get_window_tracks", return_value=[]):
+            await run_due_automations(session_factory=_TestSessionLocal)
+        history = (await client.get(f"/api/automations/{automation_id}/history")).json()
+        assert [row["status"] for row in history] == ["empty"]
     finally:
         await _cleanup_user_with_automations(client, email)
 

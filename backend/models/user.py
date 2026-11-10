@@ -23,4 +23,6 @@ class User(Base):
     # the first full load (runs wait for it).
     scrobbles_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     scrobbles_complete_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The newcomer's guide was finished or skipped: it starts by itself only before that.
+    guide_done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # soft delete
