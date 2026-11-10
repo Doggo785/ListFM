@@ -33,6 +33,12 @@ async def get_latest_played_at(db: AsyncSession, user_id: str) -> datetime | Non
     ).scalar_one()
 
 
+async def get_earliest_played_at(db: AsyncSession, user_id: str) -> datetime | None:
+    return (
+        await db.execute(select(func.min(Scrobble.played_at)).where(Scrobble.user_id == user_id))
+    ).scalar_one()
+
+
 async def store_scrobbles(
     db: AsyncSession, user_id: str, listens: list[tuple[str, str, datetime]]
 ) -> None:
@@ -55,11 +61,14 @@ async def store_scrobbles(
     )
 
 
-async def store_track_albums(db: AsyncSession, listens: list[tuple[str, str, str | None]]) -> None:
+async def store_track_albums(
+    db: AsyncSession, listens: list[tuple[str, str, str | None]], *, older: bool = False
+) -> None:
     """Set each track's album from (title, artist, album), newest first. Caller commits.
 
     A track keeps one album, the one of its latest listen seen, even when it
     was also played from a single: a limit per album needs no more than that.
+    ``older`` listens predate what is stored: they only fill a track without album.
     """
     # Longer than the column: treat as no album rather than fail the page.
     albums: dict[tuple[str, str], str] = {}
@@ -90,7 +99,7 @@ async def store_track_albums(db: AsyncSession, listens: list[tuple[str, str, str
         update(table)
         .where(
             table.c.id == bindparam("track_id"),
-            table.c.album_id.is_distinct_from(bindparam("new_album_id")),
+            table.c.album_id.is_(None) if older else table.c.album_id.is_distinct_from(bindparam("new_album_id")),
         )
         .values(album_id=bindparam("new_album_id")),
         # Sorted: two syncs updating shared tracks in the same order cannot deadlock.

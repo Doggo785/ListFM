@@ -25,7 +25,8 @@ const MAX_HOLES = 4;
 const WORK_GLOW_MS = 2500; // A finished task's front stays this long, for its last flare, then the ribbon lets it go.
 const FRONT_EASE = 2.5; // Per second: how fast the drawn front catches up with where it should be.
 const IMPORT_TIP = 0.6; // Months: how long the wave's tip tapers while an import brings it in.
-const SPARK_BEHIND = 20; // CSS pixels: sparks leave from the flame just behind its head, never from past its tip.
+// CSS pixels: sparks leave from the flame just behind its head, on the side already burnt (track.trail), never past its tip.
+const SPARK_BEHIND = 20;
 const random = Math.random; // Where embers leave: noise for the eye, never a secret.
 
 // shape: half-width along the ribbon. angle and offset: where it lives. heat: how hot its core burns.
@@ -163,12 +164,14 @@ void main(){
     float beyond=smoothstep(uMap.z-.2,uMap.z+.5,mo)+smoothstep(.2,-.5,mo);
     amount=max(amount,.5*uDrum.x*min(beyond,1.));
     float past=uDrum.x*1.8;
-    // An arriving year's tip thins out like a tongue, instead of stopping on a wall where the reading is.
-    float ends=smoothstep(-past,.3-past*.5,mo)*smoothstep(uMap.z+past,uMap.z-.14-${IMPORT_TIP.toFixed(2)}*uWork.x+past*.5,mo);
-    // A first import reads the years before the one shown: left of the year, a low line lit up to the front.
+    // A first import reads newest first: the year's wave starts where the reading has reached, and its tip
+    // thins out like a tongue instead of stopping on a wall.
+    float from=uWork.x*max((uWork.y-uMap.x)/uMap.y,0.);
+    float ends=smoothstep(from-past,from+.3+${IMPORT_TIP.toFixed(2)}*min(from,1.)-past*.5,mo)*smoothstep(uMap.z+past,uMap.z-.14+past*.5,mo);
+    // Then it reads the years before the one shown: left of the year, a low line lit from the front on.
     float early=uWork.x*step(px,uMap.x);
     amount*=1.-early;
-    ends=mix(ends,clamp((uWork.y-px)/8.,0.,1.),early);
+    ends=mix(ends,clamp((px-uWork.y)/8.,0.,1.),early);
     heat=track*uWork.z*exp(-pow((px-uWave.z)/90.,2.));
     amount=max(amount,.6*heat); // The playhead stands out even over a quiet day.
     float wave=uWave.y*(.17+.83*amount)*ends*(1.+.22*heat);
@@ -316,6 +319,8 @@ function emberOrigin(track, wander) {
   const months = monthAt(x, track);
   // Wrapped on the drum the flame carries on past both ends of the year, and so do its embers.
   if (track.zoom < 0.5 && (months < 0 || months > track.end)) return null;
+  // During a first import, nothing is drawn yet left of where the reading has reached.
+  if (track.importing > 0.5 && x < track.lineStart) return null;
   return { x, y: waveCentre(x, track, wander) - random() * track.half * 0.7 };
 }
 
@@ -408,8 +413,11 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
       const wanted = frontAt(work, time);
       const fresh = work.shownKind !== work.kind;
       // Forward only: a read behind the guess holds the front until the work catches up, it never walks back.
+      // A history is read newest first: its reach only goes back in time.
       work.shown = fresh ? wanted.share : work.shown + Math.max(0, wanted.share - work.shown) * ease(FRONT_EASE);
-      work.shownUntil = fresh || wanted.until == null ? wanted.until : work.shownUntil + Math.max(0, wanted.until - work.shownUntil) * ease(FRONT_EASE);
+      // The reading starts from today, at the right end: its first page glides in like the others.
+      const from = work.shownReached ?? Date.now();
+      work.shownReached = wanted.reached == null ? null : from - Math.max(0, from - wanted.reached) * ease(FRONT_EASE);
       // Another task starts elsewhere on the ribbon: its head lights up there, it does not leap.
       if (fresh && work.shownKind) frontStrength = 0;
       work.shownKind = work.kind;
@@ -494,7 +502,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     frontStrength += ((shown && !track ? 1 : 0) - frontStrength) * ease(3);
     const flare = shown?.doneAt != null ? Math.exp(-(time - shown.doneAt) / 700) : 0;
     gl.uniform3f(uniforms.uFront, shown?.shown ?? 0, frontStrength, flare);
-    gl.uniform3f(uniforms.uWork, track?.importing ?? 0, track?.lineEnd ?? 0, track?.glow ?? 1);
+    gl.uniform3f(uniforms.uWork, track?.importing ?? 0, track?.lineStart ?? 0, track?.glow ?? 1);
     gl.uniform1f(uniforms.uFade, (track ? TRACK_QUIET_FADE : QUIET_FADE) / CELL);
     gl.uniform1f(uniforms.uWander, wander);
     gl.uniform1f(uniforms.uAngle, now.angle);
@@ -524,7 +532,7 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
       // The head of the work spits sparks, so many a second whatever the frame rate, from inside its flame.
       sparkDebt = track?.sparks ? sparkDebt + dt * track.sparks : 0;
       for (; sparkDebt >= 1; sparkDebt -= 1) {
-        const x = track.head - random() * SPARK_BEHIND;
+        const x = track.head + (track.trail ?? -1) * random() * SPARK_BEHIND;
         embers.push(burstEmber(x, waveCentre(x, track, wander) - random() * track.half * 0.6));
       }
       emberLayer.draw(embers, CELL, window.innerHeight, canvas.width, canvas.height);

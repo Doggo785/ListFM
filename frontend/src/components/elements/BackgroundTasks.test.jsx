@@ -32,11 +32,11 @@ describe("BackgroundTasks", () => {
     vi.useFakeTimers();
     startScrobbleSync.mockResolvedValue({
       stage: "sync", done: 38, total: 153, complete: false, eta_seconds: 370,
-      since: "2019-02-01T10:00:00Z", until: "2023-03-14T09:00:00Z",
+      since: "2019-02-01T10:00:00Z", reached: "2023-03-14T09:00:00Z",
     });
     getScrobbleSync.mockResolvedValue({ stage: "done", done: 153, total: 153, complete: true });
     await render();
-    expect(container.textContent).toContain("Importing your listens up to March 2023: 25% · about 6 min left.");
+    expect(container.textContent).toContain("Importing your listens, back to March 2023: 25% · about 6 min left.");
     expect(ribbonStage.work).toMatchObject({ kind: "listens", share: 38 / 153, since: Date.parse("2019-02-01T10:00:00Z"), doneAt: null });
     await act(async () => vi.advanceTimersByTimeAsync(3000));
     expect(getScrobbleSync).toHaveBeenCalledTimes(1);
@@ -73,7 +73,7 @@ describe("BackgroundTasks", () => {
     expect(container.textContent).toBe("");
     await act(async () => vi.advanceTimersByTimeAsync(60000));
     expect(container.textContent).toContain("Looking up tags: 1,200 / 9,552 artists · about 3 min left");
-    expect(ribbonStage.work).toMatchObject({ kind: "tags", until: null });
+    expect(ribbonStage.work).toMatchObject({ kind: "tags", reached: null });
     expect(container.textContent).toContain("Tag filters can be incomplete until then.");
     expect(container.querySelector('[role="status"]').textContent).not.toContain("1,200");
   });

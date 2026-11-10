@@ -102,11 +102,11 @@ def test_eta_follows_the_pace_so_far():
         assert store.read("k").eta_seconds() is None
 
 
-def test_span_keeps_its_start_and_moves_its_end():
+def test_span_keeps_its_start_and_moves_its_reach():
     store = ProgressStore()
     store.start("k")
-    store.report("k", "sync", 1, 3, since=10, until=20)
-    store.report("k", "sync", 2, 3, since=15, until=30)
+    store.report("k", "sync", 1, 3, since=10, reached=30)
+    store.report("k", "sync", 2, 3, since=15, reached=20)
     store.report("k", "sync", 3, 3)
     progress = store.read("k")
-    assert (progress.since, progress.until) == (10, 30)
+    assert (progress.since, progress.reached) == (10, 20)

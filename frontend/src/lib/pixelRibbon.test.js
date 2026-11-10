@@ -247,7 +247,7 @@ describe("createRibbon", () => {
     const gl = fakeGl();
     const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE, reducedMotion: true });
     ribbon.setScene(sceneFor("/automations"));
-    ribbonStage.work = { kind: "tags", share: 0.4, perSecond: 0, at: 0, until: null, doneAt: null };
+    ribbonStage.work = { kind: "tags", share: 0.4, perSecond: 0, at: 0, reached: null, doneAt: null };
     tick(16);
     // uFront, then uWork: the front is the frame's second vec3.
     expect(gl.calls.uniform3f.at(-2).slice(1)).toEqual([0.4, 1, 0]);
@@ -256,6 +256,27 @@ describe("createRibbon", () => {
     expect(ribbonStage.work.shown).toBe(1);
     tick(3000);
     expect(ribbonStage.work).toBeNull();
+    ribbon.destroy();
+  });
+
+  it("walks a first import's reading back in time from today, gliding, never forward again", () => {
+    const gl = fakeGl();
+    const ribbon = createRibbon(canvasWith(gl), { palette: PALETTE });
+    ribbon.setScene(sceneFor("/dashboard"));
+    const month = 30 * 24 * 3600 * 1000;
+    const reached = Date.now() - month;
+    ribbonStage.work = { kind: "listens", share: 0.1, perSecond: 0, at: 0, since: 0, reached, reachedAt: 0, reachedPerSecond: 0, doneAt: null };
+    tick(16);
+    const first = ribbonStage.work.shownReached;
+    expect(first).toBeGreaterThan(reached); // On its way from today, not snapped to the first page.
+    tick(500);
+    const later = ribbonStage.work.shownReached;
+    expect(later).toBeLessThan(first);
+    expect(later).toBeGreaterThanOrEqual(reached);
+    ribbonStage.work.reached = reached + month / 2; // A read behind the guess holds the front back.
+    tick(1000);
+    expect(ribbonStage.work.shownReached).toBeLessThanOrEqual(later);
+    ribbonStage.work = null;
     ribbon.destroy();
   });
 

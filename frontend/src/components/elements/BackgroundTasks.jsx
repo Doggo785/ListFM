@@ -32,16 +32,16 @@ function currentTask(status) {
   if (!status.complete) {
     if (status.error) return { note: status.error };
     const share = status.total ? status.done / status.total : 0;
-    const reached = status.until ? ` up to ${MONTH.format(new Date(status.until))}` : "";
+    const back = status.reached ? `, back to ${MONTH.format(new Date(status.reached))}` : "";
     return {
       kind: "listens",
-      progress: `Importing your listens${reached}: ${Math.round(share * 100)}%`,
+      progress: `Importing your listens${back}: ${Math.round(share * 100)}%`,
       left: status.total ? timeLeft(status.eta_seconds) ?? "estimating the time left" : null,
       note: "Previews only see part of them, and runs wait until it finishes.",
       share,
       eta: status.eta_seconds,
       since: status.since,
-      until: status.until,
+      reached: status.reached,
     };
   }
   if (status.runs?.length) {

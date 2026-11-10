@@ -54,7 +54,7 @@ async def _sync_status(db: AsyncSession, user: User) -> ScrobbleSyncStatus:
         synced_at=user.scrobbles_synced_at,
         eta_seconds=progress.eta_seconds() if progress and progress.stage == "sync" else None,
         since=_instant(progress.since if progress else None),
-        until=_instant(progress.until if progress else None),
+        reached=_instant(progress.reached if progress else None),
         tags_done=tags.done if tags and tags_running else 0,
         tags_total=tags.total if tags and tags_running else 0,
         tags_eta_seconds=tags.eta_seconds() if tags and tags_running else None,
