@@ -11,6 +11,8 @@ import { mix, smoothstep as sstep } from "@/lib/ribbonTrack";
 import { createMachine } from "./machine";
 import { beatToSettle, chainPhases, clamp, ease, heartbeat, listensUpTo, shareAtBeat, storyAt, storyBeats, timelineShare } from "./story";
 
+const random = Math.random; // Noise for falling pixels only, never a secret: no crypto randomness needed.
+
 export const BREATH_SECONDS = 1.7;
 export const FUSE_SECONDS = 1.7;
 const INTRO_SECONDS = BREATH_SECONDS + FUSE_SECONDS + 1.2;
@@ -74,7 +76,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
 
   const lay = () => {
     machine.layout(stage.H * BAND);
-    m.passed = new Float32Array(stage.W).fill(intro ? Number.POSITIVE_INFINITY : -1e6);
+    m.passed = new Float32Array(stage.W).fill(intro ? Number.POSITIVE_INFINITY : -1000000);
   };
   lay();
   stage.onResize = lay;
@@ -141,7 +143,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
     };
   };
 
-  const scenes = {
+  const scenes = new Map(Object.entries({
     listens(k, thread) {
       const { W } = stage;
       const head = clamp(k / SWEEP_TO_END) * W;
@@ -174,7 +176,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
           // What the Window leaves out comes apart: the ribbon sheds its pixels from both ends toward the month it keeps.
           for (let x = Math.min(front, was); x <= Math.max(front, was); x += 1) {
             const half = thread.years(clamp(Math.floor(x), 0, W - 1));
-            for (let y = thread.y - half; y < thread.y + half; y += 1) if (Math.random() < 0.08) stage.crumb(x, y);
+            for (let y = thread.y - half; y < thread.y + half; y += 1) if (random() < 0.08) stage.crumb(x, y);
           }
         }
       }
@@ -250,7 +252,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
       });
       return recipe;
     },
-  };
+  }));
 
   /** A thread lying along one line of the page, from the left edge up to `to`. It comes in as the line scrolls into view. */
   const lineThread = (line, to, level) => {
@@ -275,7 +277,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
     fuseHead: (seconds) => mix(m.x0 ?? 0, stage.W, sstep(0, FUSE_SECONDS, seconds)),
     forgeHead: (seconds) => mix(0, stage.W, sstep(0, FUSE_SECONDS, seconds)),
     // The forge's own sparks: the name is the one thing on this page allowed to burn, so these alone rise.
-    sparkAt: (x, y) => stage.crumb(x, y, { vy: -40 - Math.random() * 70, g: 30, life: 0.4 + Math.random() * 0.7 }),
+    sparkAt: (x, y) => stage.crumb(x, y, { vy: -40 - random() * 70, g: 30, life: 0.4 + random() * 0.7 }),
     pointer: (x, y) => {
       m.px = x / CELL;
       m.py = y / CELL;
@@ -404,7 +406,7 @@ export function createShow({ stage, demo, root, intro, onChange, onLit }) {
       let step = null;
       if (enter >= SCENE_SHOWS_FROM && storyRect.bottom > 0) {
         if (enter >= 1) stage.thread({ c: thread.c, hw: () => 0.7, heat: 1 });
-        step = scenes[scene](k, thread, p);
+        step = scenes.get(scene)(k, thread, p);
       }
 
       const turnLine = find("turn-line");

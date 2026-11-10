@@ -106,9 +106,11 @@ export function listensUpTo(weeks, share) {
   return Math.round(before + (weeks[whole] ?? 0) * (at - whole));
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** Where a date lies on the timeline that starts at `first` and holds these weeks. */
 export function timelineShare(first, weeks, isoDate) {
-  return (new Date(isoDate) - new Date(first)) / 86400000 / (weeks.length * 7);
+  return (new Date(isoDate) - new Date(first)) / DAY_MS / (weeks.length * 7);
 }
 
 const TICK_EVERY_MONTHS = 6;

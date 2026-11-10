@@ -6,6 +6,7 @@
 import { dither, rgb } from "@/lib/forge";
 import { CELL } from "@/lib/pixelRibbon";
 
+const random = Math.random; // Noise for falling pixels only, never a secret: no crypto randomness needed.
 const QUIET_MARGIN = 5;
 const MAX_CRUMBS = 1400;
 
@@ -119,7 +120,7 @@ export function createStage(canvas) {
   };
 
   /** A pixel leaving the thread. It falls unless told otherwise, and goes dark on the way. */
-  stage.crumb = (x, y, { vx = (Math.random() - 0.5) * 16, vy = Math.random() * 10, life = 0.5 + Math.random() * 0.7, g = 45 } = {}) => {
+  stage.crumb = (x, y, { vx = (random() - 0.5) * 16, vy = random() * 10, life = 0.5 + random() * 0.7, g = 45 } = {}) => {
     if (crumbs.length < MAX_CRUMBS) crumbs.push({ x, y, vx, vy, life, age: 0, g });
   };
 
@@ -132,7 +133,7 @@ export function createStage(canvas) {
       crumb.y += crumb.vy * dt;
       const share = crumb.age / crumb.life;
       // It skips frames toward its end, so it blinks out rather than vanishing.
-      if (share <= 0.7 || Math.random() >= (share - 0.7) * 2.5) stage.put(crumb.x, crumb.y, crumbTones[Math.floor(share * crumbTones.length)]);
+      if (share <= 0.7 || random() >= (share - 0.7) * 2.5) stage.put(crumb.x, crumb.y, crumbTones[Math.floor(share * crumbTones.length)]);
       return true;
     });
   };
