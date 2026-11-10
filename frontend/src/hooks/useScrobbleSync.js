@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getScrobbleSync } from "@/lib/api";
 
-const POLL_MS = 3000;
+const POLL_MS = 3000; // --duration-poll in index.css follows it.
 // A scheduled sync can start a tag pass at any moment, so an idle status is still re-read now and then.
 const IDLE_POLL_MS = 60000;
 

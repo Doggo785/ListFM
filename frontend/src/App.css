@@ -534,8 +534,8 @@ html, body, #root {
 
 .background-task__fill {
   background-image: repeating-linear-gradient(90deg, var(--ember) 0 4px, transparent 4px 8px);
-  /* Each read moves it on: it glides there instead of jumping. */
-  transition: width var(--duration-slide) var(--ease-out);
+  /* Each read moves it on: it glides there at a steady pace until the next one, instead of jumping. */
+  transition: width var(--duration-poll) linear;
 }
 
 /* Below this the row no longer fits it: it takes its own line under the links. */

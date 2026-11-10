@@ -264,7 +264,8 @@ export default function YearDeck({ scrollerRef, lineRef, story, automations, pla
       const deckHalf = card * DECK_HALF_SHARE;
       Object.assign(track, {
         series: source.series,
-        end: source.end,
+        // While the year arrives its wave ends at the gliding front, not at the last page in: it grows, never jumps.
+        end: mix(source.end, (history.frontX - history.yearX) / history.perMonth, band),
         count: source.count,
         x0: history.yearX * band,
         perMonth,
