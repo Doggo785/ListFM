@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0](https://github.com/Doggo785/ListFM/compare/v0.6.0...v0.7.0) (2026-11-10)
+
+
+### Features
+
+* **guide:** walk newcomers through ListFM while their listens arrive ([#154](https://github.com/Doggo785/ListFM/issues/154)) ([54d6734](https://github.com/Doggo785/ListFM/commit/54d67349b5e0501879b9eceb9b76b41f18df0700))
+* **landing:** rebuild the landing page as the machine itself ([#150](https://github.com/Doggo785/ListFM/issues/150)) ([218d0da](https://github.com/Doggo785/ListFM/commit/218d0daf19d94d769e4e94f81a83d21b8e0ec43a))
+* **playlist:** send a playlist to a streaming app and download its cover ([#141](https://github.com/Doggo785/ListFM/issues/141)) ([c702380](https://github.com/Doggo785/ListFM/commit/c702380b60811d8f9147757e5f111002afa5ff16))
+* **privacy:** add the privacy page and legal notice ([#155](https://github.com/Doggo785/ListFM/issues/155)) ([b352c41](https://github.com/Doggo785/ListFM/commit/b352c41809ae9f182d2df4ebf9137e553e299d96))
+* **runs:** show runs at work, scheduled ones included ([#152](https://github.com/Doggo785/ListFM/issues/152)) ([c4261ff](https://github.com/Doggo785/ListFM/commit/c4261ff403c18dbf4a862f7dff72474ba837f4c7))
+* **ui:** show the thread at work during a sync and a tag pass ([#151](https://github.com/Doggo785/ListFM/issues/151)) ([d3a8dff](https://github.com/Doggo785/ListFM/commit/d3a8dff9ab05f677481013d29fe9038eac419077))
+
+
+### Bug Fixes
+
+* **ui:** make the Dashboard flame's work animations smooth ([#153](https://github.com/Doggo785/ListFM/issues/153)) ([e1f9c34](https://github.com/Doggo785/ListFM/commit/e1f9c3478c2b2627b040538d296136881dd5b137))
+
 ## [0.6.0](https://github.com/Doggo785/ListFM/compare/v0.5.0...v0.6.0) (2026-11-06)
 
 
