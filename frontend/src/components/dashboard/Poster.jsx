@@ -90,7 +90,12 @@ export default function Poster({ story, totals, runs, automations, username, lin
               {moment.albums.map((album) => (
                 <li key={`${album.artist}|${album.title}`} className="poster__album">
                   <div className="poster__cover">
-                    <AlbumArt url={album.cover_url} seed={album.title} eager small className="block aspect-square w-full object-cover" />
+                    {/* No cover is looked up during a first import: the albums still change on every read. */}
+                    {totals?.complete === false && !album.cover_url ? (
+                      <p className="poster__cover-wait text-xs text-(--text-muted)">Covers come after the import</p>
+                    ) : (
+                      <AlbumArt url={album.cover_url} seed={album.title} eager small className="block aspect-square w-full object-cover" />
+                    )}
                   </div>
                   <p className="truncate pt-2 text-xs"><LastfmLink artist={album.artist} album={album.title}>{album.title}</LastfmLink></p>
                   <p className="flex gap-1 text-xs text-(--text-muted)">

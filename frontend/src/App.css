@@ -218,6 +218,17 @@ html, body, #root {
   width: 128px;
   background: var(--ember-1);
 }
+/* A first import looks up no cover: the shelf says so instead of showing the ribbon alone. */
+.poster__cover-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 12px;
+  text-align: center;
+  background: var(--ground);
+  border: 1px solid var(--line);
+}
 .poster__totals {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, max-content));
