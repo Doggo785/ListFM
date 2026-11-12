@@ -43,11 +43,20 @@ export function AuthProvider({ children }) {
     await checkSession();
   }, [checkSession]);
 
-  const register = useCallback(async (email, password) => {
-    await request("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+  // Nothing opens yet: the account waits for the link mailed to the address.
+  const register = useCallback((email, password) => request("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  }), []);
+
+  // The mailed links: each signs the person in on the way.
+  const confirmEmail = useCallback(async (token) => {
+    await request("/api/auth/confirm", { method: "POST", body: JSON.stringify({ token }) });
+    await checkSession();
+  }, [checkSession]);
+
+  const resetPassword = useCallback(async (token, password) => {
+    await request("/api/auth/password/reset", { method: "POST", body: JSON.stringify({ token, password }) });
     await checkSession();
   }, [checkSession]);
 
@@ -95,12 +104,14 @@ export function AuthProvider({ children }) {
     isLastfmLinked,
     login,
     register,
+    confirmEmail,
+    resetPassword,
     logout,
     finishLastfmLink,
     refreshUser,
     forgetUser,
     loading,
-  }), [user, avatar, loading, isLastfmLinked, login, register, logout, finishLastfmLink, refreshUser, forgetUser]);
+  }), [user, avatar, loading, isLastfmLinked, login, register, confirmEmail, resetPassword, logout, finishLastfmLink, refreshUser, forgetUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

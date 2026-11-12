@@ -79,6 +79,37 @@ describe("expired session", () => {
   });
 });
 
+describe("signing up by mail", () => {
+  let auth;
+  const mount = async () => {
+    function Probe() {
+      auth = useAuth();
+      return auth.isAuthenticated ? "in" : "out";
+    }
+    return render(<AuthProvider><Probe /></AuthProvider>);
+  };
+
+  it("registers without opening a session", async () => {
+    request.mockRejectedValueOnce(new Error("API 401")).mockResolvedValue({ detail: "We sent you a link." });
+    const container = await mount();
+    await act(async () => expect(await auth.register("me@example.com", "long-enough")).toEqual({ detail: "We sent you a link." }));
+    expect(request).toHaveBeenLastCalledWith("/api/auth/register", expect.objectContaining({ method: "POST" }));
+    expect(container.textContent).toBe("out");
+  });
+
+  it.each([
+    ["confirmEmail", ["abc"], "/api/auth/confirm"],
+    ["resetPassword", ["abc", "long-enough"], "/api/auth/password/reset"],
+  ])("signs in on the way when %s follows a mailed link", async (name, args, path) => {
+    request.mockRejectedValueOnce(new Error("API 401")).mockResolvedValue({ timezone: "Europe/Paris" });
+    const container = await mount();
+    expect(container.textContent).toBe("out");
+    await act(async () => auth[name](...args));
+    expect(request.mock.calls.map(([called]) => called)).toContain(path);
+    expect(container.textContent).toBe("in");
+  });
+});
+
 describe("profile avatar", () => {
   it("fetches the Last.fm profile once and shares the avatar", async () => {
     request.mockImplementation(async (path) =>

@@ -64,7 +64,7 @@ export function sceneFor(pathname) {
   if (pathname.startsWith("/automations/")) return SCENES.detail;
   if (pathname === "/playlists") return SCENES.playlists;
   if (pathname.startsWith("/playlists/")) return SCENES.playlist;
-  if (["/login", "/register", "/link-lastfm"].includes(pathname) || pathname.startsWith("/auth/")) return SCENES.auth;
+  if (["/login", "/register", "/link-lastfm", "/confirm-email", "/forgot-password", "/reset-password"].includes(pathname) || pathname.startsWith("/auth/")) return SCENES.auth;
   if (pathname === "/settings") return SCENES.settings;
   return SCENES.other;
 }

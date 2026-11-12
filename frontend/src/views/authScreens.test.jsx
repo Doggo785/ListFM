@@ -4,10 +4,13 @@ import { createRoot } from "react-dom/client";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AuthCallback from "./AuthCallback";
+import ConfirmEmail from "./ConfirmEmail";
+import ForgotPassword from "./ForgotPassword";
 import LastfmReturn from "./LastfmReturn";
 import LinkLastfm from "./LinkLastfm";
 import Login from "./Login";
 import Register from "./Register";
+import ResetPassword from "./ResetPassword";
 
 const auth = vi.hoisted(() => ({ value: {} }));
 const api = vi.hoisted(() => ({ request: vi.fn(), connectLastfm: vi.fn() }));
@@ -80,6 +83,16 @@ describe("the screens before the site", () => {
       expect(landed()).toBe("/dashboard");
     });
 
+    it("offers a new link when the address was never confirmed", async () => {
+      const login = vi.fn().mockRejectedValue(new Error("API 403: Confirm your email first."));
+      await show("/login", <Login />, { login });
+      await fill({ email: "me@example.com", password: "long-enough" });
+      await submit();
+      expect(alert()).toBe("Confirm your email first.");
+      expect(host.textContent).toContain("Send a new link");
+      expect(host.querySelector('a[href="/forgot-password"]')).not.toBeNull();
+    });
+
     it("reveals the password on demand", async () => {
       await show("/login", <Login />, { login: vi.fn() });
       await act(async () => host.querySelector('[aria-label="Show password"]').click());
@@ -103,13 +116,20 @@ describe("the screens before the site", () => {
       expect(alert()).toContain(message);
     });
 
-    it("goes on to connect Last.fm", async () => {
-      const register = vi.fn().mockResolvedValue();
+    it("waits for the mailed link, and can send it again", async () => {
+      const register = vi.fn().mockResolvedValue({ detail: "We sent you a link." });
       await show("/register", <Register />, { register });
-      await fill({ "register-email": "me@example.com", "register-password": "long-enough", "register-confirm": "long-enough" });
+      await fill({ "register-email": "Me@Example.com", "register-password": "long-enough", "register-confirm": "long-enough" });
       await submit();
-      expect(register).toHaveBeenCalledWith("me@example.com", "long-enough");
-      expect(landed()).toBe("/link-lastfm");
+      expect(register).toHaveBeenCalledWith("Me@Example.com", "long-enough");
+      expect(host.querySelector("h2").textContent).toBe("Check your inbox");
+      expect(host.textContent).toContain("me@example.com");
+      api.request.mockResolvedValue({ detail: "A new link is on its way." });
+      await submit();
+      expect(api.request).toHaveBeenCalledWith("/api/auth/confirm/resend", expect.objectContaining({ body: JSON.stringify({ email: "me@example.com" }) }));
+      expect(host.querySelector('[role="status"]').textContent).toBe("A new link is on its way.");
+      await act(async () => [...host.querySelectorAll("button")].find((b) => b.textContent === "Start again").click());
+      expect(host.querySelector("#register-email")).not.toBeNull();
     });
 
     it("says when the email is taken", async () => {
@@ -118,6 +138,52 @@ describe("the screens before the site", () => {
       await fill({ "register-email": "me@example.com", "register-password": "long-enough", "register-confirm": "long-enough" });
       await submit();
       expect(alert()).toBe("An account with this email already exists");
+    });
+  });
+
+  describe("the mailed links", () => {
+    it("confirms the address once, then goes on to Last.fm", async () => {
+      const confirmEmail = vi.fn().mockResolvedValue();
+      await show("/confirm-email?token=abc", <ConfirmEmail />, { confirmEmail });
+      expect(confirmEmail).toHaveBeenCalledTimes(1);
+      expect(confirmEmail).toHaveBeenCalledWith("abc");
+      expect(landed()).toBe("/link-lastfm");
+    });
+
+    it("offers a new link when the old one no longer works", async () => {
+      const confirmEmail = vi.fn().mockRejectedValue(new Error("API 400: This link no longer works. Ask for a new one."));
+      await show("/confirm-email?token=old", <ConfirmEmail />, { confirmEmail });
+      expect(alert()).toBe("This link no longer works. Ask for a new one.");
+      expect(host.querySelector("#resend-email")).not.toBeNull();
+    });
+
+    it("mails a reset link and says the same thing whoever asks", async () => {
+      api.request.mockResolvedValue({ detail: "If an account uses this address, a link is on its way." });
+      await show("/forgot-password", <ForgotPassword />);
+      await submit();
+      expect(alert()).toBe("Enter the email you signed up with.");
+      await fill({ "forgot-email": "me@example.com" });
+      await submit();
+      expect(api.request).toHaveBeenCalledWith("/api/auth/password/forgot", expect.objectContaining({ body: JSON.stringify({ email: "me@example.com" }) }));
+      expect(host.querySelector('[role="status"]').textContent).toContain("a link is on its way");
+    });
+
+    it("sets the new password and signs in", async () => {
+      const resetPassword = vi.fn().mockResolvedValue();
+      await show("/reset-password?token=abc", <ResetPassword />, { resetPassword });
+      await fill({ "reset-password": "long-enough", "reset-again": "different" });
+      await submit();
+      expect(alert()).toBe("The two passwords are different.");
+      await fill({ "reset-again": "long-enough" });
+      await submit();
+      expect(resetPassword).toHaveBeenCalledWith("abc", "long-enough");
+      expect(landed()).toBe("/dashboard");
+    });
+
+    it("can't be used without its token", async () => {
+      await show("/reset-password", <ResetPassword />, { resetPassword: vi.fn() });
+      expect(alert()).toContain("no longer works");
+      expect(host.querySelector('button[type="submit"]').disabled).toBe(true);
     });
   });
 
