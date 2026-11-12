@@ -238,8 +238,8 @@ async def test_discord_callback_no_email(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_discord_callback_new_user(client: AsyncClient):
-    """Discord callback with email for a new user redirects to /link-lastfm."""
+async def test_discord_callback_new_user(client: AsyncClient, activity_lines):
+    """Discord callback with email for a new user redirects to /link-lastfm, and logs no id or email."""
     email = _unique_email()
     try:
         with (
@@ -264,6 +264,7 @@ async def test_discord_callback_new_user(client: AsyncClient):
             )
         assert resp.status_code == 302
         assert "/link-lastfm" in resp.headers["location"]
+        assert activity_lines() == ["account discord   new account"]
     finally:
         await _cleanup_user(email=email)
 

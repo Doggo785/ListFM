@@ -1,19 +1,16 @@
-import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-logger = logging.getLogger(__name__)
-
 from models.auth_provider import AuthProvider
 from models.mail_link import MailLink
 from models.refresh_token import RefreshToken
 from models.user import User
 from schemas import UserCreate, UserUpdate
+from services.activity_log import log_activity
 from services.rate_limit import DUPLICATE_EMAIL_MESSAGE
+from sqlalchemy import delete, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def get_user_by_id(db: AsyncSession, user_id: str) -> User | None:
@@ -166,12 +163,6 @@ async def _get_or_create_user_from_provider(
             await db.flush()
             return user, False
 
-    logger.warning(
-        "Creating new user for provider=%s provider_user_id=%s — "
-        "no existing user found by provider or email. This may indicate a duplicate account.",
-        provider, provider_user_id,
-    )
-
     user = User(
         id=str(uuid.uuid4()),
         email=email,
@@ -194,10 +185,8 @@ async def _get_or_create_user_from_provider(
     await db.flush()
     await db.refresh(user)
 
-    logger.info(
-        "Created new user id=%s via provider=%s provider_user_id=%s",
-        user.id, provider, provider_user_id,
-    )
+    # No provider id or email here: the Privacy page only lists the Last.fm username in the logs.
+    log_activity("account", provider, "new account")
     return user, True
 
 
