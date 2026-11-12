@@ -1,8 +1,8 @@
-# Une seule source et une chaîne Fenêtre → Filtres → Tri → Limites
+# One source and a Window → Filters → Sort → Limits chain
 
-Les 4 sources (top tracks, recent, loved, top artists) n'étaient que des combinaisons figées de fenêtre, de filtre et de tri, et chacune lisait des réglages différents sans le dire. Depuis que les écoutes sont stockées en local (ADR 0001), une automation part toujours des écoutes de l'utilisateur et les fait passer par la même chaîne : Fenêtre, Filtres, Tri, Limites. Les anciennes sources deviennent des presets qui préremplissent cette chaîne.
+The 4 sources (top tracks, recent, loved, top artists) were only fixed combinations of window, filter and sort, and each read different settings without saying so. Since listens are stored locally (ADR 0001), an automation always starts from the person's listens and runs them through the same chain: Window, Filters, Sort, Limits. The old sources become presets that prefill that chain.
 
 ## Consequences
 
-- Aucune migration des automations existantes : ce sont des tests, l'ancien format est abandonné.
-- La source « top artists » ne fait plus de découverte (morceaux populaires jamais écoutés) : elle devient le filtre « artiste dans ton top N ». La découverte, si elle revient, sera une feature à part.
+- No migration of existing automations: they were tests, the old format is dropped.
+- The "top artists" source no longer does discovery (popular tracks never listened to): it becomes the filter "artist in your top N". Discovery, if it comes back, will be a separate feature.

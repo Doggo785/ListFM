@@ -1,16 +1,16 @@
-# Historique d'écoute complet stocké en local
+# The full listening history is stored locally
 
-Les sources lisaient Last.fm en direct, plafonnées à 50 morceaux : un filtre sélectif voyait trop peu de morceaux, l'aperçu ne pouvait pas refléter le run, et chaque lecture plus profonde coûtait des appels. On stocke maintenant toutes les écoutes de chaque utilisateur en base : un chargement complet au premier lien Last.fm (`user.getRecentTracks` par pages de 1000, repli à 200, méthode reprise de felhag/lastfm-stats-web), puis une synchro incrémentale (seulement ce qui est plus récent que la dernière écoute connue) avant chaque run et chaque aperçu. Les sources deviennent des requêtes en base, sans appel Last.fm.
+Sources used to read Last.fm live, capped at 50 tracks: a selective filter saw too few tracks, the preview couldn't reflect the run, and every deeper read cost more calls. Every person's listens are now stored in the database: a full load when Last.fm is first linked (`user.getRecentTracks` in pages of 1000, falling back to 200, a method taken from felhag/lastfm-stats-web), then an incremental sync (only what is newer than the last known listen) before each run and each preview. Sources become database queries, with no Last.fm call.
 
 ## Considered Options
 
-- **Lecture en direct avec une profondeur réglable** : coût par run proportionnel à la profondeur, et l'aperçu diverge du run dès que les deux lisent différemment.
-- **Lecture en direct jusqu'à remplir la playlist** : coût imprévisible d'un run à l'autre.
+- **Live reads with an adjustable depth**: cost per run grows with the depth, and the preview drifts from the run as soon as the two read differently.
+- **Live reads until the playlist is full**: unpredictable cost from one run to the next.
 
 ## Consequences
 
-- Place mesurée sur Postgres 16 (1 M de lignes insérées dans l'ordre chronologique, clé `(user_id, played_at, track_id)`) : environ 220 octets par écoute avec les ids `varchar(36)` du projet (contre 120 avec des `uuid` natifs). 150 000 écoutes ≈ 33 Mo, 5 M ≈ 1,1 Go, plus les morceaux distincts dans `tracks`.
-- Les pages de 1000 dépassent le maximum documenté par Last.fm (200) : le repli à 200 est obligatoire.
-- Le premier chargement prend plusieurs minutes pour un gros compte et doit afficher sa progression.
-- Depuis le guide des nouveaux arrivants (2026-11), le premier chargement lit du plus récent au plus ancien : les mois récents qu'une playlist demande sont là en quelques secondes, et l'aperçu dit jusqu'où l'historique est lu. Un run demandé pendant ce chargement attend sur sa ligne et part tout seul à la fin, au lieu d'échouer.
-- Les conditions de l'API Last.fm (§4.3.4) plafonnent à 100 Mo les données Last.fm gardées (« Reasonable Usage Cap »). La base de dev de l'owner, avec son seul historique, en tenait déjà environ 209 Mo en novembre 2026. Décision de l'owner (2026-11-12) : on garde l'historique complet sans demander d'accord à Last.fm, puisque peu de gens utiliseront le site ; si l'usage grossit, l'owner adapte la méthode (par exemple limiter les années gardées). Ne pas rouvrir la question sans lui.
+- Space measured on Postgres 16 (1 M rows inserted in chronological order, key `(user_id, played_at, track_id)`): about 220 bytes per listen with the project's `varchar(36)` ids (120 with native `uuid`). 150,000 listens ≈ 33 MB, 5 M ≈ 1.1 GB, plus the distinct tracks in `tracks`.
+- Pages of 1000 exceed Last.fm's documented maximum (200): the fallback to 200 is mandatory.
+- The first load takes several minutes for a large account and must show its progress.
+- Since the newcomer's guide (2026-11), the first load reads from newest to oldest: the recent months a playlist asks for are there in seconds, and the preview says how far back the history has been read. A run asked for during that load waits on its line and starts by itself at the end, instead of failing.
+- The Last.fm API terms (§4.3.4) cap stored Last.fm data at 100 MB ("Reasonable Usage Cap"). The owner's dev database, with their history alone, already held about 209 MB in November 2026. Owner's decision (2026-11-12): keep the full history without asking Last.fm, since few people will use the site; if usage grows, the owner adapts the method (for instance by limiting the years kept). Don't reopen the question without them.

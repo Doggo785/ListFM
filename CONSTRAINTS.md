@@ -1,79 +1,79 @@
 # Constraints — ListFM
 
 Last reviewed: 2026-11-03 (solo + agents).
-Lire avant d'écrire du code. Ne jamais affaiblir ce fichier pour faire passer un changement.
-Mode : **Block** — tout échec du socle ou d'une dimension enforced bloque la tâche.
-Règle non négociable : l'agent ne merge jamais de lui-même. Il ouvre la PR, fait passer la CI et attend l'owner.
-Seule exception : un « go merge #N » de l'owner citant la PR. L'agent squash-merge alors, vérifie que la branche distante est supprimée et supprime la branche locale.
+Read before writing code. Never weaken this file to get a change through.
+Mode: **Block** — any failure of the baseline or of an enforced dimension blocks the task.
+Non-negotiable rule: the agent never merges on its own. It opens the PR, gets CI green and waits for the owner.
+Only exception: a "go merge #N" from the owner naming the PR. The agent then squash-merges, checks that the remote branch is deleted and deletes the local branch.
 
-## Socle (toujours enforced, sans setup)
+## Baseline (always enforced, no setup)
 
-- Pas de nouvelle suppression de check : `eslint-disable`, `@ts-ignore`, `# noqa`
-  (les 9 `# noqa: BLE001` de `backend/services/lastfm.py` sont grandfathered,
-  justifiés et purgés par RUF100 — tout nouveau `noqa` exige un commentaire
-  de justification + revue), `# type: ignore`, `istanbul ignore`,
+- No new check suppression: `eslint-disable`, `@ts-ignore`, `# noqa`
+  (the 9 `# noqa: BLE001` in `backend/services/lastfm.py` are grandfathered,
+  justified and purged by RUF100 — any new `noqa` needs a justifying comment
+  and a review), `# type: ignore`, `istanbul ignore`,
   `Stryker disable`, `nosemgrep`, `gitleaks:allow`.
-- Pas de stub non implémenté : `NotImplementedError`, `throw new Error("Not implemented")`,
-  `except: pass` / `catch {}` vide (logger suffit à justifier un handler côté ruff, le silence non).
-- Pas de test skippé ou supprimé sans motif dans le message de commit
-  (`pytest.mark.skip`, `describe.skip`, `it.skip`, fichier de test supprimé).
-- Pas de secret en source (voir gate gitleaks, `--redact` obligatoire : jamais la valeur, seulement règle + emplacement).
-- Ce fichier ne se modifie que dans une PR dédiée ou un paragraphe de PR explicitement relu ;
-  assouplir = fort, durcir = silencieux.
+- No unimplemented stub: `NotImplementedError`, `throw new Error("Not implemented")`,
+  empty `except: pass` / `catch {}` (logging is enough to justify a handler for ruff; silence is not).
+- No skipped or deleted test without a reason in the commit message
+  (`pytest.mark.skip`, `describe.skip`, `it.skip`, a deleted test file).
+- No secret in source (see the gitleaks gate; `--redact` is mandatory: never the value, only the rule and the location).
+- This file only changes in a dedicated PR or in a PR paragraph explicitly reviewed;
+  loosening = loud, tightening = silent.
 
-## Enforced (bloquant, vérifié le 2026-09-27)
+## Enforced (blocking, checked 2026-09-27)
 
-| Dimension | Règle + raison | Checked by | Runs at |
-|-----------|----------------|-----------|---------|
-| Lint backend | 0 erreur ruff. `ruff.toml` pin `0.16.8`, `B008` ignoré = idiome FastAPI `Depends()`. Raison : gate CI déjà bloquant (Phase 3 close, 38 findings triés → 0). | `ruff check backend` (pin `ruff==0.16.8`, local : `uvx ruff@0.16.8 check backend`) | every edit (fichiers touchés), CI job `ruff` |
-| Lint frontend | 0 erreur, 0 warning. Raison : coût nul, `eslint . --max-warnings 0` vert aujourd'hui. | `npx eslint . --max-warnings 0` (dans `frontend/`, alias `npm run check:fast`) | every edit, CI job `frontend-build` (step Lint) |
-| Design frontend | 0 anti-pattern Impeccable. Raison : la DA pixel est l'identité du site, une dérive vers le style générique doit casser le build. Scan de texte seulement (pas de page rendue) : contraste et tailles restent à `impeccable audit` en phase C. | `npm run check:design` (dans `frontend/`, pin `impeccable` exact) | task end, CI job `frontend-build` (step Design anti-patterns) |
-| Types backend | 0 erreur mypy. Raison : volume purgé (10 erreurs → 0 le 2026-09-27), un gate strict immédiat empêche le nouveau code de s'appuyer sur des types faux. | `mypy backend --ignore-missing-imports` (pin `mypy==2.3.1`) | every edit, task end, CI job `mypy` |
-| Build frontend | Vert. Raison : filet syntax/bundling ; pas de `tsc` car projet JS sans `tsconfig` (voir Mesuré). | `npm run build` (dans `frontend/`) | task end, CI job `frontend-build` (step Build) |
-| Tests backend | Suite verte. Raison : preuve de non-régression sur auth JWT/cookies + Last.fm. | `python -m pytest backend/tests/ -q` (DB `listfm-db:5433` en local, service Postgres en CI) | task end (budget 90 s), CI job `backend-tests` |
-| Tests frontend | Suite verte (vitest). Raison : même filet côté UI, inexistant en CI jusqu'au 2026-09-27. | `npx vitest run` (dans `frontend/`, après `npm ci`) | task end, CI job `frontend-tests` |
-| Coverage diff backend | ≥ 80 % des lignes modifiées. Raison : force un test sur le nouveau code sans exiger 80 % sur un héritage. Vérifié : 100 % sur le diff du PR de verrouillage. | `pytest --cov=backend --cov-report=xml` + `diff-cover coverage.xml --compare-branch=origin/main --fail-under=80` | task end (scope = diff), CI job `backend-tests` |
-| Coverage diff frontend | ≥ 80 % des lignes modifiées. Raison : idem, côté UI où la couverture globale est quasi nulle. | `vitest run --coverage --coverage.reporter=cobertura` + `diff-cover coverage/cobertura-coverage.xml --compare-branch=origin/main --fail-under=80` (dans `frontend/`) | task end (scope = diff), CI job `frontend-tests` |
-| Secrets | 0 leak. Raison : JWT + tokens Last.fm ; externe, l'agent ne peut pas négocier avec. Vérifié : 229 commits, 0 leak. | `gitleaks detect --redact --no-banner --source .` | every edit, CI job `gitleaks` |
-| Dépendances | **0 Critical, 0 High** (atteint le 2026-09-27 : bumps `click`, `pygments`, overrides `hono`/`qs`/`fast-uri`/`js-yaml` + transitifs npm). Raison : cible ambitieuse tenue, plus de build rouge permanent. Medium/Low tolérés (aujourd'hui `brace-expansion`, `minimatch`, transitifs dev). Le job CI gate sur `max_severity >= 7.0` (osv exit 1 dès le moindre finding, même Low). | `osv-scanner scan source -r . --format json` + gate Python sur `max_severity` (voir job `osv-scanner` de `ci.yml`) | task end, CI job `osv-scanner` |
+| Dimension | Rule + reason | Checked by | Runs at |
+|-----------|---------------|-----------|---------|
+| Backend lint | 0 ruff errors. `ruff.toml`, `B008` ignored = the FastAPI `Depends()` idiom. Reason: CI gate already blocking (38 findings triaged to 0). | `ruff check backend` (pinned in `requirements.txt` and CI) | every edit (touched files), CI job `ruff` |
+| Frontend lint | 0 errors, 0 warnings. Reason: free, `eslint . --max-warnings 0` is green today. | `npx eslint . --max-warnings 0` (in `frontend/`, alias `npm run check:fast`) | every edit, CI job `frontend-build` (Lint step) |
+| Frontend design | 0 Impeccable anti-patterns. Reason: the pixel art direction is the site's identity; a drift toward generic styling must break the build. Text scan only (no rendered page): contrast and sizes are left to `impeccable audit`. | `npm run check:design` (in `frontend/`, exact `impeccable` pin) | task end, CI job `frontend-build` (Design anti-patterns step) |
+| Backend types | 0 mypy errors. Reason: the backlog was purged (10 errors → 0 on 2026-09-27); a strict gate keeps new code from leaning on wrong types. | `mypy backend --ignore-missing-imports` (pinned) | every edit, task end, CI job `mypy` |
+| Frontend build | Green. Reason: syntax and bundling net; no `tsc`, the project is JS without a `tsconfig` (see Measured). | `npm run build` (in `frontend/`) | task end, CI job `frontend-build` (Build step) |
+| Backend tests | Suite green. Reason: proof of non-regression on JWT/cookie auth and Last.fm. | `python -m pytest backend/tests/ -q` (DB `listfm-db:5433` locally, a Postgres service in CI) | task end (90 s budget), CI job `backend-tests` |
+| Frontend tests | Suite green (vitest). Reason: the same net on the UI side. | `npx vitest run` (in `frontend/`, after `npm ci`) | task end, CI job `frontend-tests` |
+| Backend diff coverage | ≥ 80% of changed lines. Reason: forces a test on new code without demanding 80% of legacy code. | `pytest --cov=backend --cov-report=xml` + `diff-cover coverage.xml --compare-branch=origin/main --fail-under=80` | task end (scope = diff), CI job `backend-tests` |
+| Frontend diff coverage | ≥ 80% of changed lines. Reason: same, on the UI side where global coverage is low. | `vitest run --coverage --coverage.reporter=cobertura` + `diff-cover coverage/cobertura-coverage.xml --compare-branch=origin/main --fail-under=80` (in `frontend/`) | task end (scope = diff), CI job `frontend-tests` |
+| Secrets | 0 leaks. Reason: JWT and Last.fm tokens; external, the agent can't negotiate with it. | `gitleaks detect --redact --no-banner --source .` | every edit, CI job `gitleaks` |
+| Dependencies | **0 Critical, 0 High** (reached 2026-09-27). Medium/Low tolerated. The CI job gates on `max_severity >= 7.0` (osv exits 1 on any finding, even Low). | `osv-scanner scan source -r . --format json` + a Python gate on `max_severity` (see the `osv-scanner` job in `ci.yml`) | task end, CI job `osv-scanner` |
 
-## Mesuré, pas encore enforced (ratchets + cibles)
+## Measured, not enforced yet (ratchets + targets)
 
-| Métrique | Aujourd'hui | Direction |
-|----------|-------------|-----------|
-| Coverage projet backend | **93 %** (mesuré 2026-09-27) | ne pas régresser (tolérance 0,5 %) |
-| Coverage projet frontend | **1,58 %** (mesuré 2026-09-27) | ne pas régresser ; la cible diff ≥ 80 % fait monter ce chiffre PR par PR |
-| Types frontend (`tsc`) | N/A — projet JS, pas de `tsconfig` ; filet actuel = `vite build` | activer `tsc --noEmit` uniquement si migration TS |
-| Bundle JS | `dist/assets/index-*.js` **785 kB** (gzip 243 kB, warning Vite > 500 kB) | ne pas grossir ; code-splitting à étudier |
-| Sécu code (semgrep) | non installé | envisagé plus tard (`p/default` + `p/owasp-top-ten` sur fichiers du diff) |
-| a11y / perf page | pas d'URL preview (single-VPS, pas de déploiement preview) | hors scope tant qu'il n'y a pas d'URL à tester ; ne pas inventer de check |
+| Metric | Today | Direction |
+|--------|-------|-----------|
+| Backend project coverage | **93%** (measured 2026-09-27) | don't regress (0.5% tolerance) |
+| Frontend project coverage | **1.58%** (measured 2026-09-27) | don't regress; the ≥ 80% diff target raises it PR by PR |
+| Frontend types (`tsc`) | N/A — JS project, no `tsconfig`; current net = `vite build` | enable `tsc --noEmit` only with a TS migration |
+| JS bundle | `dist/assets/index-*.js` **785 kB** (243 kB gzip, Vite warning > 500 kB) | don't grow; code splitting to study |
+| Code security (semgrep) | not installed | considered later (`p/default` + `p/owasp-top-ten` on the diff's files) |
+| Page a11y / perf | no preview URL | out of scope while there is no URL to test; don't invent a check |
 
-## Budgets et placement (coût décide de l'emplacement)
+## Budgets and placement (cost decides where a check runs)
 
-| Phase | Commande | Budget |
-|-------|----------|--------|
-| BUILD (après chaque edit) | ruff / eslint sur fichiers touchés + socle (diff) | < 5 s |
-| VERIFY (fin de tâche) | tests liés, `mypy`, `npm run build`, diff-cover sur le diff, `osv-scanner`, `gitleaks` | < 90 s, scope = diff |
-| REVIEW (PR) | tout + gardes ci-dessous, comparé au merge-base | minutes |
-| SHIP (CI) | `backend-tests`, `ruff`, `mypy`, `gitleaks`, `osv-scanner`, `frontend-build`, `frontend-tests` | illimité |
+| Phase | Command | Budget |
+|-------|---------|--------|
+| BUILD (after each edit) | ruff / eslint on touched files + baseline (diff) | < 5 s |
+| VERIFY (task end) | related tests, `mypy`, `npm run build`, diff-cover on the diff, `osv-scanner`, `gitleaks` | < 90 s, scope = diff |
+| REVIEW (PR) | everything + the guards below, against the merge base | minutes |
+| SHIP (CI) | `backend-tests`, `ruff`, `mypy`, `gitleaks`, `osv-scanner`, `frontend-build`, `frontend-tests` | unlimited |
 
-Toujours scoper au diff : coverage des lignes touchées, semgrep sur fichiers touchés.
-`npm run check:fast` (dans `frontend/`) = ce qui tourne après un edit ; `scripts/ci-local.sh` = tous les jobs CI en local, à lancer avant chaque push (`scripts/ci-local.sh ruff mypy` pour un sous-ensemble).
-`CONSTRAINTS.md` est la source canonique ; les scripts sont des raccourcis qui doivent la refléter.
+Always scope to the diff: coverage of touched lines, semgrep on touched files.
+`npm run check:fast` (in `frontend/`) = what runs after an edit; `scripts/ci-local.sh` = every CI job locally, to run before each push (`scripts/ci-local.sh ruff mypy` for a subset).
+`CONSTRAINTS.md` is the canonical source; the scripts are shortcuts that must mirror it.
 
-## Gardes du seuil (revue du diff, `git diff` suffit)
+## Threshold guards (diff review, `git diff` is enough)
 
-1. Le seuil a bougé (budget baissé, sévérité descendue, check sorti du fast stage).
-2. Un test est devenu plus facile (`.skip`, fichier supprimé, assertions retirées).
-3. Un checker est réduit au silence (nouveau `eslint-disable`, `noqa`, `istanbul ignore`, `nosemgrep`, `gitleaks:allow`, `impeccable-disable`).
-4. Travail inachevé (stub, `catch` vide, `TODO` à la place de l'implémentation).
-5. Une exception est apparue au tableau ci-dessous sans discussion.
+1. A threshold moved (lower budget, lower severity, a check moved out of the fast stage).
+2. A test got easier (`.skip`, deleted file, removed assertions).
+3. A checker was silenced (new `eslint-disable`, `noqa`, `istanbul ignore`, `nosemgrep`, `gitleaks:allow`, `impeccable-disable`).
+4. Unfinished work (stub, empty `catch`, a `TODO` in place of the implementation).
+5. An exception appeared in the table below without discussion.
 
-Au moins une contrainte est externe (gitleaks, osv-scanner : bases externes, pas le jugement de l'agent sur lui-même).
+At least one constraint is external (gitleaks, osv-scanner: external databases, not the agent's judgment of itself).
 
 ## Exceptions
 
-| ID | Règle | Path | Raison | Owner | Expires |
-|----|-------|------|--------|-------|---------|
+| ID | Rule | Path | Reason | Owner | Expires |
+|----|------|------|--------|-------|---------|
 
-Durée max d'exception : 90 jours, avec owner nommé.
+Maximum exception length: 90 days, with a named owner.
