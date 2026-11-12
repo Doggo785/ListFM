@@ -76,7 +76,7 @@ async def listener_glimpse(body: ListenerRequest, request: Request):
         raise HTTPException(status_code=503, detail=BUSY) from exc
 
     start, end = same_month_a_year_ago(datetime.now(UTC))
-    log_activity("accueil", "visiteur", "aperçu d'un pseudo")
+    log_activity("landing", "visitor", "preview of a username")
     try:
         artist, tracks = await asyncio.to_thread(get_listener_glimpse, username, int(start.timestamp()), int(end.timestamp()))
     except pylast.WSError as exc:

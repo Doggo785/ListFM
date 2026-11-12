@@ -264,11 +264,11 @@ async def test_a_pass_prints_every_few_artists_not_every_call(activity_lines):
         await _fill(user_id, lambda _artist: [])
     lines = activity_lines()
     assert lines[:3] == [
-        "tags   someone   début, 5 artistes à chercher",
-        "tags   someone   2/5 artistes",
-        "tags   someone   4/5 artistes",
+        "tags   someone   start, 5 artists to look up",
+        "tags   someone   2/5 artists",
+        "tags   someone   4/5 artists",
     ]
-    assert lines[3].startswith("tags   someone   terminé, 5 artistes  ")
+    assert lines[3].startswith("tags   someone   done, 5 artists  ")
     assert len(lines) == 4
 
 

@@ -105,7 +105,7 @@ async def preview_automation(
         at=at,
         progress_key=progress_key,
     )
-    log_activity("aperçu", automation_label(automation.name), pipeline_summary(result, time.monotonic() - started))
+    log_activity("preview", automation_label(automation.name), pipeline_summary(result, time.monotonic() - started))
     if progress_key is not None:
         progress_store.finish(progress_key)
     result["cancelled"] = False

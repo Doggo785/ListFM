@@ -56,7 +56,7 @@ def note_rate_limited(retry_after: float = 60.0) -> None:
     global _rate_limit_until
     with _throttle_lock:
         _rate_limit_until = max(_rate_limit_until, time.monotonic() + retry_after)
-    log_activity("lastfm", "", f"limite atteinte (erreur 29), pause de {retry_after:.0f} s")
+    log_activity("lastfm", "", f"rate limited (error 29), pausing {retry_after:.0f} s")
 
 
 def is_rate_limit_error(exc: BaseException) -> bool:
@@ -91,14 +91,14 @@ def get_session_username(token: str) -> str:
     payload = "".join(f"{key}{signed[key]}" for key in sorted(signed)) + settings.lastfm_api_secret
     # Last.fm's own signature scheme, not a choice made here.
     username = _lastfm_json("auth.getSession", token=token, api_sig=pylast.md5(payload))["session"]["name"]
-    log_activity("lastfm", username, "autorisation")
+    log_activity("lastfm", username, "authorization")
     return username
 
 
 def get_user_info(username: str) -> dict:
     """Profile in one user.getInfo call; unknown users raise pylast.WSError (6)."""
     user = _lastfm_json("user.getInfo", user=username)["user"]
-    log_activity("lastfm", username, "profil")
+    log_activity("lastfm", username, "profile")
     return {
         "username": username,
         "image": _pick_image(user.get("image")),
