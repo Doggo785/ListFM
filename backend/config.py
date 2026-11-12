@@ -31,12 +31,12 @@ class Settings(BaseSettings):
     discord_oauth_client_secret: str = ""
     oauth_redirect_base: str = "http://localhost:8000"
 
-    # Outgoing mail (OVH: ssl0.ovh.net, 465). Empty host: local dev, where each mail is printed instead.
+    # Outgoing mail, SMTP over SSL (port 465). Empty host: local dev, where each mail is printed instead.
     smtp_host: str = ""
     smtp_port: int = 465
     smtp_user: str = ""
     smtp_password: str = ""
-    mail_from: str = "ListFM <listfm@doggolabs.fr>"
+    mail_from: str = "ListFM <listfm@example.com>"
     frontend_url: str = "http://localhost:5173"
 
     @field_validator("jwt_secret")
