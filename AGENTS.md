@@ -63,6 +63,10 @@ Lire avant d'agir :
 - `views/Privacy.jsx` décrit ce que le site garde et à qui il parle : une nouvelle donnée stockée, un cookie, un service tiers ou un journal doit y être ajouté dans la même PR, sinon la page ment. Elle promet aussi qu'aucune IP n'est gardée (pas de journal d'accès sur disque en prod).
 - `DESIGN.md` décrit le monde visuel, écrit depuis le Créateur. Les écrans pas encore refaits ne sont pas une référence.
 
+## Déploiement
+
+`compose.yaml` à la racine, déployé par Coolify sur le serveur de l'owner : `backend/Dockerfile` (migre puis lance uvicorn, un seul worker, `--no-access-log`) et `frontend/Dockerfile` (build Vite servi par nginx, `frontend/nginx.conf`, qui relaie `/api`). Une nouvelle variable d'env va dans `compose.yaml`, `.env.example` et le tableau du README.
+
 ## Base de données locale
 
 Postgres en Docker, conteneur `listfm-db` sur le port **5433**, bases `listfm` (dev) et `listfm_test` (tests). Après un reboot : `docker start listfm-db`. Après une nouvelle migration, migrer aussi la base de test : `DATABASE_URL=postgresql+asyncpg://listfm:listfm@localhost:5433/listfm_test alembic upgrade head` (depuis `backend/`) ; `ci-local.sh` ne le fait pas. Une erreur de connexion en test vient d'abord d'un conteneur arrêté.
