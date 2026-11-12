@@ -93,6 +93,8 @@ Local Postgres runs on port 5433. CI uses the standard 5432.
 | `JWT_SECRET` | Yes, min 32 chars | - |
 | `COOKIE_SECURE` | No, set `true` in production | `false` |
 | `ENABLE_SCHEDULER` | No | `false` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | In production (OVH: `ssl0.ovh.net`, `465`) | empty: mails are printed in the console |
+| `MAIL_FROM` | No | `ListFM <listfm@doggolabs.fr>` |
 | `TRUSTED_IP_HEADER` | No, `CF-Connecting-IP` behind Cloudflare | empty (socket address) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
 | `DISCORD_OAUTH_CLIENT_ID` / `DISCORD_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
