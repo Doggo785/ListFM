@@ -1,137 +1,83 @@
 <div align="center">
 
-![ListFM Banner](.github/assets/ListFM_readme_banner.webp)
+![ListFM](.github/assets/ListFM_readme_banner.webp)
 
-Your Last.fm history already knows your taste. ListFM turns it into playlists, automatically.
+**Describe a playlist once. It keeps coming.**
 
-I built it because I kept replaying the same 30 tracks while years of scrobbles sat unused.
+ListFM reads everything you've played on Last.fm and builds your playlists by itself, on your schedule.
 
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite)](https://vitejs.dev)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](./LICENSE)
-[![CI](https://github.com/Doggo785/ListFM/actions/workflows/ci.yml/badge.svg)](https://github.com/Doggo785/ListFM/actions/workflows/ci.yml)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/909947922e244fbc93096cc528ab05d4)](https://app.codacy.com/gh/Doggo785/ListFM/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![License: MIT](https://img.shields.io/badge/license-MIT-faa307?style=flat-square&labelColor=03071e)](./LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Doggo785/ListFM/ci.yml?branch=main&style=flat-square&label=CI&color=e85d04&labelColor=03071e)](https://github.com/Doggo785/ListFM/actions/workflows/ci.yml)
+[![Codacy](https://img.shields.io/codacy/grade/909947922e244fbc93096cc528ab05d4?style=flat-square&label=codacy&color=d00000&labelColor=03071e)](https://app.codacy.com/gh/Doggo785/ListFM/dashboard)
 
-[How it works](#how-it-works) | [Features](#features) | [Quickstart](#quickstart) | [Local dev](#local-dev) | [Stack](#stack) | [License](#license)
+[How it works](#how-it-works) · [Self-hosting](#self-hosting) · [Local dev](#local-dev) · [Stack](#stack) · [Privacy](#privacy)
 
 </div>
 
-<!--
-Live demo CTA goes here once a hosted instance exists.
-Planned text: "Try it via the hosted instance" + link.
--->
-
 ## How it works
 
-1. Link your Last.fm account. Sign up with email and password, or use Google or Discord OAuth when configured.
-2. Create an automation. Pick a source (top tracks, recent plays, loved tracks, top artists), a period, filter rules, and a schedule. Leave the schedule empty for manual runs.
-3. Let the sweep run it on schedule, or press Run now.
-4. Each run writes a generated playlist in the app. Tracks and tags are frozen at generation time, so the list stays as it was.
-5. Check run history for dates, counts before and after filtering, duration, and errors. Failed runs retry up to 3 times with backoff (5 min, 20 min, 1 h). You can also re-run by hand.
+![A recipe at work: the same month a year ago, played at least 3 times, most played first, keep 50](.github/assets/readme_machine.webp)
 
-## Features
+1. **Link Last.fm.** Your whole listening history is imported once, newest first, then kept up to date.
+2. **Write a recipe.** A window (the last 30 days, the same month a year ago, everything), filters (tags, play counts, first listen, top artists, time of day), a sort and limits. The live preview shows what it would give right now.
+3. **Pick a schedule**, or press Run now.
+4. **Get a playlist** each time it runs, frozen as it was, with a cover and its history. Copy it to your streaming app in two clicks.
 
-- Automations with full CRUD, preview before save, and recurring schedules.
-- Four sources: top tracks, recent plays, loved tracks, top artists.
-- Periods from 7 days to 12 months, plus overall.
-- Filter rules (filter groups): track limit, period, tags and genres, value caps, exclusions.
-- Run history with bounded auto-retry and manual re-run.
-- Generated playlists with an openable detail view and frozen snapshots.
-- Dashboard with the totals of your stored history (listens, tracks, artists, albums) and your most played artist over the last 50 plays.
-- Auth with email and password plus optional Google and Discord OAuth. JWT access and refresh tokens live in httpOnly cookies, with refresh rotation and revoke-all on login.
-- Last.fm responses are cached in the database with per-data freshness (7 days for global data and tags, 30-day safety net), so repeat runs skip extra API calls.
+Since Last.fm logs what you play on every app, the playlists follow your real taste, not one app's.
 
-## Quickstart
+## Self-hosting
 
-Prereqs:
-
-- Node 18+
-- Python 3.11+
-- Docker (for Postgres)
-- A Last.fm API account (free, at https://www.last.fm/api/account/create)
-
-Steps:
+ListFM ships as a Docker Compose stack: Postgres, the API (migrations run at start), and nginx serving the site and `/api`. It assumes one API worker: the scheduler and rate limits live in its memory.
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/Doggo785/ListFM.git
-cd ListFM
-
-# 2. Set env vars
-cp .env.example .env
-# Fill in your Last.fm keys in .env
-
-# 3. Set up the backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r backend/requirements.txt
-
-# 4. Set up the frontend
-cd frontend && npm install && cd ..
-
-# 5. Start Postgres on port 5433 (first run creates the container)
-docker run -d --name listfm-db -p 5433:5432 \
-  -e POSTGRES_USER=listfm -e POSTGRES_PASSWORD=listfm \
-  -e POSTGRES_DB=listfm postgres:16
-# Later runs: docker start listfm-db
-
-# 6. Run migrations
-cd backend && alembic upgrade head && cd ..
+git clone https://github.com/Doggo785/ListFM.git && cd ListFM
+# Set the variables below in the environment or in a .env next to compose.yaml, then:
+docker compose up -d --build
 ```
 
-Local Postgres runs on port 5433. CI uses the standard 5432.
+Put a reverse proxy with HTTPS in front of the `web` service (port 80). On Coolify: create a Docker Compose resource from the repo, give the domain to `web`, and fill the variables in its UI.
 
-### Env vars
-
-| Variable | Required | Default |
+| Variable | Required | Notes |
 |---|---|---|
-| `LASTFM_API_KEY` | Yes | - |
-| `LASTFM_API_SECRET` | Yes | - |
-| `DATABASE_URL` | Yes | `postgresql+asyncpg://listfm:listfm@localhost:5433/listfm` |
-| `JWT_SECRET` | Yes, min 32 chars | - |
-| `COOKIE_SECURE` | No, set `true` in production | `false` |
-| `ENABLE_SCHEDULER` | No | `false` |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | In production (OVH: `ssl0.ovh.net`, `465`) | empty: mails are printed in the console |
-| `MAIL_FROM` | No | `ListFM <listfm@doggolabs.fr>` |
-| `TRUSTED_IP_HEADER` | No, `CF-Connecting-IP` behind Cloudflare | empty (socket address) |
-| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
-| `DISCORD_OAUTH_CLIENT_ID` / `DISCORD_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
-| `OAUTH_REDIRECT_BASE` | No | `http://localhost:8000` |
-| `FRONTEND_URL` | No | `http://localhost:5173` |
+| `PUBLIC_URL` | Yes | The site's address, e.g. `https://listfm.example.com` |
+| `POSTGRES_PASSWORD` | Yes | |
+| `LASTFM_API_KEY` / `LASTFM_API_SECRET` | Yes | Free at [last.fm/api](https://www.last.fm/api/account/create) |
+| `JWT_SECRET` | Yes | At least 32 characters: `openssl rand -hex 32` |
+| `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | Yes | Sends the confirmation and reset links. `SMTP_PORT` defaults to `465` (SSL) |
+| `MAIL_FROM` | No | Defaults to `ListFM <listfm@doggolabs.fr>`: change it |
+| `TRUSTED_IP_HEADER` | No | Defaults to `CF-Connecting-IP` (Cloudflare). Behind another proxy, the header it sets to the visitor's IP |
+| `GOOGLE_OAUTH_CLIENT_*` / `DISCORD_OAUTH_CLIENT_*` | No | `_ID` and `_SECRET`. The button shows when both are set. Redirect URI: `PUBLIC_URL/api/auth/google/callback` (or `discord`) |
 
-Google and Discord OAuth are optional. The login buttons only show when the matching client ID and secret are set.
+Back up the `listfm-db` volume, for example with `docker compose exec db pg_dump -U listfm listfm`.
+
+If you run it for other people, rewrite `frontend/src/views/Privacy.jsx`: it describes this instance and names its publisher.
 
 ## Local dev
 
-From the repo root, open two terminals:
+Needs Python 3.14, Node 24, Docker, and a Last.fm API account.
 
 ```bash
-# Terminal 1, backend
-source .venv/bin/activate
-uvicorn backend.main:app --reload --port 8000
+cp .env.example .env            # fill in the Last.fm keys and JWT_SECRET
+python -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
+(cd frontend && npm install)
+
+docker run -d --name listfm-db -p 5433:5432 \
+  -e POSTGRES_USER=listfm -e POSTGRES_PASSWORD=listfm -e POSTGRES_DB=listfm postgres:16
+(cd backend && alembic upgrade head)
+
+./dev.sh                        # API on :8000, site on http://localhost:5173
 ```
 
-```bash
-# Terminal 2, frontend
-cd frontend
-npm run dev
-```
-
-Backend: http://localhost:8000. Frontend: http://localhost:5173. Interactive OpenAPI docs served by FastAPI at http://localhost:8000/docs (Swagger UI). The API resolves the user from the auth JWT, so there is no `{username}` path prefix; endpoints that read Last.fm data need a linked Last.fm account.
-
-```bash
-# Backend tests
-pytest backend/tests/ -q
-
-# Frontend lint (from frontend/)
-npm run lint
-```
+Without `SMTP_HOST`, mails are printed in the API console. `.env.example` lists every variable. Before a push, `scripts/ci-local.sh` runs the same checks as CI. More in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Stack
 
-Backend: Python 3.14, FastAPI, Pydantic v2, PostgreSQL with asyncpg, Alembic for migrations. Frontend: React 19, Vite 8, Tailwind CSS 4, Radix UI, ESLint. CI runs on GitHub Actions: tests, lint, types, secret and dependency scans.
+FastAPI, async SQLAlchemy, Postgres and Alembic on Python 3.14. React 19, Vite and Tailwind 4 in JSX, with a WebGL pixel ribbon drawn in `lib/pixelRibbon.js`. GitHub Actions runs tests, lint, types, coverage, and secret and dependency scans.
+
+## Privacy
+
+No tracking, no ads, no analytics, no IP kept. Tokens live in httpOnly cookies. Deleting your account erases your listens, automations and playlists. The full list of what is kept and who sees it is on the site's `/privacy` page.
 
 ## License
 
