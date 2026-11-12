@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0](https://github.com/Doggo785/ListFM/compare/v0.7.0...v1.0.0) (2026-11-12)
+
+
+### Features
+
+* **api:** harden ListFM for its public launch ([#160](https://github.com/Doggo785/ListFM/issues/160)) ([ade26b4](https://github.com/Doggo785/ListFM/commit/ade26b424441f4a7439ba0f78f60631ad9fce329))
+* **auth:** confirm addresses and reset passwords by mail ([#162](https://github.com/Doggo785/ListFM/issues/162)) ([22e783e](https://github.com/Doggo785/ListFM/commit/22e783ec6fdf46fa026f4f12e27162aa9158340a))
+* **dashboard:** say covers come after the import instead of a bare ribbon ([0d752b2](https://github.com/Doggo785/ListFM/commit/0d752b21fb11e0dd6ee5cda2e0f08eaa681211cc))
+* **deploy:** self-hostable Docker Compose stack and a new README ([#163](https://github.com/Doggo785/ListFM/issues/163)) ([8548205](https://github.com/Doggo785/ListFM/commit/8548205bcdc130d452987727223b1df9e83ae6fb))
+* **ui:** replace the Vite favicon with the ListFM logo ([3797c87](https://github.com/Doggo785/ListFM/commit/3797c87e83aa9f15ae1bb9eb51af472cfb47ff2a))
+
+
+### Bug Fixes
+
+* **privacy:** keep provider ids out of the account creation logs ([928308a](https://github.com/Doggo785/ListFM/commit/928308a015704476921aca7399be4d79ec2838d3))
+* **tags:** refresh expired artists a few at a time ([c912d17](https://github.com/Doggo785/ListFM/commit/c912d172f55466b0829f8431ae7b52392e9dd679))
+
+
+### Documentation
+
+* **roadmap:** mark ListFM live at listfm.doggolabs.fr ([2d8164b](https://github.com/Doggo785/ListFM/commit/2d8164b9c23f595a27480b5260cd3e65e69b2e39))
+
 ## [0.7.0](https://github.com/Doggo785/ListFM/compare/v0.6.0...v0.7.0) (2026-11-10)
 
 
