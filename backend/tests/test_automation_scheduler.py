@@ -413,7 +413,7 @@ async def test_a_run_filtering_by_tags_waits_for_the_tag_pass(client: AsyncClien
 
         with (
             patch("services.automation_runner._check_ready", _check_ready),
-            patch.object(automation_runner, "is_tagging", return_value=True),
+            patch.object(automation_runner, "is_learning_tags", return_value=True),
             patch("services.automation_runner.get_window_tracks", return_value=[]),
         ):
             waiting = (await client.post(f"/api/automations/{by_tags}/run")).json()

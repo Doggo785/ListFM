@@ -27,6 +27,7 @@ from services.tag_catalogue import (
     MAX_CONSECUTIVE_FAILURES,
     TAG_VALIDITY,
     fill_tag_catalogue,
+    is_learning_tags,
 )
 from sqlalchemy import select, update
 
@@ -116,6 +117,46 @@ async def test_expired_tags_are_refetched_and_replaced():
         await db.commit()
     assert await _fill(user_id, lambda a: [{"name": "kept", "count": 90}]) == [artist]
     assert await _known(user_id) == {artist: [{"name": "kept", "count": 90}]}
+
+
+async def _expire(*artists):
+    async with _TestSessionLocal() as db:
+        await db.execute(
+            update(Artist).where(Artist.name.in_(artists)).values(tags_fetched_at=NOW - TAG_VALIDITY - timedelta(days=1))
+        )
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_expired_artists_are_refreshed_a_few_at_a_time_and_unknown_ones_all_at_once():
+    old = [_name("old") for _ in range(3)]
+    user_id = await _user_listening_to(*old)
+    await _fill(user_id, lambda a: [])
+    await _expire(*old)
+    new = [_name("new") for _ in range(3)]
+    other = await _user_listening_to(*old, *new)
+    # A catalogue filled in one go must not expire in one go: the rest waits for the next pass.
+    with patch.object(tag_catalogue, "STALE_PER_PASS", 2):
+        assert await _fill(other, lambda a: []) == [*old[:2], *new]
+        assert await _fill(other, lambda a: []) == old[2:]
+        assert await _fill(other, lambda a: []) == []
+
+
+@pytest.mark.asyncio
+async def test_only_a_pass_learning_new_artists_makes_runs_wait():
+    known, fresh = _name("known"), _name("fresh")
+    user_id = await _user_listening_to(known)
+    await _fill(user_id, lambda a: [])
+    await _expire(known)
+    seen = []
+    await _fill(user_id, lambda a: seen.append(is_learning_tags(user_id)) or [])
+    assert seen == [False]  # refreshing keeps the old tags usable
+
+    other = await _user_listening_to(fresh)
+    seen.clear()
+    await _fill(other, lambda a: seen.append(is_learning_tags(other)) or [])
+    assert seen == [True]
+    assert not is_learning_tags(other)
 
 
 @pytest.mark.asyncio

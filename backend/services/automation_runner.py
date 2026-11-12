@@ -48,7 +48,7 @@ from services.scrobble_sync import (
     start_scrobble_sync,
     sync_scrobbles,
 )
-from services.tag_catalogue import after_pass, is_tagging
+from services.tag_catalogue import after_pass, is_learning_tags
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -399,13 +399,13 @@ def _filters_by_tags(filter_groups) -> bool:
 
 
 async def _check_ready(db: AsyncSession, automation: Automation) -> None:
-    """A run waits for the first full load, and one filtering by tags for the tag pass in flight."""
+    """A run waits for the first full load, and one filtering by tags for a tag pass learning new artists."""
     user = await db.get(User, automation.user_id)
     if user is None or user.scrobbles_complete_at is None:
         # Restarts an interrupted first load; a no-op while one runs.
         start_scrobble_sync(automation.user_id, automation.lastfm_username)
         raise HistoryLoading
-    if _filters_by_tags(automation.filter_groups) and is_tagging(automation.user_id):
+    if _filters_by_tags(automation.filter_groups) and is_learning_tags(automation.user_id):
         raise TagsLoading
 
 

@@ -158,8 +158,8 @@ async def replace_artist_tags(db: AsyncSession, artist: str, tags: list[dict]) -
     await mark_artist_tags_fetched(db, {artist})
 
 
-async def get_artists_to_tag(db: AsyncSession, user_id: str, stale_before: datetime) -> list[str]:
-    """This user's artists with unknown or expired tags, most listened first."""
+async def get_artists_to_tag(db: AsyncSession, user_id: str, stale_before: datetime) -> list[tuple[str, bool]]:
+    """This user's artists with unknown or expired tags, most listened first, each with True when unknown."""
     # Listens counted per track first: the primary key puts played_at before track_id, so joining
     # scrobbles track by track rereads all of the user's listens each time (minutes on a big history).
     plays = (
@@ -169,14 +169,14 @@ async def get_artists_to_tag(db: AsyncSession, user_id: str, stale_before: datet
         .subquery()
     )
     rows = await db.execute(
-        select(Track.artist)
+        select(Track.artist, Artist.name.is_(None))
         .join(plays, plays.c.track_id == Track.id)
         .outerjoin(Artist, Artist.name == Track.artist)
         .where(or_(Artist.name.is_(None), Artist.tags_fetched_at < stale_before))
-        .group_by(Track.artist)
+        .group_by(Track.artist, Artist.name)
         .order_by(func.sum(plays.c.plays).desc(), Track.artist)
     )
-    return list(rows.scalars())
+    return [(artist, unknown) for artist, unknown in rows.all()]
 
 
 async def artist_tags_fetched_since(db: AsyncSession, artist: str, since: datetime) -> bool:

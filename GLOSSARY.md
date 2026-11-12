@@ -21,7 +21,7 @@ The list of an automation's runs: when, how many tracks, and the error when one 
 _Avoid_: Listening history (say Listens)
 
 **Waiting run**:
-A run asked for during the first import, or during the tag pass when it filters by tags: it waits on its history line and starts by itself once ready. It is neither a failure nor an attempt.
+A run asked for during the first import, or, when it filters by tags, while the tag pass looks up artists with no tags yet: it waits on its history line and starts by itself once ready. It is neither a failure nor an attempt.
 _Avoid_: Blocked run, failed run
 
 **Empty run**:
