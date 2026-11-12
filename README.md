@@ -6,6 +6,8 @@
 
 ListFM reads everything you've played on Last.fm and builds your playlists by itself, on your schedule.
 
+**[Try it at listfm.doggolabs.fr](https://listfm.doggolabs.fr)**, or host your own.
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-faa307?style=flat-square&labelColor=03071e)](./LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Doggo785/ListFM/ci.yml?branch=main&style=flat-square&label=CI&color=e85d04&labelColor=03071e)](https://github.com/Doggo785/ListFM/actions/workflows/ci.yml)
 [![Codacy](https://img.shields.io/codacy/grade/909947922e244fbc93096cc528ab05d4?style=flat-square&label=codacy&color=d00000&labelColor=03071e)](https://app.codacy.com/gh/Doggo785/ListFM/dashboard)
