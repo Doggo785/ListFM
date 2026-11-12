@@ -32,3 +32,6 @@ httpx-oauth==0.17.0
 apscheduler==3.11.3
 # Explicit floor for a transitive dep (via pytest): fixes PYSEC-2023-117 / PYSEC-2026-2987.
 pygments==2.21.0
+# Explicit pins for transitive deps (via pylast): osv resolves httpx2>=2.9.1, which has PYSEC-2026-3844/3845/3846.
+httpx2==2.16.0
+httpcore2==2.16.0
