@@ -73,6 +73,10 @@ oauth_login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # Wrong passwords per account, whatever the IP: guessing one password from many IPs stops here.
 failed_login_limiter = RateLimiter(max_requests=20, window_seconds=3600)
 complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# Links by mail, per address: each one sends a mail to someone who may not have asked for it.
+mail_link_limiter = RateLimiter(max_requests=3, window_seconds=3600)
+# Opening a mail link, per IP: the tokens can't be guessed, this only keeps guessing pointless.
+mail_link_use_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # Run now and retry, per automation: each run writes a playlist and reads the whole window.
 manual_run_limiter = RateLimiter(max_requests=1, window_seconds=60)
 # The landing page's public route: two Last.fm calls per name, on the same budget

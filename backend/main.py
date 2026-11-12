@@ -14,6 +14,7 @@ from routers.generated_playlists import router as generated_playlists_router
 from routers.public import router as public_router
 from routers.users import router as users_router
 from services.automation_runner import run_due_automations
+from services.signups import purge_stale_signups
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -46,6 +47,7 @@ def create_scheduler() -> AsyncIOScheduler | None:
         max_instances=1,
         coalesce=True,
     )
+    scheduler.add_job(purge_stale_signups, trigger="interval", hours=1, id="signup_purge", max_instances=1, coalesce=True)
     return scheduler
 
 

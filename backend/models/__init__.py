@@ -6,6 +6,7 @@ from models.auth_provider import AuthProvider
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
+from models.mail_link import MailLink
 from models.playlist_track import PlaylistTrack
 from models.refresh_token import RefreshToken
 from models.scrobble import Scrobble
@@ -24,6 +25,7 @@ __all__ = [
     "Automation",
     "AutomationHistory",
     "GeneratedPlaylist",
+    "MailLink",
     "PlaylistTrack",
     "RefreshToken",
     "Scrobble",

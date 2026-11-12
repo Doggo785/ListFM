@@ -22,14 +22,12 @@ from .conftest import (
     _TestSessionLocal,
     _unique_email,
     link_lastfm,
+    signup,
 )
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
-    reg = await client.post(
-        "/api/auth/register",
-        json={"email": email, "password": "StrongP@ss1!"},
-    )
+    reg = await signup(client, email, "StrongP@ss1!")
     assert reg.status_code == 201
     client.cookies.clear()
     login = await client.post(

@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
@@ -12,6 +13,7 @@ from config import get_settings
 from database import get_db
 from httpx import ASGITransport, AsyncClient
 from models.auth_provider import AuthProvider
+from models.mail_link import MailLink
 from models.refresh_token import RefreshToken
 from models.scrobble import Scrobble
 from models.user import User
@@ -23,6 +25,8 @@ from services.rate_limit import (
     listener_limiter,
     listener_total_limiter,
     login_limiter,
+    mail_link_limiter,
+    mail_link_use_limiter,
     manual_run_limiter,
     oauth_login_limiter,
     refresh_limiter,
@@ -63,6 +67,7 @@ _TEST_TABLES = (
     "generated_playlists",
     "automations",
     "refresh_tokens",
+    "mail_links",
     "auth_providers",
     "users",
 )
@@ -98,6 +103,8 @@ async def _cleanup_db():
         complete_email_limiter,
         failed_login_limiter,
         manual_run_limiter,
+        mail_link_limiter,
+        mail_link_use_limiter,
     ):
         limiter.reset()
     async with _TestSessionLocal() as db:
@@ -173,6 +180,7 @@ async def _cleanup_user(email: str | None = None, user_id: str | None = None) ->
         if uid is None:
             return
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == uid))
+        await db.execute(delete(MailLink).where(MailLink.user_id == uid))
         await db.execute(delete(AuthProvider).where(AuthProvider.user_id == uid))
         await db.execute(delete(Scrobble).where(Scrobble.user_id == uid))
         await db.execute(delete(UserTrack).where(UserTrack.user_id == uid))
@@ -184,15 +192,50 @@ def _unique_email() -> str:
     return f"test-{uuid.uuid4().hex[:12]}@test.example.com"
 
 
+# Every mail the app sends during a test, newest last: (to, subject, body).
+SENT_MAILS: list[tuple[str, str, str]] = []
+
+
+@pytest.fixture(autouse=True)
+def _mailbox(monkeypatch):
+    """No mail leaves a test: each one lands in SENT_MAILS."""
+    SENT_MAILS.clear()
+
+    async def send(to, subject, body):
+        SENT_MAILS.append((to, subject, body))
+        return True
+
+    for module in ("routers.auth", "routers.auth_oauth"):
+        monkeypatch.setattr(f"{module}.send_mail", send)
+
+
+def mailed_token(email: str) -> str:
+    """The token of the latest link mailed to an address."""
+    body = next(body for to, _, body in reversed(SENT_MAILS) if to == email)
+    link = re.search(r"https?://\S+", body)
+    assert link is not None, body
+    return parse_qs(urlparse(link.group(0)).query)["token"][0]
+
+
+async def signup(client: AsyncClient, email: str, password: str = "StrongP@ss1!", display_name: str | None = None):
+    """Register and follow the mailed link, as a person would: the client ends signed in. Returns the register response."""
+    reg = await client.post("/api/auth/register", json={"email": email, "password": password, "display_name": display_name})
+    if reg.status_code == 201:
+        assert (await client.post("/api/auth/confirm", json={"token": mailed_token(email)})).status_code == 200
+    return reg
+
+
 async def _register_and_login(
     client: AsyncClient, email: str, password: str = "StrongP@ss1!"
 ):
-    """Register a new user and log in. Returns the login response."""
+    """Register a new user, follow the mailed link, and log in. Returns the login response."""
     reg = await client.post(
         "/api/auth/register",
         json={"email": email, "password": password},
     )
     assert reg.status_code == 201
+    confirmed = await client.post("/api/auth/confirm", json={"token": mailed_token(email)})
+    assert confirmed.status_code == 200
     client.cookies.clear()
     resp = await client.post(
         "/api/auth/login",

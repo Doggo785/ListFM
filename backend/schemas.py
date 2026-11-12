@@ -117,6 +117,21 @@ class PasswordChange(PasswordValidatorMixin, BaseModel):
     password: str = Field(min_length=8)
 
 
+class EmailOnly(EmailValidatorMixin, BaseModel):
+    """An address to send a link to (a new confirmation, a password reset)."""
+
+    email: str
+
+
+class MailLinkUse(BaseModel):
+    token: str = Field(max_length=100)
+
+
+class PasswordReset(PasswordValidatorMixin, BaseModel):
+    token: str = Field(max_length=100)
+    password: str = Field(min_length=8)
+
+
 class AccountDelete(BaseModel):
     confirm: str
 

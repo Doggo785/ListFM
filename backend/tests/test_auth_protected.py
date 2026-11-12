@@ -11,6 +11,7 @@ from .conftest import (
     _make_expired_token,
     _TestSessionLocal,
     _unique_email,
+    signup,
 )
 
 
@@ -24,10 +25,7 @@ async def test_protected_no_token(client: AsyncClient):
 async def test_protected_valid_token(client: AsyncClient):
     email = _unique_email()
     try:
-        reg = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!", "display_name": "Tester"},
-        )
+        reg = await signup(client, email, "StrongP@ss1!", display_name="Tester")
         assert reg.status_code == 201
 
         resp = await client.get("/api/auth/me")
@@ -43,10 +41,7 @@ async def test_protected_valid_token(client: AsyncClient):
 async def test_protected_expired_token(client: AsyncClient):
     email = _unique_email()
     try:
-        reg = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        reg = await signup(client, email, "StrongP@ss1!")
         assert reg.status_code == 201
         user_id = _get_user_id_from_cookies(client)
 
@@ -77,10 +72,7 @@ async def test_protected_deleted_user(client: AsyncClient):
     email = _unique_email()
     user_id = None
     try:
-        reg = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        reg = await signup(client, email, "StrongP@ss1!")
         assert reg.status_code == 201
         user_id = _get_user_id_from_cookies(client)
 
@@ -102,10 +94,7 @@ async def test_e2e_register_login_protected_refresh_logout(client: AsyncClient):
     email = _unique_email()
     password = "StrongP@ss1!"
     try:
-        reg = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": password, "display_name": "E2E"},
-        )
+        reg = await signup(client, email, password, display_name="E2E")
         assert reg.status_code == 201
 
         me1 = await client.get("/api/auth/me")

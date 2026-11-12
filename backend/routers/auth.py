@@ -1,5 +1,6 @@
 import uuid
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 
 import jwt
 from config import get_settings
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from models.refresh_token import RefreshToken
 from models.user import User
 from repositories.automations import erase_user_automations
+from repositories.mail_links import create_mail_link, use_mail_link
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     get_refresh_token_by_hash,
@@ -21,6 +23,8 @@ from repositories.users import (
     delete_user,
     get_lastfm_provider,
     get_user_by_email,
+    get_user_by_id,
+    release_unconfirmed_email,
 )
 from routers.deps import (
     clear_auth_cookies,
@@ -29,8 +33,11 @@ from routers.deps import (
 )
 from schemas import (
     AccountDelete,
+    EmailOnly,
     GuideUpdate,
+    MailLinkUse,
     PasswordChange,
+    PasswordReset,
     TimezoneUpdate,
     TokenResponse,
     UserCreate,
@@ -44,10 +51,13 @@ from services.auth import (
     hash_refresh_token,
     verify_password,
 )
+from services.mailer import confirm_address_mail, reset_password_mail, send_mail
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
     failed_login_limiter,
     login_limiter,
+    mail_link_limiter,
+    mail_link_use_limiter,
     rate_limit,
     rate_limit_by_key,
     rate_limit_email_key,
@@ -99,13 +109,35 @@ async def _establish_session(
     set_auth_cookies(response, access_token, refresh_token)
 
 
-@router.post("/register", response_model=TokenResponse, status_code=201)
+CONFIRM_SENT = "We sent you a link. Open it to finish creating your account."
+LINK_EXPIRED = "This link no longer works. Ask for a new one."
+
+
+async def _mail_link(email: str, purpose: str, token: str) -> None:
+    """Send a confirmation or reset link; the answer to the browser is the same whether it left or not."""
+    settings = get_settings()
+    if purpose == "verify":
+        subject, body = confirm_address_mail(f"{settings.frontend_url}/confirm-email?{urlencode({'token': token})}")
+    else:
+        subject, body = reset_password_mail(f"{settings.frontend_url}/reset-password?{urlencode({'token': token})}")
+    await send_mail(email, subject, body)
+
+
+async def _commit_or_500(db: AsyncSession, detail: str) -> None:
+    try:
+        await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=detail)
+
+
+@router.post("/register", status_code=201)
 async def register(
     body: UserCreate,
     request: Request,
-    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
+    """Create the account and mail a link to confirm the address: nothing opens until it is followed."""
     rate_limit(request, register_limiter)
     email = body.email.strip().lower()
 
@@ -113,19 +145,74 @@ async def register(
         raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
 
     rate_limit_by_key(register_email_limiter, rate_limit_email_key(email))
-    existing = await get_user_by_email(db, email)
-    if existing is not None:
+    # An unconfirmed sign-up doesn't own its address: whoever can open the mailbox takes it.
+    await release_unconfirmed_email(db, email)
+    if await get_user_by_email(db, email) is not None:
         raise HTTPException(status_code=409, detail=DUPLICATE_EMAIL_MESSAGE)
 
-    # Create user (also creates auth_provider entry)
     user_data = UserCreate(email=email, password=body.password, display_name=body.display_name)
-    password_hash = hash_password(body.password)
-    user = await create_user(db, user_data, password_hash)
+    user = await create_user(db, user_data, hash_password(body.password))
+    token = await create_mail_link(db, user.id, "verify")
+    await _commit_or_500(db, "Failed to create account")
+    await _mail_link(email, "verify", token)
+    return {"detail": CONFIRM_SENT}
 
-    await _establish_session(
-        db, user, response, error_detail="Failed to create account"
-    )
 
+@router.post("/confirm/resend", status_code=202)
+async def resend_confirmation(body: EmailOnly, request: Request, db: AsyncSession = Depends(get_db)):
+    """A new confirmation link. Same answer whether the address waits for one or not."""
+    rate_limit(request, register_limiter)
+    email = body.email.strip().lower()
+    rate_limit_by_key(mail_link_limiter, rate_limit_email_key(email))
+    user = await get_user_by_email(db, email)
+    if user is not None and not user.email_verified and user.password_hash is not None:
+        token = await create_mail_link(db, user.id, "verify")
+        await _commit_or_500(db, "Failed to send the link")
+        await _mail_link(email, "verify", token)
+    return {"detail": "If this address waits for a confirmation, a new link is on its way."}
+
+
+@router.post("/confirm", response_model=TokenResponse)
+async def confirm_email(body: MailLinkUse, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """The link from the mail: the address is confirmed and the person is signed in."""
+    rate_limit(request, mail_link_use_limiter)
+    user_id = await use_mail_link(db, body.token, "verify")
+    user = await get_user_by_id(db, user_id) if user_id else None
+    if user is None:
+        await _commit_or_500(db, "Failed to confirm the address")
+        raise HTTPException(status_code=400, detail=LINK_EXPIRED)
+    user.email_verified = True
+    await _establish_session(db, user, response, error_detail="Failed to confirm the address")
+    return _build_token_response()
+
+
+@router.post("/password/forgot", status_code=202)
+async def forgot_password(body: EmailOnly, request: Request, db: AsyncSession = Depends(get_db)):
+    """Mail a reset link. Same answer whether an account uses the address or not."""
+    rate_limit(request, login_limiter)
+    email = body.email.strip().lower()
+    rate_limit_by_key(mail_link_limiter, rate_limit_email_key(email))
+    user = await get_user_by_email(db, email)
+    if user is not None and user.password_hash is not None:
+        token = await create_mail_link(db, user.id, "reset")
+        await _commit_or_500(db, "Failed to send the link")
+        await _mail_link(email, "reset", token)
+    return {"detail": "If an account uses this address, a link to reset its password is on its way."}
+
+
+@router.post("/password/reset", response_model=TokenResponse)
+async def reset_password(body: PasswordReset, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """A new password from the mailed link: every other device is signed out, this one is signed in."""
+    rate_limit(request, mail_link_use_limiter)
+    user_id = await use_mail_link(db, body.token, "reset")
+    user = await get_user_by_id(db, user_id) if user_id else None
+    if user is None or user.password_hash is None:
+        await _commit_or_500(db, "Failed to change password")
+        raise HTTPException(status_code=400, detail=LINK_EXPIRED)
+    user.password_hash = hash_password(body.password)
+    # Opening the mail proves the address too.
+    user.email_verified = True
+    await _establish_session(db, user, response, error_detail="Failed to change password")
     return _build_token_response()
 
 
@@ -146,6 +233,8 @@ async def login(
     if user is None or user.password_hash is None or not verify_password(body.password, user.password_hash):
         failed_login_limiter.record(account)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.email_verified:
+        raise HTTPException(status_code=403, detail="Confirm your email first: open the link we sent you, or ask for a new one.")
 
     await _establish_session(
         db, user, response, error_detail="Failed to log in"

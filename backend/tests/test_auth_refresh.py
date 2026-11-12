@@ -12,6 +12,7 @@ from .conftest import (
     _get_user_id_from_cookies,
     _TestSessionLocal,
     _unique_email,
+    signup,
 )
 
 
@@ -19,10 +20,7 @@ from .conftest import (
 async def test_refresh_success(client: AsyncClient):
     email = _unique_email()
     try:
-        reg = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        reg = await signup(client, email, "StrongP@ss1!")
         assert reg.status_code == 201
 
         resp = await client.post("/api/auth/refresh")
@@ -40,10 +38,7 @@ async def test_refresh_success(client: AsyncClient):
 async def test_refresh_sets_new_cookies(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         old_access = client.cookies.get("access_token")
         old_refresh = client.cookies.get("refresh_token")
 
@@ -62,10 +57,7 @@ async def test_refresh_sets_new_cookies(client: AsyncClient):
 async def test_refresh_token_rotation_revokes_old(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         old_refresh = client.cookies.get("refresh_token")
         assert old_refresh is not None
 
@@ -91,10 +83,7 @@ async def test_refresh_token_rotation_revokes_old(client: AsyncClient):
 async def test_refresh_revoked_token_returns_401(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         old_refresh = client.cookies.get("refresh_token")
 
         await client.post("/api/auth/refresh")
@@ -118,10 +107,7 @@ async def test_refresh_reuse_revokes_entire_family(client: AsyncClient):
     """
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         old_refresh = client.cookies.get("refresh_token")
         assert old_refresh is not None
 
@@ -165,10 +151,7 @@ async def test_concurrent_refresh_from_two_tabs_keeps_both_logged_in(client: Asy
     """The same token presented again right after rotation is a race, not theft."""
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         shared_refresh = client.cookies.get("refresh_token")
 
         assert (await client.post("/api/auth/refresh")).status_code == 200  # tab A
@@ -188,10 +171,7 @@ async def test_refresh_after_logout_gets_no_grace(client: AsyncClient):
     """A token revoked by logout stays dead even seconds later."""
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         token = client.cookies.get("refresh_token")
         assert (await client.post("/api/auth/logout")).status_code == 200
         async with AsyncClient(
@@ -214,10 +194,7 @@ async def test_login_revokes_previous_families(client: AsyncClient):
     """A fresh login must revoke every prior refresh token (one active session)."""
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         client.cookies.clear()
         resp = await client.post(
             "/api/auth/login",
@@ -272,10 +249,7 @@ async def test_register_no_revoke_crash(client: AsyncClient):
     """Register still works and creates exactly one active token family."""
     email = _unique_email()
     try:
-        resp = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        resp = await signup(client, email, "StrongP@ss1!")
         assert resp.status_code == 201
 
         user_id = _get_user_id_from_cookies(client)
@@ -298,10 +272,7 @@ async def test_refresh_rejects_access_token(client: AsyncClient):
     """An access token presented as the refresh cookie must be rejected (typ)."""
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         access = client.cookies.get("access_token")
         assert access is not None
         client.cookies.set("refresh_token", access)
@@ -316,10 +287,7 @@ async def test_me_rejects_refresh_token(client: AsyncClient):
     """A refresh token presented as the access cookie must be rejected (typ)."""
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         refresh = client.cookies.get("refresh_token")
         assert refresh is not None
         client.cookies.set("access_token", refresh)
