@@ -35,7 +35,7 @@ git clone https://github.com/Doggo785/ListFM.git && cd ListFM
 docker compose up -d --build
 ```
 
-Put a reverse proxy with HTTPS in front of the `web` service (port 80). On Coolify: create a Docker Compose resource from the repo, give the domain to `web`, and fill the variables in its UI.
+Put a reverse proxy with HTTPS in front of the `web` service (port 80). For example on Coolify: create a Docker Compose resource from the repo, give the domain to `web`, and fill the variables in its UI.
 
 | Variable | Required | Notes |
 |---|---|---|
@@ -44,8 +44,8 @@ Put a reverse proxy with HTTPS in front of the `web` service (port 80). On Cooli
 | `LASTFM_API_KEY` / `LASTFM_API_SECRET` | Yes | Free at [last.fm/api](https://www.last.fm/api/account/create) |
 | `JWT_SECRET` | Yes | At least 32 characters: `openssl rand -hex 32` |
 | `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` | Yes | Sends the confirmation and reset links. `SMTP_PORT` defaults to `465` (SSL) |
-| `MAIL_FROM` | No | Defaults to `ListFM <listfm@doggolabs.fr>`: change it |
-| `TRUSTED_IP_HEADER` | No | Defaults to `CF-Connecting-IP` (Cloudflare). Behind another proxy, the header it sets to the visitor's IP |
+| `MAIL_FROM` | Yes | The sender, e.g. `ListFM <listfm@example.com>`: an address your SMTP account may send as |
+| `TRUSTED_IP_HEADER` | No | Where the visitor's IP is read, for the rate limits. Defaults to `X-Real-IP`, set by the bundled nginx. Behind Cloudflare: `CF-Connecting-IP`. Behind another proxy, the visitors all share its address unless you name a header that proxy overwrites |
 | `GOOGLE_OAUTH_CLIENT_*` / `DISCORD_OAUTH_CLIENT_*` | No | `_ID` and `_SECRET`. The button shows when both are set. Redirect URI: `PUBLIC_URL/api/auth/google/callback` (or `discord`) |
 
 Back up the `listfm-db` volume, for example with `docker compose exec db pg_dump -U listfm listfm`.

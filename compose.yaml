@@ -1,5 +1,5 @@
 # ListFM in production: Postgres, the API, and nginx serving the site and proxying /api.
-# Coolify: point the domain at the `web` service (port 80) and fill the variables below.
+# Put an HTTPS reverse proxy (Coolify, Caddy, Traefik...) in front of `web` (port 80) and fill the variables below.
 x-logs: &logs
   # 3 files of 10 MB: the privacy page says the logs roll over by size.
   logging:
@@ -36,12 +36,12 @@ services:
       OAUTH_REDIRECT_BASE: ${PUBLIC_URL}
       COOKIE_SECURE: "true"
       ENABLE_SCHEDULER: "true"
-      TRUSTED_IP_HEADER: ${TRUSTED_IP_HEADER:-CF-Connecting-IP}
+      TRUSTED_IP_HEADER: ${TRUSTED_IP_HEADER:-X-Real-IP}
       SMTP_HOST: ${SMTP_HOST:?}
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_USER: ${SMTP_USER:?}
       SMTP_PASSWORD: ${SMTP_PASSWORD:?}
-      MAIL_FROM: ${MAIL_FROM:-ListFM <listfm@doggolabs.fr>}
+      MAIL_FROM: ${MAIL_FROM:?}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
       DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID:-}
