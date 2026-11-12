@@ -6,6 +6,7 @@ import PixelRibbon from "./components/ui/PixelRibbon";
 import ScrollToTop from "./components/elements/ScrollToTop";
 import AuthGuard from "./components/AuthGuard";
 import Guide from "./components/elements/Guide";
+import { useAuth } from "./contexts/AuthContext";
 
 // Each page in its own file, all fetched just after the first one: a later change of page waits for nothing.
 const pageLoaders = [];
@@ -34,12 +35,15 @@ const Playlist = page(() => import("./views/Playlist"));
 const Settings = page(() => import("./views/Settings"));
 const LastfmReturn = page(() => import("./views/LastfmReturn"));
 const Privacy = page(() => import("./views/Privacy"));
+const NotFound = page(() => import("./views/NotFound"));
 
 const NO_NAV_PATHS = ["/", "/privacy", "/login", "/register", "/auth/callback", "/auth/lastfm", "/link-lastfm"];
 
 function App() {
   const location = useLocation();
-  const showNav = !NO_NAV_PATHS.includes(location.pathname);
+  const { isAuthenticated, loading } = useAuth();
+  // Signed-out visitors only reach a page with no nav or a 404; while the session loads, keep the nav where it was.
+  const showNav = !NO_NAV_PATHS.includes(location.pathname) && (loading || isAuthenticated);
 
   useEffect(() => {
     // A failed fetch only costs the head start: the page retries when it is opened.
@@ -147,6 +151,7 @@ function App() {
                   </AuthGuard>
                 }
               />
+              <Route path="*" element={<NotFound />} />
             </Routes>
             </Suspense>
           </div>

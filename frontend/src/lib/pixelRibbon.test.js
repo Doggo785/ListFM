@@ -116,6 +116,30 @@ describe("createRibbon", () => {
     expect(() => ribbon.destroy()).not.toThrow();
   });
 
+  it("stops on a lost GL context and builds everything again when it comes back", () => {
+    const gl = fakeGl();
+    const canvas = canvasWith(gl);
+    const ribbon = createRibbon(canvas, { palette: PALETTE });
+    const lost = new Event("webglcontextlost", { cancelable: true });
+    canvas.dispatchEvent(lost);
+    // Without preventDefault the browser never hands the context back.
+    expect(lost.defaultPrevented).toBe(true);
+    expect(window.cancelAnimationFrame).toHaveBeenCalled();
+
+    const programs = gl.calls.createProgram.length;
+    frames.length = 0;
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(gl.calls.createProgram.length).toBeGreaterThan(programs);
+    expect(frames).toHaveLength(1);
+
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    gl.getShaderParameter = () => false;
+    frames.length = 0;
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(frames).toHaveLength(0);
+    ribbon.destroy();
+  });
+
   it("sizes the canvas in cells on the pixel grid", () => {
     const canvas = canvasWith(fakeGl());
     createRibbon(canvas, { palette: PALETTE });
