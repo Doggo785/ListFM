@@ -27,10 +27,15 @@ TAG_VALIDITY = timedelta(days=90)
 MAX_CONSECUTIVE_FAILURES = 5
 # One console line per this many artists: a line per call would bury everything else.
 LOG_EVERY = 100
+# Expired artists refreshed per pass, a few minutes' worth: a catalogue filled in one go would
+# otherwise expire in one go, and the rest follows on the next syncs. Unknown artists are never capped.
+STALE_PER_PASS = 300
 
 # Users with a pass in flight (single worker, see AGENTS.md), and strong
 # references so running tasks are not collected.
 _running: set[str] = set()
+# Users whose pass looks up artists with no tags yet: only those passes make runs wait.
+_learning: set[str] = set()
 _background_tasks: set[asyncio.Task] = set()
 # Called with the user id once a pass ends: runs filtering by tags wait for it.
 after_pass: list[Callable[[str], None]] = []
@@ -42,9 +47,20 @@ def tags_progress_key(user_id: str) -> str:
 
 async def fill_tag_catalogue(db: AsyncSession, user_id: str, username: str) -> None:
     stale_before = datetime.now(UTC) - TAG_VALIDITY
-    artists = await get_artists_to_tag(db, user_id, stale_before)
+    found = await get_artists_to_tag(db, user_id, stale_before)
+    refreshed = set([artist for artist, unknown in found if not unknown][:STALE_PER_PASS])
+    artists = [artist for artist, unknown in found if unknown or artist in refreshed]
     if not artists:
         return
+    if len(artists) > len(refreshed):
+        _learning.add(user_id)
+    try:
+        await _look_up(db, artists, stale_before, user_id, username)
+    finally:
+        _learning.discard(user_id)
+
+
+async def _look_up(db: AsyncSession, artists: list[str], stale_before: datetime, user_id: str, username: str) -> None:
     started = time.monotonic()
     log_activity("tags", username, f"start, {len(artists)} artists to look up")
     failures = 0
@@ -88,6 +104,11 @@ async def _fill_in_background(user_id: str, username: str) -> None:
 
 def is_tagging(user_id: str) -> bool:
     return user_id in _running
+
+
+def is_learning_tags(user_id: str) -> bool:
+    """A pass is looking up artists with no tags yet. Refreshing expired ones keeps their old tags usable."""
+    return user_id in _learning
 
 
 def start_tag_catalogue(user_id: str, username: str) -> None:
