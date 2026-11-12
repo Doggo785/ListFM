@@ -43,7 +43,7 @@ Lire avant d'agir :
 - `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.
 - Un cron se lit toujours via `schemas.cron_trigger`, jamais `CronTrigger.from_crontab` : APScheduler compte les jours depuis lundi, donc `1` tomberait un mardi.
 - Le scheduler du sweep ne démarre qu'avec `ENABLE_SCHEDULER` ; le rate limiter vit en mémoire du process. L'app suppose un seul worker.
-- L'IP d'un visiteur vient de `TRUSTED_IP_HEADER` (`CF-Connecting-IP` derrière Cloudflare), sinon du socket : jamais de `X-Forwarded-For`, qu'un visiteur écrit lui-même. Le login vérifie `failed_login_limiter` (par compte) avant le mot de passe, sinon une réponse 200 trahirait un bon essai.
+- L'IP d'un visiteur vient de `TRUSTED_IP_HEADER` (`CF-Connecting-IP` derrière Cloudflare ; `X-Real-IP` par défaut dans `compose.yaml`, que le nginx fourni écrase), sinon du socket : jamais de `X-Forwarded-For`, qu'un visiteur écrit lui-même. Le login vérifie `failed_login_limiter` (par compte) avant le mot de passe, sinon une réponse 200 trahirait un bon essai.
 - S'inscrire n'ouvre aucune session : `/register` envoie un lien (`mail_links`, seul le hash est gardé, il sert une fois) et la session s'ouvre en le suivant (`/confirm`). Un login sur une adresse jamais confirmée répond 403. Une inscription non confirmée ne possède pas son adresse : une nouvelle inscription ou un login Google/Discord vérifié la reprend (`release_unconfirmed_email`), et la purge horaire l'efface après 7 jours. Les demandes de lien répondent la même chose que l'adresse existe ou non.
 - `services/mailer.py` envoie par le SMTP d'OVH. Sans `SMTP_HOST` il imprime le mail en local (pour suivre ses liens) et refuse en prod (`COOKIE_SECURE`) : un lien ouvre un compte. Les tests ne passent jamais par lui : `SENT_MAILS` et `mailed_token` dans `conftest.py`.
 - Garde-fous d'un serveur à la maison : `MAX_AUTOMATIONS` (20), un planning au plus une fois par jour (minute et heure fixes, `_validate_cron` et `isValidCron` jugent les cas de `frontend/src/lib/cron-cases.json`), Run now et Re-run limités par `manual_run_limiter` juste avant le run (un appel refusé ne compte pas), et `PLAYLISTS_KEPT` (50) playlists par automation, que `noRepeatPlaylists` ne peut pas dépasser.
@@ -62,6 +62,10 @@ Lire avant d'agir :
 - Un artiste, un album ou un morceau affiché ouvre sa page Last.fm (`LastfmLink`, `lastfmUrl`), et une page qui montre des données Last.fm porte `LastfmCredit` : les conditions de l'API le demandent (§2.7).
 - `views/Privacy.jsx` décrit ce que le site garde et à qui il parle : une nouvelle donnée stockée, un cookie, un service tiers ou un journal doit y être ajouté dans la même PR, sinon la page ment. Elle promet aussi qu'aucune IP n'est gardée (pas de journal d'accès sur disque en prod).
 - `DESIGN.md` décrit le monde visuel, écrit depuis le Créateur. Les écrans pas encore refaits ne sont pas une référence.
+
+## Déploiement
+
+`compose.yaml` à la racine, déployé par Coolify sur le serveur de l'owner : `backend/Dockerfile` (migre puis lance uvicorn, un seul worker, `--no-access-log`) et `frontend/Dockerfile` (build Vite servi par nginx, `frontend/nginx.conf`, qui relaie `/api`). Une nouvelle variable d'env va dans `compose.yaml`, `.env.example` et le tableau du README.
 
 ## Base de données locale
 

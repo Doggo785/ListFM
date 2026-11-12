@@ -1,0 +1,58 @@
+# ListFM in production: Postgres, the API, and nginx serving the site and proxying /api.
+# Put an HTTPS reverse proxy (Coolify, Caddy, Traefik...) in front of `web` (port 80) and fill the variables below.
+x-logs: &logs
+  # 3 files of 10 MB: the privacy page says the logs roll over by size.
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "3" }
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: listfm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: listfm
+    volumes:
+      - listfm-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "listfm"]
+      interval: 5s
+      retries: 10
+    <<: *logs
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql+asyncpg://listfm:${POSTGRES_PASSWORD}@db:5432/listfm
+      LASTFM_API_KEY: ${LASTFM_API_KEY:?}
+      LASTFM_API_SECRET: ${LASTFM_API_SECRET:?}
+      JWT_SECRET: ${JWT_SECRET:?}
+      FRONTEND_URL: ${PUBLIC_URL:?}
+      OAUTH_REDIRECT_BASE: ${PUBLIC_URL}
+      COOKIE_SECURE: "true"
+      ENABLE_SCHEDULER: "true"
+      TRUSTED_IP_HEADER: ${TRUSTED_IP_HEADER:-X-Real-IP}
+      SMTP_HOST: ${SMTP_HOST:?}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:?}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?}
+      MAIL_FROM: ${MAIL_FROM:?}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID:-}
+      DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET:-}
+    <<: *logs
+
+  web:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [backend]
+    <<: *logs
+
+volumes:
+  listfm-db:
