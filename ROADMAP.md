@@ -79,7 +79,7 @@ Chaque PR branche le ruban sur les vraies données de l'écran et supprime l'anc
 
 **Plan jusqu'à la v1.0.0** (bilan de fin de phase D et grilling du 2026-11-12). Pas de VPS : ListFM tourne chez l'owner, sur son serveur `DogPenthouse` (Coolify), publié par son tunnel Cloudflare sur `listfm.doggolabs.fr`.
 
-1. *(fait, #156)* Mises à jour Dependabot vérifiées en lot.
+1. *(fait, #156 et #164)* Mises à jour Dependabot vérifiées en lot.
 2. *(fait)* **Harden** :
    - le limiteur ne croit plus `X-Forwarded-For`, seulement l'en-tête du proxy (`TRUSTED_IP_HEADER`, `CF-Connecting-IP` en prod), et bloque un compte après 20 mauvais mots de passe en une heure, quelle que soit l'IP ;
    - garde-fous : 20 automations par compte, un planning au plus une fois par jour (une minute et une heure, même règle front et serveur, cas partagés dans `cron-cases.json`), Run now et Re-run une fois par minute, 50 playlists gardées par automation ;
@@ -87,8 +87,8 @@ Chaque PR branche le ruban sur les vraies données de l'écran et supprime l'anc
    - page Privacy à jour (3e cookie, Cloudflare, journaux, sauvegardes, contact `listfm@doggolabs.fr`), page 404, délai d'abandon dans `api.js`, `/docs` coupé, `/api/health` qui interroge la base, `PUT` dans CORS, `role` et `source_tracks` retirés, ruban reconstruit après une perte de contexte WebGL, CI en Python 3.14 et lancée chaque semaine.
 3. *(fait)* **Mail** : vérification de l'email avant d'utiliser le compte (un compte jamais vérifié est supprimé au bout de 7 jours) et mot de passe oublié (lien d'une heure, à usage unique, qui déconnecte partout, même réponse que l'email existe ou non), par le SMTP d'OVH (`ssl0.ovh.net`) depuis `listfm@doggolabs.fr`.
 4. *(fait)* **Deploy + README** : `compose.yaml` (Postgres, API qui migre au démarrage sans journal d'accès, nginx qui sert le site et `/api` sans journal d'accès, journaux Docker limités à 3 × 10 Mo), README refait dans la DA avec la doc d'auto-hébergement. À vérifier au déploiement privé : un aperçu ou un run de plus de 100 s serait coupé par Cloudflare (erreur 524).
-5. Points 20 à 29 du bilan : mesures sur vrai matériel (charge du ruban sur petit PC et téléphone, premier import réel, deck 3D pendant un import, parcours complet sur téléphone), menu compact sur téléphone, `impeccable polish` et `harden`, animations restantes (liste à demander à l'owner), `DESIGN.md` réécrit depuis le site fini, règle des sessions (se connecter déconnecte les autres appareils).
-6. Côté serveur, avec les instructions exactes données à l'owner : compte `listfm@doggolabs.fr` et DKIM chez OVH, MX/SPF/DKIM/DMARC chez Cloudflare, dump ListFM ajouté à `penthouse-backup.sh`, copie chiffrée `restic` vers Backblaze B2 (sans carte, plafond à 0 $, 7 nuits), Better Stack (ListFM, panel, node et battement de la sauvegarde) et Uptime Kuma, adresses de retour Google et Discord, secrets dans Coolify.
+5. *(fait)* Points 20 à 29 du bilan : mesures sur vrai matériel (charge du ruban sur petit PC et téléphone, premier import réel, deck 3D pendant un import, parcours complet sur téléphone), menu compact sur téléphone, `impeccable polish` et `harden`, animations restantes (liste à demander à l'owner), `DESIGN.md` réécrit depuis le site fini, règle des sessions (se connecter déconnecte les autres appareils).
+6. *(fait)* Côté serveur, avec les instructions exactes données à l'owner : compte `listfm@doggolabs.fr` et DKIM chez OVH, MX/SPF/DKIM/DMARC chez Cloudflare, dump ListFM ajouté à `penthouse-backup.sh`, copie chiffrée `restic` vers Backblaze B2 (sans carte, plafond à 0 $, 7 nuits), Better Stack (ListFM, panel, node et battement de la sauvegarde) et Uptime Kuma, adresses de retour Google et Discord, secrets dans Coolify.
 7. Tout à la fin : déploiement privé dans Coolify sur Tailscale, test complet, puis entrée publique dans le tunnel et `Release-As: 1.0.0`. La base de prod part de zéro.
 
 ## Plus tard (feu vert owner requis)
