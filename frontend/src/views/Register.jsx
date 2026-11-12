@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import AuthScreen, { FormError, MaskedField, ProviderButtons, TextField } from "@/components/elements/AuthScreen";
+import { ResendLink } from "@/components/elements/MailLinks";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { readableError } from "@/lib/api";
-
-const MIN_PASSWORD = 8;
+import { MIN_PASSWORD } from "@/lib/password";
 
 function problem(email, first, again) {
   if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) return "Enter a valid email address.";
@@ -20,8 +20,8 @@ export default function Register() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sentTo, setSentTo] = useState(null);
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     document.title = "Create an account - ListFM";
@@ -35,12 +35,30 @@ export default function Register() {
     setLoading(true);
     try {
       await register(email.trim(), password);
-      navigate("/link-lastfm");
+      setSentTo(email.trim().toLowerCase());
     } catch (err) {
       setError(readableError(err));
-      setLoading(false);
     }
+    setLoading(false);
   };
+
+  if (sentTo) {
+    return (
+      <AuthScreen title="Check your inbox">
+        <div className="flex flex-col gap-4">
+          <p className="text-pretty">
+            We sent a link to <span className="text-(--ember)">{sentTo}</span>. Open it to finish creating your account: it works for 24 hours.
+          </p>
+          <p className="text-(--text-muted)">Nothing yet? Look in your spam, or ask for a new one.</p>
+          <ResendLink email={sentTo} />
+          <p className="text-(--text-muted)">
+            Wrong address?{" "}
+            <button type="button" onClick={() => setSentTo(null)} className="text-(--text) underline underline-offset-4">Start again</button>
+          </p>
+        </div>
+      </AuthScreen>
+    );
+  }
 
   return (
     <AuthScreen title="Create an account">

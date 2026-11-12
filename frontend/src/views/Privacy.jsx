@@ -56,7 +56,7 @@ export default function Privacy() {
           <List>
             <li>No ads, no analytics, no tracking of any kind. Nothing about you is sold, rented or shared.</li>
             <li>No record of where or from what you sign in: neither your IP address nor your browser is kept with your session.</li>
-            <li>No emails you didn&apos;t ask for. ListFM sends none at all today.</li>
+            <li>No emails you didn&apos;t ask for: only the link to confirm your address, and the one to reset your password when you ask.</li>
           </List>
         </Part>
 
@@ -75,6 +75,7 @@ export default function Privacy() {
               so they see your IP address, as with any visit to Last.fm.
             </li>
             <li><span className="text-(--text)">Google or Discord</span>, only if you sign in with them: they know you used ListFM.</li>
+            <li><span className="text-(--text)">OVH</span>, whose mail service sends those two mails: it sees your address and what the mail says.</li>
             <li>
               <span className="text-(--text)">Cloudflare</span> carries the traffic between you and the server, so the server&apos;s home address stays hidden.
               It sees your IP address and the pages you load, and keeps its own logs under its{" "}
@@ -95,6 +96,10 @@ export default function Privacy() {
               playlists, sign-in links, email and name. What is left is an empty line with no personal data.
             </li>
             <li>Each automation keeps its 50 latest playlists. Older ones are erased as new ones arrive.</li>
+            <li>
+              A sign-up whose address is never confirmed is erased after 7 days. The link in a mail works once: for 24 hours to confirm an address,
+              for one hour to reset a password.
+            </li>
             <li>
               The server writes what it does in its logs, with your Last.fm username and the names of your automations. They roll over by size, so older lines
               disappear within days or weeks. They never hold your IP address.

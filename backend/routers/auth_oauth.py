@@ -17,6 +17,7 @@ from httpx_oauth.oauth2 import GetAccessTokenError
 from models.auth_provider import AuthProvider
 from models.user import User
 from repositories.automations import set_automations_lastfm_username
+from repositories.mail_links import create_mail_link
 from repositories.refresh_tokens import (
     create_refresh_token as store_refresh_token,
     revoke_all_user_refresh_tokens,
@@ -29,17 +30,22 @@ from repositories.users import (
     get_or_create_user_from_google,
     get_user_by_email,
     get_user_by_lastfm_username,
+    release_unconfirmed_email,
 )
 from routers.deps import get_current_active_user, set_auth_cookies
 from schemas import LinkLastfmRequest, LinkLastfmResponse, OAuthCompleteEmailRequest
 from services.auth import create_access_token, create_refresh_token
 from services.lastfm import get_session_username
+from services.mailer import confirm_address_mail, send_mail
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
     complete_email_limiter,
     link_lastfm_limiter,
+    mail_link_limiter,
     oauth_login_limiter,
     rate_limit,
+    rate_limit_by_key,
+    rate_limit_email_key,
 )
 from services.scrobble_sync import start_scrobble_sync
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -439,7 +445,9 @@ async def complete_oauth_email(
     rate_limit(request, complete_email_limiter)
     if current_user.email is not None:
         raise HTTPException(status_code=400, detail="Email already set")
+    rate_limit_by_key(mail_link_limiter, rate_limit_email_key(body.email))
 
+    await release_unconfirmed_email(db, body.email)
     existing = await get_user_by_email(db, body.email)
     if existing is not None and existing.id != current_user.id:
         raise HTTPException(
@@ -451,6 +459,7 @@ async def complete_oauth_email(
     current_user.email_verified = False
     current_user.updated_at = datetime.now(UTC)
     await db.flush()
+    token = await create_mail_link(db, current_user.id, "verify")
 
     try:
         await db.commit()
@@ -463,4 +472,6 @@ async def complete_oauth_email(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update email")
 
+    subject, mail = confirm_address_mail(f"{get_settings().frontend_url}/confirm-email?{urlencode({'token': token})}")
+    await send_mail(body.email, subject, mail)
     return {"detail": "Email updated"}

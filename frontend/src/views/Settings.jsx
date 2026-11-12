@@ -7,8 +7,8 @@ import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/contexts/AuthContext";
 import { connectLastfm, readableError, request } from "@/lib/api";
 import { guide } from "@/lib/guide";
+import { MIN_PASSWORD } from "@/lib/password";
 
-const MIN_PASSWORD = 8;
 const MAX_ZONES = 8;
 const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 

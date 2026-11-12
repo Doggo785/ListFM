@@ -10,11 +10,11 @@ from services.rate_limit import (
     register_limiter,
 )
 
-from .conftest import _cleanup_user, _unique_email
+from .conftest import SENT_MAILS, _cleanup_user, _unique_email, mailed_token, signup
 
 
 @pytest.mark.asyncio
-async def test_register_success(client: AsyncClient):
+async def test_register_mails_a_link_and_opens_nothing_until_it_is_followed(client: AsyncClient):
     email = _unique_email()
     try:
         resp = await client.post(
@@ -22,37 +22,35 @@ async def test_register_success(client: AsyncClient):
             json={"email": email, "password": "StrongP@ss1!", "display_name": "Test"},
         )
         assert resp.status_code == 201
-        data = resp.json()
-        assert data["token_type"] == "bearer"
-        # Cookies only: no token value in the body, both delivered as cookies.
-        assert "access_token" not in data
-        assert "refresh_token" not in data
-        assert "expires_in" in data
-        assert client.cookies.get("access_token") is not None
-        assert client.cookies.get("refresh_token") is not None
-        assert "password_hash" not in data
-        assert "password" not in data
+        assert "link" in resp.json()["detail"]
+        assert "password" not in resp.text
+        assert client.cookies.get("access_token") is None
+        to, subject, body = SENT_MAILS[-1]
+        assert to == email and "Confirm" in subject and "/confirm-email?token=" in body
+
+        login = await client.post("/api/auth/login", json={"email": email, "password": "StrongP@ss1!"})
+        assert login.status_code == 403
+
+        confirmed = await client.post("/api/auth/confirm", json={"token": mailed_token(email)})
+        assert confirmed.status_code == 200
+        auth_cookies = [h for h in confirmed.headers.get_list("set-cookie") if "access_token" in h or "refresh_token" in h]
+        assert len(auth_cookies) == 2 and all("httponly" in h.lower() for h in auth_cookies)
+        assert (await client.get("/api/auth/me")).json()["email"] == email
     finally:
         await _cleanup_user(email=email)
 
 
 @pytest.mark.asyncio
-async def test_register_sets_http_only_cookies(client: AsyncClient):
+async def test_a_link_works_once(client: AsyncClient):
     email = _unique_email()
     try:
-        resp = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
-        assert resp.status_code == 201
-        set_cookie_headers = resp.headers.get_list("set-cookie")
-        auth_cookies = [
-            h for h in set_cookie_headers
-            if "access_token" in h.lower() or "refresh_token" in h.lower()
-        ]
-        assert len(auth_cookies) >= 2, "Expected both access_token and refresh_token cookies"
-        for header in auth_cookies:
-            assert "httponly" in header.lower(), f"Cookie not httponly: {header}"
+        await client.post("/api/auth/register", json={"email": email, "password": "StrongP@ss1!"})
+        token = mailed_token(email)
+        assert (await client.post("/api/auth/confirm", json={"token": token})).status_code == 200
+        client.cookies.clear()
+        again = await client.post("/api/auth/confirm", json={"token": token})
+        assert again.status_code == 400
+        assert client.cookies.get("access_token") is None
     finally:
         await _cleanup_user(email=email)
 
@@ -61,12 +59,8 @@ async def test_register_sets_http_only_cookies(client: AsyncClient):
 async def test_register_duplicate_email(client: AsyncClient):
     email = _unique_email()
     try:
-        resp1 = await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
-        assert resp1.status_code == 201
-
+        assert (await signup(client, email)).status_code == 201
+        client.cookies.clear()
         resp2 = await client.post(
             "/api/auth/register",
             json={"email": email, "password": "StrongP@ss1!"},
@@ -80,15 +74,30 @@ async def test_register_duplicate_email(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_an_unconfirmed_sign_up_gives_its_address_to_whoever_opens_the_mailbox(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await client.post("/api/auth/register", json={"email": email, "password": "Squatter-123"})
+        squatter_link = mailed_token(email)
+        assert (await client.post("/api/auth/register", json={"email": email, "password": "Owner-12345"})).status_code == 201
+        assert (await client.post("/api/auth/confirm", json={"token": squatter_link})).status_code == 400
+        assert (await client.post("/api/auth/confirm", json={"token": mailed_token(email)})).status_code == 200
+        client.cookies.clear()
+        assert (await client.post("/api/auth/login", json={"email": email, "password": "Squatter-123"})).status_code == 401
+        assert (await client.post("/api/auth/login", json={"email": email, "password": "Owner-12345"})).status_code == 200
+    finally:
+        await _cleanup_user(email=email)
+
+
+@pytest.mark.asyncio
 async def test_register_email_limiter_429_same_email(client: AsyncClient):
     """The per-email register limiter throttles the 4th attempt for the same
     email even after the IP limiter is reset (attacker rotating IPs but
-    reusing the same victim email)."""
+    reusing the same victim email): each try mails the victim."""
     email_a = _unique_email()
     email_b = _unique_email()
     password = "StrongP@ss1!"
     try:
-        # Burn 3 requests on the same email (1 success + 2 duplicates).
         statuses = []
         for _ in range(3):
             resp = await client.post(
@@ -96,12 +105,12 @@ async def test_register_email_limiter_429_same_email(client: AsyncClient):
                 json={"email": email_a, "password": password},
             )
             statuses.append(resp.status_code)
-        assert statuses == [201, 409, 409]
+        # Unconfirmed, each one replaces the last.
+        assert statuses == [201, 201, 201]
 
         # Reset ONLY the IP limiter — simulates the attacker changing IP.
         register_limiter.reset()
 
-        # 4th attempt on the same email is throttled by the per-email limiter.
         resp4 = await client.post(
             "/api/auth/register",
             json={"email": email_a, "password": password},
@@ -159,11 +168,10 @@ async def test_register_email_normalized(client: AsyncClient):
     raw_email = f"  Test-{uuid.uuid4().hex[:8]}@Example.COM  "
     normalized = raw_email.strip().lower()
     try:
-        resp = await client.post(
-            "/api/auth/register",
-            json={"email": raw_email, "password": "StrongP@ss1!"},
-        )
+        resp = await client.post("/api/auth/register", json={"email": raw_email, "password": "StrongP@ss1!"})
         assert resp.status_code == 201
+        assert SENT_MAILS[-1][0] == normalized
+        assert (await client.post("/api/auth/confirm", json={"token": mailed_token(normalized)})).status_code == 200
 
         resp2 = await client.post(
             "/api/auth/register",

@@ -9,6 +9,7 @@ from .conftest import (
     _cleanup_user,
     _TestSessionLocal,
     _unique_email,
+    signup,
 )
 
 
@@ -16,10 +17,7 @@ from .conftest import (
 async def test_logout_success(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         resp = await client.post("/api/auth/logout")
         assert resp.status_code == 200
         assert resp.json()["detail"] == "Logged out"
@@ -31,10 +29,7 @@ async def test_logout_success(client: AsyncClient):
 async def test_logout_clears_cookies(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         resp = await client.post("/api/auth/logout")
         assert resp.status_code == 200
 
@@ -54,10 +49,7 @@ async def test_logout_clears_cookies(client: AsyncClient):
 async def test_logout_revokes_refresh_token(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         refresh_token = client.cookies.get("refresh_token")
         assert refresh_token is not None
 
@@ -79,10 +71,7 @@ async def test_logout_revokes_refresh_token(client: AsyncClient):
 async def test_logout_then_protected_route_fails(client: AsyncClient):
     email = _unique_email()
     try:
-        await client.post(
-            "/api/auth/register",
-            json={"email": email, "password": "StrongP@ss1!"},
-        )
+        await signup(client, email, "StrongP@ss1!")
         await client.post("/api/auth/logout")
         client.cookies.clear()
 

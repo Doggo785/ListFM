@@ -23,7 +23,13 @@ from services import scrobble_sync
 from services.lastfm import get_session_username
 from sqlalchemy import func, select
 
-from .conftest import _register_and_login, _TestSessionLocal, _unique_email, link_lastfm
+from .conftest import (
+    _register_and_login,
+    _TestSessionLocal,
+    _unique_email,
+    link_lastfm,
+    mailed_token,
+)
 
 PASSWORD = "StrongP@ss1!"  # What _register_and_login uses.
 
@@ -147,6 +153,7 @@ async def test_deleting_erases_listens_frees_the_email_and_stops_runs(client: As
     client.cookies.clear()
     again = await client.post("/api/auth/register", json={"email": email, "password": PASSWORD})
     assert again.status_code == 201
+    assert (await client.post("/api/auth/confirm", json={"token": mailed_token(email)})).status_code == 200
     assert (await link_lastfm(client, "leaving")).status_code == 200
 
 

@@ -26,7 +26,7 @@ describe("sceneFor", () => {
   });
 
   it("keeps one scene on every screen before the site, so moving between them is still", () => {
-    for (const path of ["/register", "/link-lastfm", "/auth/lastfm", "/auth/callback"]) expect(sceneFor(path)).toBe(sceneFor("/login"));
+    for (const path of ["/register", "/link-lastfm", "/auth/lastfm", "/auth/callback", "/confirm-email", "/forgot-password", "/reset-password"]) expect(sceneFor(path)).toBe(sceneFor("/login"));
   });
 
   it("shows the Creator's scene while editing an automation", () => {

@@ -48,7 +48,7 @@ export default function AuthCallback() {
     return (
       <AuthScreen title="One more thing">
         <form onSubmit={submit} noValidate className="flex flex-col gap-4">
-          <p className="text-(--text-muted)">Discord did not share an email address. Enter one to finish your account.</p>
+          <p className="text-(--text-muted)">Discord did not share an email address. Enter one to finish your account: we&apos;ll mail you a link to confirm it.</p>
           <TextField id="oauth-email" label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={saving} />
           <FormError>{error}</FormError>
           <Button type="submit" disabled={saving}>{saving ? "Saving" : "Continue"}</Button>

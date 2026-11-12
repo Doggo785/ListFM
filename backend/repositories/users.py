@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 from models.auth_provider import AuthProvider
+from models.mail_link import MailLink
 from models.refresh_token import RefreshToken
 from models.user import User
 from schemas import UserCreate, UserUpdate
@@ -136,6 +137,9 @@ async def _get_or_create_user_from_provider(
         return existing, False
 
     if email:
+        if email_verified:
+            # The provider vouches for the mailbox: an unconfirmed sign-up can't keep the address from its owner.
+            await release_unconfirmed_email(db, email)
         result = await db.execute(
             select(User).where(
                 func.lower(User.email) == email.lower(),
@@ -234,6 +238,7 @@ async def delete_user(db: AsyncSession, user_id: str) -> bool:
         return False
     await db.execute(delete(AuthProvider).where(AuthProvider.user_id == user_id))
     await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
+    await db.execute(delete(MailLink).where(MailLink.user_id == user_id))
     user.email = None
     user.password_hash = None
     user.display_name = None
@@ -241,3 +246,48 @@ async def delete_user(db: AsyncSession, user_id: str) -> bool:
     user.deleted_at = datetime.now(UTC)
     await db.flush()
     return True
+
+
+# Never confirmed and nothing but a password: no session ever opened, so no data either.
+def _unconfirmed_signups():
+    other_sign_in = select(AuthProvider.id).where(AuthProvider.user_id == User.id, AuthProvider.provider != "email").exists()
+    return select(User.id).where(
+        User.email_verified.is_(False),
+        User.password_hash.is_not(None),
+        User.deleted_at.is_(None),
+        ~other_sign_in,
+    )
+
+
+async def _erase_users(db: AsyncSession, ids: list[str]) -> None:
+    if not ids:
+        return
+    for model in (AuthProvider, RefreshToken, MailLink):
+        await db.execute(delete(model).where(model.user_id.in_(ids)))
+    await db.execute(delete(User).where(User.id.in_(ids)))
+
+
+async def release_unconfirmed_email(db: AsyncSession, email: str) -> None:
+    """Let whoever owns an address take it: an unconfirmed sign-up holding it goes, another account loses it.
+
+    Caller is responsible for committing the session.
+    """
+    holder = await get_user_by_email(db, email)
+    if holder is None or holder.email_verified:
+        return
+    if (await db.execute(_unconfirmed_signups().where(User.id == holder.id))).first():
+        await _erase_users(db, [holder.id])
+    else:
+        holder.email = None
+    await db.flush()
+
+
+async def purge_unconfirmed_signups(db: AsyncSession, older_than: timedelta) -> int:
+    """Erase the sign-ups nobody confirmed in time, which frees their addresses. Returns how many went.
+
+    Caller is responsible for committing the session.
+    """
+    cutoff = datetime.now(UTC) - older_than
+    ids = list((await db.execute(_unconfirmed_signups().where(User.created_at < cutoff))).scalars())
+    await _erase_users(db, ids)
+    return len(ids)

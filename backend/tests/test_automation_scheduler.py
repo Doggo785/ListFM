@@ -37,15 +37,13 @@ from .conftest import (
     _TestSessionLocal,
     _unique_email,
     link_lastfm,
+    signup,
 )
 
 
 async def _register_login_link(client: AsyncClient, email: str) -> None:
     """Register, log in, and link a Last.fm account."""
-    reg = await client.post(
-        "/api/auth/register",
-        json={"email": email, "password": "StrongP@ss1!"},
-    )
+    reg = await signup(client, email, "StrongP@ss1!")
     assert reg.status_code == 201
     client.cookies.clear()
     login = await client.post(
@@ -322,10 +320,7 @@ async def test_history_endpoint_404_unknown_or_foreign(client: AsyncClient):
         async with AsyncClient(
             transport=ASGITransport(app=client._transport.app), base_url="http://test"
         ) as fresh:
-            reg = await fresh.post(
-                "/api/auth/register",
-                json={"email": other_email, "password": "StrongP@ss1!"},
-            )
+            reg = await signup(fresh, other_email, "StrongP@ss1!")
             assert reg.status_code == 201
             resp = await fresh.get(f"/api/automations/{automation_id}/history")
             assert resp.status_code == 404
@@ -461,10 +456,7 @@ async def test_run_now_404_unknown_or_foreign(client: AsyncClient):
         async with AsyncClient(
             transport=ASGITransport(app=client._transport.app), base_url="http://test"
         ) as fresh:
-            reg = await fresh.post(
-                "/api/auth/register",
-                json={"email": other_email, "password": "StrongP@ss1!"},
-            )
+            reg = await signup(fresh, other_email, "StrongP@ss1!")
             assert reg.status_code == 201
             resp = await fresh.post(f"/api/automations/{automation_id}/run")
             assert resp.status_code == 404
@@ -528,10 +520,7 @@ async def test_playlist_tracks_endpoint_404_foreign(client: AsyncClient):
         async with AsyncClient(
             transport=ASGITransport(app=client._transport.app), base_url="http://test"
         ) as fresh:
-            reg = await fresh.post(
-                "/api/auth/register",
-                json={"email": other_email, "password": "StrongP@ss1!"},
-            )
+            reg = await signup(fresh, other_email, "StrongP@ss1!")
             assert reg.status_code == 201
             link = await link_lastfm(fresh, "other_user")
             assert link.status_code == 200

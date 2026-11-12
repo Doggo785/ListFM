@@ -394,11 +394,11 @@ async def test_google_callback_existing_user_unverified_email_blocked(client: As
 
 
 @pytest.mark.asyncio
-async def test_google_verified_email_never_binds_to_unverified_local_account(client: AsyncClient):
-    """A squatter's unverified local account must not absorb the real owner's Google login."""
+async def test_a_verified_google_login_takes_the_address_back_from_an_unconfirmed_sign_up(client: AsyncClient):
+    """A squatter's unconfirmed sign-up must neither absorb the owner's Google login nor block it."""
     email = _unique_email()
     try:
-        await _register_and_login(client, email)
+        await client.post("/api/auth/register", json={"email": email, "password": "Squatter-123"})
 
         with (
             patch.object(
@@ -420,16 +420,12 @@ async def test_google_verified_email_never_binds_to_unverified_local_account(cli
                 cookies={"oauth_state": "fakestate"},
             )
 
-        assert resp.status_code == 409
-        assert "access_token" not in resp.cookies
+        assert resp.status_code == 302
         async with _TestSessionLocal() as db:
-            result = await db.execute(
-                select(AuthProvider).where(
-                    AuthProvider.provider == "google",
-                    AuthProvider.provider_user_id == "google_owner_456",
-                )
-            )
-            assert result.scalar_one_or_none() is None
+            owner = (await db.execute(select(User).where(User.email == email))).scalar_one()
+            assert owner.password_hash is None and owner.email_verified is True
+            linked = await db.execute(select(AuthProvider).where(AuthProvider.user_id == owner.id, AuthProvider.provider == "google"))
+            assert linked.scalar_one_or_none() is not None
     finally:
         await _cleanup_user(email=email)
 

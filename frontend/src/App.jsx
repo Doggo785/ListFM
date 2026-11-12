@@ -36,8 +36,11 @@ const Settings = page(() => import("./views/Settings"));
 const LastfmReturn = page(() => import("./views/LastfmReturn"));
 const Privacy = page(() => import("./views/Privacy"));
 const NotFound = page(() => import("./views/NotFound"));
+const ConfirmEmail = page(() => import("./views/ConfirmEmail"));
+const ForgotPassword = page(() => import("./views/ForgotPassword"));
+const ResetPassword = page(() => import("./views/ResetPassword"));
 
-const NO_NAV_PATHS = ["/", "/privacy", "/login", "/register", "/auth/callback", "/auth/lastfm", "/link-lastfm"];
+const NO_NAV_PATHS = ["/", "/privacy", "/login", "/register", "/confirm-email", "/forgot-password", "/reset-password", "/auth/callback", "/auth/lastfm", "/link-lastfm"];
 
 function App() {
   const location = useLocation();
@@ -142,6 +145,9 @@ function App() {
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/confirm-email" element={<ConfirmEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route
                 path="/link-lastfm"
