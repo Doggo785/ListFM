@@ -85,7 +85,7 @@ Each PR wires the ribbon to the screen's real data and deletes the old code it r
 4. *(done)* **Deploy + README**: `compose.yaml` (Postgres, an API that migrates at start without an access log, nginx serving the site and `/api` without an access log, Docker logs capped at 3 × 10 MB), README rebuilt in the art direction with the self-hosting guide. To check at the private deploy: a preview or run longer than 100 s would be cut by Cloudflare (error 524).
 5. *(done)* Real-hardware measures (ribbon load on a small PC and a phone, a real first import, the 3D deck during an import, the full journey on a phone), compact phone menu, `impeccable polish` and `harden`, remaining animations, `DESIGN.md` rewritten from the finished site, session rule (signing in signs out other devices).
 6. *(done)* Server side: mail domain (SPF, DKIM, DMARC), backups with an encrypted offsite copy, monitoring, Google and Discord redirect URIs, secrets.
-7. At the very end: a private deploy, a full test, then the public address and `Release-As: 1.0.0`. The production database starts empty.
+7. *(done, 2026-11-12)* A private deploy, a full test, then the public address (https://listfm.doggolabs.fr) and `Release-As: 1.0.0`. The production database started empty.
 
 ## Later (owner's go-ahead required)
 
