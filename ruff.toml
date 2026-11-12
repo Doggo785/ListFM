@@ -10,7 +10,7 @@
 # The CI gate lands only after the manual triage of the 38 remaining
 # findings (plan Phase 3), so dev stays green in the meantime.
 
-target-version = "py312"
+target-version = "py314"
 
 [lint]
 # B008: a function call in an argument default is the FastAPI idiom

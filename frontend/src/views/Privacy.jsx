@@ -2,9 +2,9 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 // What this page says must stay true of the code: change one, change the other (AGENTS.md).
-const UPDATED = "November 10, 2026";
+const UPDATED = "November 12, 2026";
 const PUBLISHER = "Stéphane Plathey";
-const CONTACT = "stephane.plathey@proton.me";
+const CONTACT = "listfm@doggolabs.fr";
 const REPOSITORY = "https://github.com/Doggo785/ListFM";
 
 const link = "text-(--text) underline underline-offset-4 hover:text-(--ember)";
@@ -62,7 +62,8 @@ export default function Privacy() {
 
         <Part title="Cookies">
           <p>
-            Two cookies keep you signed in: one lasts 30 minutes, the other 7 days. They are needed for the site to work, which is why no cookie banner asks you about them.
+            Two cookies keep you signed in: one lasts 30 minutes, the other 7 days. A third lives a few minutes while you sign in with Google or Discord, or link Last.fm,
+            to check that the answer comes from the sign-in you started. They are needed for the site to work, which is why no cookie banner asks you about them.
             Your browser also remembers where you are in the newcomer&apos;s guide. That&apos;s all.
           </p>
         </Part>
@@ -75,18 +76,34 @@ export default function Privacy() {
             </li>
             <li><span className="text-(--text)">Google or Discord</span>, only if you sign in with them: they know you used ListFM.</li>
             <li>
+              <span className="text-(--text)">Cloudflare</span> carries the traffic between you and the server, so the server&apos;s home address stays hidden.
+              It sees your IP address and the pages you load, and keeps its own logs under its{" "}
+              <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer" className={link}>privacy policy</a>. It stores none of your ListFM data.
+            </li>
+            <li>
               The name you type to try ListFM on the home page goes to Last.fm to fetch that listener&apos;s history.
               ListFM holds it in memory for one hour and never writes it down.
             </li>
           </List>
-          <p>Your data stays on ListFM&apos;s server in France. No hosting company stands in between.</p>
+          <p>Your data is stored on ListFM&apos;s own server, at home in France. The only copy elsewhere is the encrypted backup below.</p>
         </Part>
 
         <Part title="How long it stays">
-          <p>
-            As long as your account exists. Delete your account in Settings and everything goes at once: your listens, automations, runs, playlists, sign-in links, email and name.
-            What is left is an empty line with no personal data.
-          </p>
+          <List>
+            <li>
+              Your data stays as long as your account exists. Delete your account in Settings and everything goes at once: your listens, automations, runs,
+              playlists, sign-in links, email and name. What is left is an empty line with no personal data.
+            </li>
+            <li>Each automation keeps its 50 latest playlists. Older ones are erased as new ones arrive.</li>
+            <li>
+              The server writes what it does in its logs, with your Last.fm username and the names of your automations. They roll over by size, so older lines
+              disappear within days or weeks. They never hold your IP address.
+            </li>
+            <li>
+              The database is backed up every night and the copies are kept up to five weeks, so a deleted account leaves the backups within five weeks too.
+              One copy goes to Backblaze, encrypted before it leaves: they store it but cannot read it.
+            </li>
+          </List>
         </Part>
 
         <Part title="Your rights">

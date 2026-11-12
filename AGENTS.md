@@ -43,11 +43,13 @@ Lire avant d'agir :
 - `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.
 - Un cron se lit toujours via `schemas.cron_trigger`, jamais `CronTrigger.from_crontab` : APScheduler compte les jours depuis lundi, donc `1` tomberait un mardi.
 - Le scheduler du sweep ne démarre qu'avec `ENABLE_SCHEDULER` ; le rate limiter vit en mémoire du process. L'app suppose un seul worker.
+- L'IP d'un visiteur vient de `TRUSTED_IP_HEADER` (`CF-Connecting-IP` derrière Cloudflare), sinon du socket : jamais de `X-Forwarded-For`, qu'un visiteur écrit lui-même. Le login vérifie `failed_login_limiter` (par compte) avant le mot de passe, sinon une réponse 200 trahirait un bon essai.
+- Garde-fous d'un serveur à la maison : `MAX_AUTOMATIONS` (20), un planning au plus une fois par jour (minute et heure fixes, `_validate_cron` et `isValidCron` jugent les cas de `frontend/src/lib/cron-cases.json`), Run now et Re-run limités par `manual_run_limiter` juste avant le run (un appel refusé ne compte pas), et `PLAYLISTS_KEPT` (50) playlists par automation, que `noRepeatPlaylists` ne peut pas dépasser.
 
 ## Pièges frontend
 
 - JSX sans TypeScript malgré la dépendance TS ; imports via l'alias `@/`.
-- `src/lib/api.js` est l'unique client HTTP (refresh JWT auto). Pas de second client.
+- `src/lib/api.js` est l'unique client HTTP (refresh JWT auto). Pas de second client. Chaque appel abandonne après 30 s ; l'aperçu, Run now et Re-run ont 10 min (ils donnent leur avancement sur un ticket).
 - Couleurs, typo et mouvement viennent des tokens de `src/index.css`, pas de valeur en dur dans un nouvel écran. La direction est dans `PRODUCT.md`.
 - Polices pixel : Tiny5 pour les titres et chiffres, Jersey 20 pour le texte, sans `letter-spacing` ni tailles hors de l'échelle `--text-*`, sinon les lettres deviennent floues. Aucune graisse n'existe : la hiérarchie passe par la taille et la couleur.
 - Le ruban de pixels (`lib/pixelRibbon.js`) se monte une seule fois dans `App` et n'a pas de raison d'être remonté. Tout bloc de contenu porte `data-quiet` (12 au plus à l'écran) : le ruban se dissout autour et ne passe jamais sous un texte, sauf le nom forgé du Dashboard. Une page qui porte `data-ribbon-hot` le fait chauffer (une génération en échec). Un élément vide `data-chain="412,120,50"` le couche droit dans cette bande, avec une largeur par étage de la chaîne.
@@ -55,6 +57,7 @@ Lire avant d'agir :
 - La page d'accueil a son propre canvas (`lib/landing/stage.js`) et le shader se tait sous elle (`silent` dans sa scène) : c'est la seule exception au ruban unique, parce que le fil doit pouvoir se défaire en pixels. Le spectacle suit le scroll avec un léger retard lissé, et quand le scroll s'arrête la page glisse jusqu'à l'étape suivante dans le sens du geste (`storyBeats`, `beatToSettle`), à l'envers aussi. Pas de `scroll-snap` CSS : il saccade avec les trackpads.
 - `lib/landing/demo.json` sort de `scripts/landing_demo.py`, à travers le vrai moteur, et il est public à vie une fois commité : l'owner le relit avant. Ne pas le modifier à la main.
 - Le guide des nouveaux arrivants (`components/elements/Guide.jsx`, étapes dans `lib/guide.js`) pointe les vrais écrans par `data-guide-step` et par des classes existantes (`.background-task`, `.poster__line`) : renommer l'une demande de changer l'étape. Pendant ses étapes, l'éditeur affiche ses champs vides (le brouillon garde ses valeurs par défaut dessous) et cache les recettes. La mascotte s'appelle « the thread » partout, comme sur la page d'accueil ; sur le Dashboard elle brûle en flamme.
+- Un artiste, un album ou un morceau affiché ouvre sa page Last.fm (`LastfmLink`, `lastfmUrl`), et une page qui montre des données Last.fm porte `LastfmCredit` : les conditions de l'API le demandent (§2.7).
 - `views/Privacy.jsx` décrit ce que le site garde et à qui il parle : une nouvelle donnée stockée, un cookie, un service tiers ou un journal doit y être ajouté dans la même PR, sinon la page ment. Elle promet aussi qu'aucune IP n'est gardée (pas de journal d'accès sur disque en prod).
 - `DESIGN.md` décrit le monde visuel, écrit depuis le Créateur. Les écrans pas encore refaits ne sont pas une référence.
 
