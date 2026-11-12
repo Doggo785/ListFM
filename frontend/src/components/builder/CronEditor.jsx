@@ -7,6 +7,7 @@ import {
   WEEKDAYS,
   describeCron,
   isValidCron,
+  runsTooOften,
   readSchedule,
   writeSchedule,
 } from "@/lib/automation-rules";
@@ -87,7 +88,11 @@ export default function CronEditor({ value, onChange, zone }) {
         )}
       </div>
       {frequency === "custom" && invalid && (
-        <p className="text-sm text-(--ember)">Use five parts: minute (0-59), hour (0-23), day (1-31), month (1-12), weekday (0-7).</p>
+        <p className="text-sm text-(--ember)">
+          {runsTooOften(value)
+            ? "An automation runs at most once a day: use one minute and one hour, like 0 8 * * *."
+            : "Use five parts: minute (0-59), hour (0-23), day (1-31), month (1-12), weekday (0-7)."}
+        </p>
       )}
       {description && (
         <p className="text-sm text-(--text-muted)">

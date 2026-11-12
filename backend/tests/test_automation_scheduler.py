@@ -27,6 +27,7 @@ from services.automation_runner import (
     run_due_automations,
     run_waiting,
 )
+from services.rate_limit import manual_run_limiter
 from sqlalchemy import delete, func, select
 
 from .conftest import (
@@ -378,6 +379,8 @@ async def test_a_run_during_the_first_load_waits_then_starts_by_itself(client: A
             assert waited.json()["status"] == "waiting"
             assert "listening history" in waited.json()["error_message"]
             # Asking again, or retrying the old failure, joins the same wait: one wait, one line.
+            assert (await client.post(f"/api/automations/{automation_id}/run")).status_code == 429
+            manual_run_limiter.reset()  # a minute later
             again = await client.post(f"/api/automations/{automation_id}/run")
             assert again.json()["id"] == waited.json()["id"]
             assert start.call_count == 2  # An interrupted first load starts again.

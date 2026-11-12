@@ -12,6 +12,7 @@ import { createShow, FUSE_SECONDS } from "@/lib/landing/show";
 import { createStage } from "@/lib/landing/stage";
 import { SCENE_NAMES, sceneStarts, storyBeats, storyScreens } from "@/lib/landing/story";
 import { loadAlbums } from "@/lib/playlistCover";
+import { LastfmCredit } from "@/components/ui/Lastfm";
 
 const NAME = "ListFM";
 const REPOSITORY = "https://github.com/Doggo785/ListFM";
@@ -173,6 +174,7 @@ function Page({ still }) {
           <span> · </span><Link to="/privacy" className="underline hover:text-(--ember)">Privacy</Link>
           <span> · ListFM isn't affiliated with Last.fm, Spotify or the other services named here.</span>
           <span> · The example is {demo.name}'s real history, as of {new Date(demo.asOf).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.</span>
+          <LastfmCredit quiet={false} className="pt-2" />
         </footer>
       </section>
     </main>

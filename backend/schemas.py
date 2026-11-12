@@ -39,6 +39,10 @@ def _named_weekdays(field: str) -> str:
     return ",".join(dict.fromkeys(days))
 
 
+# Playlists kept per automation: older ones are erased after each run, so no-repeat can't look further back.
+PLAYLISTS_KEPT = 50
+
+
 def cron_trigger(expr: str, timezone: tzinfo) -> CronTrigger:
     """The trigger of a standard crontab, whose weekday number means what cron says it means."""
     parts = expr.split()
@@ -48,13 +52,19 @@ def cron_trigger(expr: str, timezone: tzinfo) -> CronTrigger:
 
 
 def _validate_cron(v: str) -> str:
-    """Accept empty (unscheduled) or a crontab the scheduler can parse."""
+    """Accept empty (unscheduled) or a crontab the scheduler can parse that fires at most once a day.
+
+    The editor applies the same rule; frontend/src/lib/cron-cases.json holds the cases both must agree on.
+    """
     if not v:
         return v
     try:
         cron_trigger(v, UTC)
     except Exception as e:  # noqa: BLE001 -- any parse failure becomes ValueError for pydantic
         raise ValueError(f"Invalid cron expression: {e}")
+    minute, hour = v.split()[:2]
+    if not (minute.isdigit() and hour.isdigit()):
+        raise ValueError("An automation runs at most once a day: use one minute and one hour, like 0 8 * * *")
     return v
 
 
@@ -256,7 +266,7 @@ class AutomationOutput(BaseModel):
     # GLOSSARY: Limite. None = no limit.
     maxPerArtist: int | None = Field(default=None, ge=1, le=200)
     maxPerAlbum: int | None = Field(default=None, ge=1, le=200)
-    noRepeatPlaylists: int | None = Field(default=None, ge=1, le=50)
+    noRepeatPlaylists: int | None = Field(default=None, ge=1, le=PLAYLISTS_KEPT)
 
     @field_validator("maxSize")
     @classmethod

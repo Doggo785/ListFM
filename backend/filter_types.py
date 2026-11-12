@@ -132,7 +132,7 @@ class FilterGroup(BaseModel):
     id: str
     logic: FilterLogic = "AND"
     conditions: list[FilterCondition] = Field(default_factory=list)
-    groups: list["FilterGroup"] = Field(default_factory=list)
+    groups: list[FilterGroup] = Field(default_factory=list)
 
 
 _ = FilterGroup.model_rebuild()

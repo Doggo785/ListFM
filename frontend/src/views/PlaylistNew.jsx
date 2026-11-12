@@ -37,6 +37,8 @@ import {
 } from "@/lib/automation-rules";
 import { EDITOR_START, guide, guidesEditor, useGuide } from "@/lib/guide";
 import { useAuth } from "../contexts/AuthContext";
+import { lastfmUrl } from "@/lib/lastfm";
+import { LastfmCredit } from "@/components/ui/Lastfm";
 
 const CUSTOM = "custom";
 const WINDOW_CHOICES = [...WINDOW_OPTIONS, { value: CUSTOM, label: "Custom" }];
@@ -182,7 +184,7 @@ function Preview({ preview, draft, linked, saved }) {
                 style={{ "--row": Math.min(i, ROW_STAGGER_LIMIT) }}
               >
                 <a
-                  href={`https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.title)}`}
+                  href={lastfmUrl({ artist: track.artist, track: track.title })}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 py-2 pr-2 outline-none transition-colors duration-(--duration-quick) hover:bg-(--ember-1) focus-visible:bg-(--ember-1) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ember-9)"
@@ -421,6 +423,7 @@ function Creator({ saved }) {
 
           <aside data-guide-step="preview" data-quiet className="flex min-h-0 min-w-0 flex-col lg:sticky lg:top-4 lg:max-h-[calc(100vh-7rem)] lg:self-start">
             <Preview preview={preview} draft={draft} linked={linked} saved={Boolean(saved)} />
+            <LastfmCredit quiet={false} className="pt-3" />
           </aside>
         </div>
       </div>

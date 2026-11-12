@@ -10,6 +10,7 @@ import { LinkLastfmHint, LoadFailed } from "@/components/elements/PageStates";
 import { glide, glideArrived } from "@/lib/glide";
 import { describeCoverage, plural, shelvesOf } from "@/lib/playlists";
 import { FOCUS } from "@/lib/utils";
+import { LastfmCredit } from "@/components/ui/Lastfm";
 
 
 // Browser Back carries no state: this is how the shelves still find the playlist that was open.
@@ -122,6 +123,7 @@ export default function Playlists() {
         {!failed && shelves.map((shelf) => (
           <Shelf key={shelf.key} shelf={shelf} opening={opening} cameFrom={cameFrom} returnTo={returnTo} onOpen={openPlaylist} />
         ))}
+        {!failed && shelves.length > 0 && <LastfmCredit className="w-fit pt-8" />}
       </div>
     </main>
   );

@@ -18,10 +18,12 @@ from models.user import User
 from models.user_track import UserTrack
 from services.rate_limit import (
     complete_email_limiter,
+    failed_login_limiter,
     link_lastfm_limiter,
     listener_limiter,
     listener_total_limiter,
     login_limiter,
+    manual_run_limiter,
     oauth_login_limiter,
     refresh_limiter,
     register_email_limiter,
@@ -94,6 +96,8 @@ async def _cleanup_db():
         link_lastfm_limiter,
         oauth_login_limiter,
         complete_email_limiter,
+        failed_login_limiter,
+        manual_run_limiter,
     ):
         limiter.reset()
     async with _TestSessionLocal() as db:

@@ -18,7 +18,7 @@ osv_job()       { osv-scanner scan source -r . --format json --output "$LOGS/osv
                   python3 scripts/osv_gate.py "$LOGS/osv.json"; }
 ruff_job()      { uvx ruff@0.17.4 check backend; }
 # CI installs mypy alone (no project deps); mirror that, or results differ.
-mypy_job()      { uvx --python 3.12 mypy@2.3.1 backend --ignore-missing-imports; }
+mypy_job()      { uvx --python 3.14 mypy@2.3.1 backend --ignore-missing-imports; }
 backend_job()   { "$VENV/python" -m pytest backend/tests/ -q --cov=backend --cov-report=xml:coverage.xml &&
                   "$VENV/diff-cover" coverage.xml --compare-branch=origin/main --fail-under=80; }
 # shortcut: reuses existing node_modules instead of `npm ci`; run `npm ci` after lockfile changes.

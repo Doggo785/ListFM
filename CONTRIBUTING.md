@@ -4,7 +4,7 @@ This guide covers setup, workflow, and code style. Follow it for every change. T
 
 ## Setup
 
-You need Python 3.12, Node 20+, and Docker. Postgres runs in Docker in a container named listfm-db on port 5433.
+You need Python 3.14, Node 22.22+ or 24.15+, and Docker. Postgres runs in Docker in a container named listfm-db on port 5433.
 
 Create the backend venv from the repo root:
 

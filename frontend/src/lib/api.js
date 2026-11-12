@@ -16,21 +16,26 @@ export function setSessionExpiredHandler(handler) {
   _onSessionExpired = handler;
 }
 
-export async function request(path, options = {}) {
+// A stuck server must not leave a screen waiting forever.
+const TIMEOUT_MS = 30 * 1000;
+// A preview or a run reports its progress on a ticket, and can take minutes on a long history.
+const LONG_TIMEOUT_MS = 10 * 60 * 1000;
+
+export async function request(path, { timeoutMs = TIMEOUT_MS, ...options } = {}) {
   const url = `${API_BASE}${path}`;
+  const deadline = AbortSignal.timeout(timeoutMs);
   let res;
   try {
     res = await fetch(url, {
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       ...options,
+      signal: options.signal ? AbortSignal.any([options.signal, deadline]) : deadline,
     });
   } catch (err) {
-    if (err instanceof TypeError && err.message === "Failed to fetch") {
-      throw new Error(
-        "Unable to reach the server. Make sure the backend is running."
-      );
-    }
+    if (err?.name === "TimeoutError") throw new Error("ListFM is taking too long to answer. Try again in a moment.");
+    // fetch rejects with a TypeError when the network or the server is down, whatever the browser's wording.
+    if (err instanceof TypeError) throw new Error("Can't reach ListFM right now. Check your connection, then try again.");
     throw err;
   }
   if (res.status === 401 && path !== "/api/auth/refresh" && !options._retried) {
@@ -39,12 +44,13 @@ export async function request(path, options = {}) {
       refreshPromise = fetch(`${API_BASE}/api/auth/refresh`, {
         method: "POST",
         credentials: "include",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       }).finally(() => { isRefreshing = false; });
     }
     try {
       const refreshRes = await refreshPromise;
       if (refreshRes.ok) {
-        return request(path, { ...options, _retried: true });
+        return request(path, { ...options, timeoutMs, _retried: true });
       }
       _onSessionExpired?.();
     } catch {
@@ -108,6 +114,7 @@ export async function getListeningStory() {
 export async function previewAutomation(automation, progressToken, automationId) {
   return request("/api/automations/preview", {
     method: "POST",
+    timeoutMs: LONG_TIMEOUT_MS,
     body: JSON.stringify({
       automation,
       ...(progressToken && { progress_token: progressToken }),
@@ -156,6 +163,7 @@ export async function getAutomationHistory(id) {
 export async function runAutomationNow(id, progressToken) {
   return request(`/api/automations/${id}/run`, {
     method: "POST",
+    timeoutMs: LONG_TIMEOUT_MS,
     ...(progressToken ? { body: JSON.stringify({ progress_token: progressToken }) } : {}),
   });
 }
@@ -163,6 +171,7 @@ export async function runAutomationNow(id, progressToken) {
 export async function retryRun(id, historyId, progressToken) {
   return request(`/api/automations/${id}/history/${historyId}/retry`, {
     method: "POST",
+    timeoutMs: LONG_TIMEOUT_MS,
     body: JSON.stringify({ progress_token: progressToken }),
   });
 }

@@ -42,9 +42,13 @@ from services.automation_runner import (
     window_bounds,
 )
 from services.progress import store as progress_store
+from services.rate_limit import manual_run_limiter, rate_limit_by_key
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Each one runs on the owner's server: enough for anyone, not a farm.
+MAX_AUTOMATIONS = 20
 
 router = APIRouter(prefix="/api", tags=["automations"])
 
@@ -285,6 +289,7 @@ async def run_automation_now(
     (GET run-progress?token=); otherwise to the legacy run:{id} ticket.
     """
     await _lock_or_409(db, automation)
+    rate_limit_by_key(manual_run_limiter, f"run:{automation.id}")
     now = datetime.now(UTC)
     zone = await db.scalar(select(User.timezone).where(User.id == automation.user_id)) or "UTC"
     scheduled_for = (last_fire_time(automation.cron, now, zone) if automation.cron else None) or now
@@ -313,6 +318,8 @@ async def retry_failed_run(
         raise HTTPException(status_code=404, detail="Run not found")
     if failed.id != rows[0].id or failed.status != "failed":
         raise HTTPException(status_code=409, detail="Only the latest failed run can be retried")
+    # Its own key: re-running a run that just failed must not wait for the Run now that started it.
+    rate_limit_by_key(manual_run_limiter, f"retry:{automation.id}")
     return await _run_and_commit(db, automation, failed.scheduled_for, failed.attempt + 1, body)
 
 
@@ -323,6 +330,8 @@ async def create_new_automation(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if len(await get_automations(db, current_user.id)) >= MAX_AUTOMATIONS:
+        raise HTTPException(status_code=409, detail=f"You can keep up to {MAX_AUTOMATIONS} automations. Delete one to make room.")
     automation = await create_automation(db, current_user.id, username, data)
     try:
         await db.commit()

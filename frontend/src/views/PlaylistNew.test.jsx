@@ -89,7 +89,7 @@ describe("creator", () => {
     const container = await render();
     await wait(400);
     const link = container.querySelector("ol li a");
-    expect(link.getAttribute("href")).toBe("https://www.last.fm/music/Sigur%20R%C3%B3s/_/AC%2FDC%3F%20Song");
+    expect(link.getAttribute("href")).toBe("https://www.last.fm/music/Sigur+R%C3%B3s/_/AC%2FDC%3F+Song");
     expect(link.target).toBe("_blank");
     expect(link.rel).toBe("noopener noreferrer");
   });

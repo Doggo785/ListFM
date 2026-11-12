@@ -93,6 +93,7 @@ Local Postgres runs on port 5433. CI uses the standard 5432.
 | `JWT_SECRET` | Yes, min 32 chars | - |
 | `COOKIE_SECURE` | No, set `true` in production | `false` |
 | `ENABLE_SCHEDULER` | No | `false` |
+| `TRUSTED_IP_HEADER` | No, `CF-Connecting-IP` behind Cloudflare | empty (socket address) |
 | `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
 | `DISCORD_OAUTH_CLIENT_ID` / `DISCORD_OAUTH_CLIENT_SECRET` | No | empty (button hidden) |
 | `OAUTH_REDIRECT_BASE` | No | `http://localhost:8000` |
@@ -128,7 +129,7 @@ npm run lint
 
 ## Stack
 
-Backend: Python 3.12, FastAPI, Pydantic v2, PostgreSQL with asyncpg, Alembic for migrations. Frontend: React 19, Vite 8, Tailwind CSS 4, Radix UI, ESLint. CI runs on GitHub Actions: tests, lint, types, secret and dependency scans.
+Backend: Python 3.14, FastAPI, Pydantic v2, PostgreSQL with asyncpg, Alembic for migrations. Frontend: React 19, Vite 8, Tailwind CSS 4, Radix UI, ESLint. CI runs on GitHub Actions: tests, lint, types, secret and dependency scans.
 
 ## License
 

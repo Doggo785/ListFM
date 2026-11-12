@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import PixelNumber from "@/components/elements/PixelNumber";
 import { buttonVariants } from "@/components/ui/buttonVariants";
+import { LastfmLink } from "@/components/ui/Lastfm";
+import { lastfmUrl } from "@/lib/lastfm";
 import { describeRun, dayOf, RUN_TONES, timeOf } from "@/lib/runs";
 import { FOCUS } from "@/lib/utils";
 import AlbumArt from "./AlbumArt";
@@ -19,7 +21,15 @@ function Lead({ moment, complete }) {
     <p className="poster__lead">
       {moment.days ? `Last ${moment.days} days: ` : "All time: "}
       <span className="text-(--ember)">{listens(moment.plays)}</span>
-      {moment.runners_up.length > 0 && `, ahead of ${NAMES.format(moment.runners_up)}`}.
+      {moment.runners_up.length > 0 && (
+        <>
+          , ahead of{" "}
+          {NAMES.formatToParts(moment.runners_up).map((part, i) =>
+            part.type === "element" ? <LastfmLink key={i} artist={part.value}>{part.value}</LastfmLink> : part.value,
+          )}
+        </>
+      )}
+      .
     </p>
   );
 }
@@ -63,7 +73,13 @@ export default function Poster({ story, totals, runs, automations, username, lin
   return (
     <section className="poster">
       <div className="poster__name">
-        <ForgedName name={moment?.artist ?? username} reducedMotion={reducedMotion} />
+        {moment?.artist ? (
+          <a href={lastfmUrl({ artist: moment.artist })} target="_blank" rel="noopener noreferrer" aria-label={`${moment.artist}, opens on Last.fm in a new tab`} className={`block ${FOCUS}`}>
+            <ForgedName name={moment.artist} reducedMotion={reducedMotion} />
+          </a>
+        ) : (
+          <ForgedName name={username} reducedMotion={reducedMotion} />
+        )}
       </div>
       <div ref={lineRef} className="poster__line" aria-hidden="true" />
       <div className="poster__body">
@@ -76,9 +92,9 @@ export default function Poster({ story, totals, runs, automations, username, lin
                   <div className="poster__cover">
                     <AlbumArt url={album.cover_url} seed={album.title} eager small className="block aspect-square w-full object-cover" />
                   </div>
-                  <p className="truncate pt-2 text-xs">{album.title}</p>
+                  <p className="truncate pt-2 text-xs"><LastfmLink artist={album.artist} album={album.title}>{album.title}</LastfmLink></p>
                   <p className="flex gap-1 text-xs text-(--text-muted)">
-                    <span className="truncate">{album.artist}</span>
+                    <LastfmLink artist={album.artist} className="truncate">{album.artist}</LastfmLink>
                     {/* The line above the shelf says what this number counts. */}
                     <span className="shrink-0">· {count(album.plays)}<span className="sr-only"> {album.plays === 1 ? "listen" : "listens"}</span></span>
                   </p>

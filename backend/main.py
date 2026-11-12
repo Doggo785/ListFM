@@ -14,6 +14,7 @@ from routers.generated_playlists import router as generated_playlists_router
 from routers.public import router as public_router
 from routers.users import router as users_router
 from services.automation_runner import run_due_automations
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 # App loggers (pipeline, enrich cache, ...) propagate to root. Without this,
@@ -59,7 +60,8 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="ListFM", version="0.1.0", lifespan=lifespan)
+# No /docs, /redoc or /openapi.json: the API serves the site only, and a public map of it helps nobody else.
+app = FastAPI(title="ListFM", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,7 +69,7 @@ app.add_middleware(
     allow_credentials=True,
     # Explicit: the API only serves these methods, and the frontend only
     # ever sends Content-Type (auth travels in httpOnly cookies).
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
 
@@ -99,5 +101,8 @@ app.include_router(public_router)
 
 
 @app.get("/api/health")
-def health():
+async def health():
+    """For the uptime monitors: up only when the database answers too."""
+    async with engine.connect() as connection:
+        await connection.execute(text("SELECT 1"))
     return {"status": "ok"}

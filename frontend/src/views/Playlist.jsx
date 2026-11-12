@@ -14,6 +14,8 @@ import { glide, glideArrived } from "@/lib/glide";
 import { coverPng } from "@/lib/playlistCover";
 import { describeCoverage, describeMade, plural, tracksAsText } from "@/lib/playlists";
 import { FOCUS } from "@/lib/utils";
+import { lastfmUrl } from "@/lib/lastfm";
+import { LastfmCredit } from "@/components/ui/Lastfm";
 
 const COPIED_MS = 2000;
 // Reads a pasted list and fills a playlist on most streaming apps, which their APIs don't let ListFM do (see ROADMAP).
@@ -170,7 +172,7 @@ function Tracks({ tracks, failed, onRetry }) {
       {tracks.map((track, i) => (
         <li key={track.position} className="preview-row" style={{ "--row": Math.min(i, 14) }}>
           <a
-            href={`https://www.last.fm/music/${encodeURIComponent(track.artist)}/_/${encodeURIComponent(track.title)}`}
+            href={lastfmUrl({ artist: track.artist, track: track.title })}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 py-2 pr-2 outline-none transition-colors duration-(--duration-quick) hover:bg-(--ember-1) focus-visible:bg-(--ember-1) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--ember-9)"
@@ -289,6 +291,7 @@ export default function Playlist() {
           }} />
         </section>
       </div>
+      <LastfmCredit className="w-fit pt-8" />
     </main>
   );
 }

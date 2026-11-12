@@ -326,31 +326,38 @@ function emberOrigin(track, wander) {
 
 /**
  * Starts the ribbon on a canvas and returns its controls. Without WebGL2 the page simply has no
- * ribbon: nothing depends on it.
- * shortcut: a lost GL context stays blank until the next page load, rebuild it if that shows up.
+ * ribbon: nothing depends on it. A lost GL context (a phone switching apps) is rebuilt when the
+ * browser hands it back.
  */
 export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion = false }) {
   const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
   if (!gl) return INERT;
   let main;
   let emberLayer;
-  try {
+  let uniforms;
+  let seriesTexture;
+  let shownSeries = null;
+  // Every GL object, made again from nothing: a restored context keeps none of the old ones.
+  const build = () => {
     main = compile(gl);
     emberLayer = createEmberLayer(gl, [8, 7, 6, 4, 2, 1].map((i) => hexToRgb(palette[i])));
     gl.useProgram(main.program);
     gl.bindVertexArray(main.vao);
+    ({ uniforms } = main);
+    gl.uniform3fv(uniforms.uHot, [...hexToRgb(palette[7]), ...hexToRgb(palette[8])]);
+    gl.uniform3fv(uniforms.uInk, hexToRgb(ink));
+    seriesTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, seriesTexture);
+    gl.uniform1i(uniforms.uSeries, 0);
+    shownSeries = null;
+  };
+  try {
+    build();
   } catch (error) {
     console.error("Ribbon shader failed to compile", error);
     return INERT;
   }
-  const { uniforms } = main;
-  gl.uniform3fv(uniforms.uHot, [...hexToRgb(palette[7]), ...hexToRgb(palette[8])]);
-  gl.uniform3fv(uniforms.uInk, hexToRgb(ink));
-  const seriesTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, seriesTexture);
-  gl.uniform1i(uniforms.uSeries, 0);
   let embers = [];
-  let shownSeries = null;
   let lastTrack = null;
 
   const target = { cols: Array(COLUMNS).fill(0.08), ramp: rampFor(0, palette), angle: 0, off: -0.3, px: 0.5, py: 0.5, pull: 0, calm: 0, edge: SOFT_EDGE, track: 0 };
@@ -540,6 +547,24 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
     frameId = window.requestAnimationFrame(frame);
   };
   frameId = window.requestAnimationFrame(frame);
+  // Without preventDefault the browser never hands the context back.
+  const onLost = (e) => {
+    e.preventDefault();
+    window.cancelAnimationFrame(frameId);
+  };
+  const onRestored = () => {
+    try {
+      build();
+    } catch (error) {
+      console.error("Ribbon shader failed to compile", error);
+      return;
+    }
+    resize();
+    last = performance.now();
+    frameId = window.requestAnimationFrame(frame);
+  };
+  canvas.addEventListener("webglcontextlost", onLost);
+  canvas.addEventListener("webglcontextrestored", onRestored);
   ribbonStage.alive = true;
   ribbonStage.burst = (x, y) => {
     if (!reducedMotion) embers.push(burstEmber(x, y));
@@ -563,6 +588,8 @@ export function createRibbon(canvas, { palette, ink = palette[0], reducedMotion 
       ribbonStage.burst = () => {};
       window.cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
+      canvas.removeEventListener("webglcontextlost", onLost);
+      canvas.removeEventListener("webglcontextrestored", onRestored);
       document.removeEventListener("pointermove", onPointer);
       document.removeEventListener("focusin", onFocus);
     },

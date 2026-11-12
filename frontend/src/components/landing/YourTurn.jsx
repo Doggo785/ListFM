@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/buttonVariants";
 import { Input } from "@/components/ui/input";
 import { getListenerGlimpse, readableError } from "@/lib/api";
+import { lastfmUrl } from "@/lib/lastfm";
 import { FUSE_SECONDS } from "@/lib/landing/show";
+import { FOCUS } from "@/lib/utils";
 
 function Glimpse({ glimpse, reducedMotion, headX, onSpark }) {
   if (!glimpse.artist && glimpse.tracks.length === 0) {
@@ -16,9 +18,16 @@ function Glimpse({ glimpse, reducedMotion, headX, onSpark }) {
   return (
     <>
       {glimpse.artist && (
-        <div data-show="turn-name" className="landing__name">
+        <a
+          data-show="turn-name"
+          href={lastfmUrl({ artist: glimpse.artist })}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${glimpse.artist}, opens on Last.fm in a new tab`}
+          className={`landing__name ${FOCUS}`}
+        >
           <ForgedName name={glimpse.artist} quiet reducedMotion={reducedMotion} relights={false} headX={headX} sweepSeconds={FUSE_SECONDS} onSpark={onSpark} />
-        </div>
+        </a>
       )}
       <div data-show="turn-line" className="landing__line" aria-hidden="true" />
       <div data-quiet className="text-base">

@@ -176,7 +176,7 @@ async def test_preview_success_returns_tracks_and_total(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_preview_applies_server_side_filters(client: AsyncClient):
     """A successful preview applies the filter tree server-side and reports
-    before_filter/source_tracks alongside the existing {tracks, total} keys."""
+    before_filter alongside the existing {tracks, total} keys."""
     email = _unique_email()
     try:
         await _register_login_link(client, email)
@@ -219,7 +219,7 @@ async def test_preview_applies_server_side_filters(client: AsyncClient):
         assert data["tracks"] == [tracks[1]]
         assert data["total"] == 1
         assert data["before_filter"] == 2
-        assert data["source_tracks"] == tracks
+        assert "source_tracks" not in data  # The editor shows the result only.
     finally:
         await _cleanup_user(email=email)
 

@@ -18,9 +18,11 @@ import {
   describeCron,
   describePeriod,
   isValidCron,
+  runsTooOften,
   usesTagFilter,
   windowOption,
 } from "@/lib/automation-rules";
+import cronCases from "@/lib/cron-cases.json";
 
 describe("automation summaries", () => {
   it("names the sort and the window", () => {
@@ -90,7 +92,7 @@ describe("schedule", () => {
   });
 
   it("leaves anything else to the custom box, unaltered", () => {
-    for (const cron of ["0 8 * * 1-5", "*/5 * * * *", "0 8 1,15 * *", "0 8 31 * *"]) {
+    for (const cron of ["0 8 * * 1-5", "0 8 1-7 * *", "0 8 1,15 * *", "0 8 31 * *"]) {
       expect(readSchedule(cron).frequency).toBe("custom");
       expect(describeCron(cron)).toBe(cron);
     }
@@ -152,12 +154,21 @@ describe("describePeriod", () => {
 });
 
 describe("isValidCron", () => {
-  it("catches what the server would refuse, and leaves names to it", () => {
-    for (const cron of ["0 0 1 3,6,9,12 *", "*/5 * * * *", "0 8 * * 1-5", "0 8 * * 7", "0 0 last * *", "0 8 * * mon-fri", "0-30/5 8 1,15 * *"]) {
-      expect(isValidCron(cron), cron).toBe(true);
-    }
-    for (const cron of ["0 0", "99 0 * * *", "0 24 * * *", "0 0 0 * *", "0 0 * 13 *", "0 0 * * 8", "*/0 * * * *", "0 0 * * 1-9", "@ * * * *", "", null]) {
-      expect(isValidCron(cron), String(cron)).toBe(false);
-    }
+  it("judges schedules as the server does", () => {
+    for (const cron of cronCases.valid) expect(isValidCron(cron), cron).toBe(true);
+    for (const cron of cronCases.invalid) expect(isValidCron(cron), cron).toBe(false);
+  });
+
+  it("leaves names to the server, and refuses no value", () => {
+    expect(isValidCron("0 8 * * xyz")).toBe(true);
+    expect(isValidCron("")).toBe(false);
+    expect(isValidCron(null)).toBe(false);
+  });
+
+  it("tells a schedule that runs too often from a malformed one", () => {
+    expect(runsTooOften("*/5 * * * *")).toBe(true);
+    expect(runsTooOften("0 8,20 * * *")).toBe(true);
+    expect(runsTooOften("0 24 * * *")).toBe(false);
+    expect(runsTooOften("0 8 * * *")).toBe(false);
   });
 });

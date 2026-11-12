@@ -48,3 +48,19 @@ describe("error messages", () => {
     await expect(request("/x")).rejects.toThrow("API 422: Invalid cron expression: x Too long");
   });
 });
+
+describe("when the server can't answer", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("says so in words a person can act on", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("NetworkError when attempting to fetch resource."));
+    await expect(request("/api/automations")).rejects.toThrow("Can't reach ListFM right now. Check your connection, then try again.");
+  });
+
+  it("gives up after a while instead of waiting forever", async () => {
+    globalThis.fetch = vi.fn((url, { signal }) => new Promise((resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason));
+    }));
+    await expect(request("/api/automations", { timeoutMs: 20 })).rejects.toThrow("ListFM is taking too long to answer. Try again in a moment.");
+  });
+});
