@@ -210,12 +210,12 @@ async def test_sync_prints_a_line_per_page(activity_lines):
     await _sync(user_id, FakeLastfm([_listen(n) for n in range(3)], loved=[("Song 1", "Artist")]), page_size=2)
     lines = activity_lines()
     assert lines[:4] == [
-        "sync   someone   début, 2 pages",
-        "sync   someone   page 1/2  +2 écoutes",
-        "sync   someone   page 2/2  +1 écoutes",
-        "sync   someone   1 morceaux aimés",
+        "sync   someone   start, 2 pages",
+        "sync   someone   page 1/2  +2 listens",
+        "sync   someone   page 2/2  +1 listens",
+        "sync   someone   1 loved tracks",
     ]
-    assert lines[4].startswith("sync   someone   terminé  ")
+    assert lines[4].startswith("sync   someone   done  ")
 
 
 @pytest.mark.asyncio

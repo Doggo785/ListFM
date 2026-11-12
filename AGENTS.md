@@ -1,72 +1,72 @@
 # ListFM
 
-Machine à playlists auto depuis Last.fm : FastAPI + async SQLAlchemy + Postgres, React 19 + Vite en JSX.
+A machine that makes playlists automatically from Last.fm: FastAPI + async SQLAlchemy + Postgres, React 19 + Vite in JSX.
 
-Lire avant d'agir :
-- `VISION.md` : le cap et les non-objectifs. Une feature hors cap se demande à l'owner.
-- `ROADMAP.md` : le statut, et la seule liste de ce qu'on fait ensuite.
-- `CONSTRAINTS.md` avant d'écrire du code : la barre qualité, les checks, la règle de merge.
-- `CONTRIBUTING.md` : setup, workflow de branche, conventions de code.
-- `GLOSSARY.md` : le vocabulaire du domaine ; `docs/adr/` : les décisions structurantes et leur pourquoi.
+Read before acting:
+- `VISION.md`: the direction and the non-goals. A feature outside them is asked of the owner.
+- `ROADMAP.md`: the status, and the only list of what comes next.
+- `CONSTRAINTS.md` before writing code: the quality bar, the checks, the merge rule.
+- `CONTRIBUTING.md`: setup, branch workflow, code conventions.
+- `GLOSSARY.md`: the domain vocabulary; `docs/adr/`: the structural decisions and their why.
 
-## Travailler avec l'owner
+## Working with the owner
 
-- Parler en français à l'owner. Expliquer un point technique avec une image vulgarisée d'une phrase.
-- Le moins de PR possible : regrouper les changements qui peuvent aller ensemble et limiter les pushs, car chaque CI et chaque merge coûtent du temps. Commits Conventional Commits atomiques dans la PR.
-- Commits et PR en anglais : titre `type(scope): summary`, corps `Summary` / `Changes` / `Test plan` comme les PR mergées. Aucun lien de session ni ligne d'attribution.
-- `scripts/ci-local.sh` passe vert avant chaque push, même pour une PR de docs.
-- Merge seulement sur « go merge #N » citant la PR (détail dans `CONSTRAINTS.md`).
-- Suivre les jobs GitHub Actions d'une PR et `Codacy Static Code Analysis` : l'attendre, et regarder ses alertes et ses duplications (`newIssues` et `deltaClonesCount`) avant d'annoncer une PR prête. Une alerte se corrige ou se montre à l'owner, jamais en silence.
+- Speak French with the owner. Explain a technical point with a one-sentence everyday picture.
+- As few PRs as possible: group changes that can go together and limit pushes, since every CI run and every merge costs time. Atomic Conventional Commits inside the PR.
+- Everything that lands on GitHub is in English: code, comments, docs, commits, PRs, console lines. Commit and PR titles `type(scope): summary`, PR body `Summary` / `Changes` / `Test plan` like the merged PRs. No session link or attribution line.
+- `scripts/ci-local.sh` passes green before every push, even for a docs PR.
+- Merge only on "go merge #N" naming the PR (details in `CONSTRAINTS.md`).
+- Follow a PR's GitHub Actions jobs and `Codacy Static Code Analysis`: wait for it, and look at its alerts and duplications (`newIssues` and `deltaClonesCount`) before calling a PR ready. An alert is fixed or shown to the owner, never silently ignored.
 
-## Pièges backend
+## Backend pitfalls
 
-- `services/lastfm.py` est du `pylast` synchrone : l'appeler via `asyncio.to_thread` (routers) ou `run_in_executor` (runner), jamais directement dans du code async.
-- La console passe par `services/activity_log.py` : une ligne lisible par étape. Jamais d'URL Last.fm ni de message d'exception dedans : une erreur httpx porte l'URL, donc la clé API (#86).
-- Les appels Last.fm de la synchro passent par `_throttled_call` (cadence `LASTFM_MIN_INTERVAL`, repli sur l'erreur 29). Les tests patchent l'intervalle à 0.
-- Le moteur de filtres n'existe que côté serveur (`services/filter_engine.py`) : l'écran affiche la réponse de l'aperçu sans la retravailler. Une condition sans valeur et un groupe vide sont ignorés.
-- `filter_groups` est validé à la lecture en base : retirer un champ ou un opérateur demande une migration qui réécrit les automations stockées.
-- Le pipeline et les filtres ne font aucun appel Last.fm (ADR 0003) : ils lisent les écoutes et le catalogue de tags en base. Un champ jamais cherché reste absent de la piste et ne passe aucun filtre, pas même `not_contains`.
-- Les repositories ne commitent pas : l'appelant commit, et rattrape `SQLAlchemyError` avec un rollback.
-- Soft-delete par `deleted_at` sur `User`, `Automation`, `GeneratedPlaylist` : chaque requête filtre `deleted_at IS NULL`. La suppression d'un compte, elle, efface pour de vrai tout ce qu'il contient (`erase_user_automations`, `delete_user`) : seule reste une ligne `users` vide.
-- Les modèles ne déclarent aucun `relationship()` ; les jointures sont des `select().join()` explicites.
-- `Automation.output` est stocké à plat (`output_max_size`) et reconstruit par un `model_validator`.
-- Tokens de provider : aucune colonne en clair. Les rajouter seulement chiffrées au repos.
-- Last.fm se lie par son autorisation web : le jeton de retour ne sert qu'une fois, la clé de session n'est pas gardée. Un test lie un compte avec `link_lastfm` de `tests/conftest.py`.
-- Les écoutes stockées forment toujours un seul bloc, pour qu'une synchro coupée reprenne où elle s'est arrêtée : ce qui est plus récent que la dernière écoute se lit du plus ancien au plus récent, et un premier import lit le reste du plus récent au plus ancien, depuis avant la plus ancienne. Dans ce sens-là, une page ne remplace jamais l'album d'un morceau (`store_track_albums(older=True)`).
-- La synchro et la recherche de tags donnent leur avancement par `progress_store` : `since` (début de l'historique, dit avant la première page) et `reached` (jusqu'où l'import a lu en remontant le temps), et `eta_seconds()` (au rythme mesuré). Sur le Dashboard, le front d'un import part de la droite (aujourd'hui) et ne fait que reculer. `BackgroundTasks` le pose sur `ribbonStage.work`, que le ruban fait glisser entre deux lectures (`lib/backgroundWork.js`). Le front dessiné (`shown`) passe d'une lecture à l'autre et n'avance que vers l'avant ; sur le Dashboard la tête passe par `moveHead`, et ce qui sort de la flamme part de `waveCentre`, copie JS du calcul du shader : changer l'un demande de changer l'autre.
-- Un run qui ne peut pas partir (premier import en cours, ou recherche de tags en cours pour un run qui filtre par tags, voir `_check_ready`) attend sur sa ligne d'historique (`waiting`), sans compter d'essai. Tout nouveau départ de l'automation reprend cette ligne. Il repart à la fin de l'import ou de la recherche de tags (`after_sync`, `after_pass`), et à chaque passage du sweep (après un redémarrage, rien d'autre ne le relancerait).
-- Chaque run, manuel ou planifié, passe par `run_automation` et s'inscrit dans `_in_flight` (mémoire du process, un seul worker) avec un ticket de progression : `GET /api/scrobbles/sync` les liste avec `next_run_at`. Un run fini y reste `RUN_LINGER_SECONDS`, et le front envoie `RUNS_DONE` sur `window` quand il en voit un partir : les pages qui montrent des runs ou des playlists relisent.
-- Pendant un premier import (`scrobbles_complete_at` vide), le Dashboard ne cherche aucune pochette : ses albums changent à chaque lecture. La recherche part sur les albums finaux.
-- `users.timezone` vide veut dire « pas encore connu », lu comme UTC : le navigateur ne le remplit que dans ce cas, pour ne jamais écraser un choix fait dans les réglages.
-- `POST /api/public/listener` (scène 7 de la page d'accueil) ne demande aucun compte et dépense le budget Last.fm des synchros : limité par visiteur et pour tout le site, gardé 1 h en mémoire seulement. En POST pour que le pseudo reste hors des logs d'accès ; il n'est écrit ni en base ni dans la console.
-- `users.guide_done_at` : le guide des nouveaux arrivants a été fini ou passé. Il ne repart alors plus tout seul, sur aucun appareil ; « Replay the guide » dans les Réglages le relance sans toucher à la colonne.
-- `TokenResponse` a un body vide exprès (tokens en cookies httpOnly uniquement) : ce n'est pas du code mort.
-- Un cron se lit toujours via `schemas.cron_trigger`, jamais `CronTrigger.from_crontab` : APScheduler compte les jours depuis lundi, donc `1` tomberait un mardi.
-- Le scheduler du sweep ne démarre qu'avec `ENABLE_SCHEDULER` ; le rate limiter vit en mémoire du process. L'app suppose un seul worker.
-- L'IP d'un visiteur vient de `TRUSTED_IP_HEADER` (`CF-Connecting-IP` derrière Cloudflare ; `X-Real-IP` par défaut dans `compose.yaml`, que le nginx fourni écrase), sinon du socket : jamais de `X-Forwarded-For`, qu'un visiteur écrit lui-même. Le login vérifie `failed_login_limiter` (par compte) avant le mot de passe, sinon une réponse 200 trahirait un bon essai.
-- S'inscrire n'ouvre aucune session : `/register` envoie un lien (`mail_links`, seul le hash est gardé, il sert une fois) et la session s'ouvre en le suivant (`/confirm`). Un login sur une adresse jamais confirmée répond 403. Une inscription non confirmée ne possède pas son adresse : une nouvelle inscription ou un login Google/Discord vérifié la reprend (`release_unconfirmed_email`), et la purge horaire l'efface après 7 jours. Les demandes de lien répondent la même chose que l'adresse existe ou non.
-- `services/mailer.py` envoie par le SMTP d'OVH. Sans `SMTP_HOST` il imprime le mail en local (pour suivre ses liens) et refuse en prod (`COOKIE_SECURE`) : un lien ouvre un compte. Les tests ne passent jamais par lui : `SENT_MAILS` et `mailed_token` dans `conftest.py`.
-- Garde-fous d'un serveur à la maison : `MAX_AUTOMATIONS` (20), un planning au plus une fois par jour (minute et heure fixes, `_validate_cron` et `isValidCron` jugent les cas de `frontend/src/lib/cron-cases.json`), Run now et Re-run limités par `manual_run_limiter` juste avant le run (un appel refusé ne compte pas), et `PLAYLISTS_KEPT` (50) playlists par automation, que `noRepeatPlaylists` ne peut pas dépasser.
+- `services/lastfm.py` is synchronous `pylast`: call it through `asyncio.to_thread` (routers) or `run_in_executor` (runner), never directly from async code.
+- The console goes through `services/activity_log.py`: one readable line per step. Never a Last.fm URL or an exception message in it: an httpx error carries the URL, and so the API key (#86).
+- The sync's Last.fm calls go through `_throttled_call` (pace `LASTFM_MIN_INTERVAL`, backs off on error 29). Tests patch the interval to 0.
+- The filter engine only exists server side (`services/filter_engine.py`): the screen shows the preview's answer without reworking it. A condition without a value and an empty group are ignored.
+- `filter_groups` is validated when read from the database: removing a field or an operator needs a migration that rewrites stored automations.
+- The pipeline and filters make no Last.fm call (ADR 0003): they read the listens and the tag catalogue in the database. A field never looked up stays missing from the track and passes no filter, not even `not_contains`.
+- Repositories don't commit: the caller commits, and catches `SQLAlchemyError` with a rollback.
+- Soft delete through `deleted_at` on `User`, `Automation`, `GeneratedPlaylist`: every query filters `deleted_at IS NULL`. Deleting an account, though, really erases everything it holds (`erase_user_automations`, `delete_user`): only an empty `users` row remains.
+- Models declare no `relationship()`; joins are explicit `select().join()`.
+- `Automation.output` is stored flat (`output_max_size`) and rebuilt by a `model_validator`.
+- Provider tokens: no plaintext column. Add them back only encrypted at rest.
+- Last.fm is linked through its web authorization: the return token is used once, the session key is not kept. A test links an account with `link_lastfm` from `tests/conftest.py`.
+- Stored listens always form one block, so that an interrupted sync resumes where it stopped: what is newer than the latest listen is read from oldest to newest, and a first import reads the rest from newest to oldest, from before the oldest one. In that direction a page never replaces a track's album (`store_track_albums(older=True)`).
+- The sync and the tag pass report progress through `progress_store`: `since` (start of the history, given before the first page) and `reached` (how far back the import has read), and `eta_seconds()` (at the measured pace). On the Dashboard an import's front starts from the right (today) and only moves back. `BackgroundTasks` puts it on `ribbonStage.work`, which the ribbon glides between two reads (`lib/backgroundWork.js`). The drawn front (`shown`) carries over from one read to the next and only moves forward; on the Dashboard the head goes through `moveHead`, and what leaves the flame starts from `waveCentre`, a JS copy of the shader's computation: changing one means changing the other.
+- A run that can't start (first import in progress, or a tag pass in progress for a run that filters by tags, see `_check_ready`) waits on its history line (`waiting`), without counting an attempt. Any new start of the automation takes that line over. It starts again at the end of the import or the tag pass (`after_sync`, `after_pass`), and on every sweep (after a restart, nothing else would start it).
+- Every run, manual or scheduled, goes through `run_automation` and registers in `_in_flight` (process memory, one worker) with a progress ticket: `GET /api/scrobbles/sync` lists them with `next_run_at`. A finished run stays there `RUN_LINGER_SECONDS`, and the front sends `RUNS_DONE` on `window` when it sees one leave: pages that show runs or playlists read again.
+- During a first import (`scrobbles_complete_at` empty), the Dashboard looks up no cover: its albums change on every read. The lookup starts on the final albums.
+- An empty `users.timezone` means "not known yet", read as UTC: the browser only fills it in that case, so it never overwrites a choice made in Settings.
+- `POST /api/public/listener` (scene 7 of the landing page) needs no account and spends the syncs' Last.fm budget: limited per visitor and for the whole site, kept 1 h in memory only. A POST so the username stays out of access logs; it is written neither to the database nor to the console.
+- `users.guide_done_at`: the newcomer's guide was finished or skipped. It then never starts by itself again, on any device; "Replay the guide" in Settings restarts it without touching the column.
+- `TokenResponse` has an empty body on purpose (tokens in httpOnly cookies only): it is not dead code.
+- A cron is always read through `schemas.cron_trigger`, never `CronTrigger.from_crontab`: APScheduler counts days from Monday, so `1` would fall on a Tuesday.
+- The sweep's scheduler only starts with `ENABLE_SCHEDULER`; the rate limiter lives in process memory. The app assumes a single worker.
+- A visitor's IP comes from `TRUSTED_IP_HEADER` (`CF-Connecting-IP` behind Cloudflare; `X-Real-IP` by default in `compose.yaml`, which the bundled nginx overwrites), otherwise from the socket: never `X-Forwarded-For`, which a visitor writes themselves. Login checks `failed_login_limiter` (per account) before the password, otherwise a 200 answer would give away a right guess.
+- Signing up opens no session: `/register` mails a link (`mail_links`, only the hash is kept, it works once) and the session opens by following it (`/confirm`). A login on an address never confirmed answers 403. An unconfirmed sign-up doesn't own its address: a new sign-up or a verified Google/Discord login takes it over (`release_unconfirmed_email`), and the hourly purge erases it after 7 days. Link requests answer the same whether the address exists or not.
+- `services/mailer.py` sends over SMTP (SSL). Without `SMTP_HOST` it prints the mail locally (to follow its links) and refuses in production (`COOKIE_SECURE`): a link opens an account. Tests never go through it: `SENT_MAILS` and `mailed_token` in `conftest.py`.
+- Home-server guard rails: `MAX_AUTOMATIONS` (20), a schedule at most once a day (fixed minute and hour, `_validate_cron` and `isValidCron` judge the cases in `frontend/src/lib/cron-cases.json`), Run now and Re-run limited by `manual_run_limiter` right before the run (a refused call doesn't count), and `PLAYLISTS_KEPT` (50) playlists per automation, which `noRepeatPlaylists` can't exceed.
 
-## Pièges frontend
+## Frontend pitfalls
 
-- JSX sans TypeScript malgré la dépendance TS ; imports via l'alias `@/`.
-- `src/lib/api.js` est l'unique client HTTP (refresh JWT auto). Pas de second client. Chaque appel abandonne après 30 s ; l'aperçu, Run now et Re-run ont 10 min (ils donnent leur avancement sur un ticket).
-- Couleurs, typo et mouvement viennent des tokens de `src/index.css`, pas de valeur en dur dans un nouvel écran. La direction est dans `PRODUCT.md`.
-- Polices pixel : Tiny5 pour les titres et chiffres, Jersey 20 pour le texte, sans `letter-spacing` ni tailles hors de l'échelle `--text-*`, sinon les lettres deviennent floues. Aucune graisse n'existe : la hiérarchie passe par la taille et la couleur.
-- Le ruban de pixels (`lib/pixelRibbon.js`) se monte une seule fois dans `App` et n'a pas de raison d'être remonté. Tout bloc de contenu porte `data-quiet` (12 au plus à l'écran) : le ruban se dissout autour et ne passe jamais sous un texte, sauf le nom forgé du Dashboard. Une page qui porte `data-ribbon-hot` le fait chauffer (une génération en échec). Un élément vide `data-chain="412,120,50"` le couche droit dans cette bande, avec une largeur par étage de la chaîne.
-- Le Dashboard pilote le ruban par `ribbonStage` et le lui rend en partant : c'est le seul écran à y poser une piste. Ses cartes vivent dans `#under-ribbon`, sous le canvas, montées par un portail, en enfants directs : la perspective du calque n'atteint que ceux-là.
-- La page d'accueil a son propre canvas (`lib/landing/stage.js`) et le shader se tait sous elle (`silent` dans sa scène) : c'est la seule exception au ruban unique, parce que le fil doit pouvoir se défaire en pixels. Le spectacle suit le scroll avec un léger retard lissé, et quand le scroll s'arrête la page glisse jusqu'à l'étape suivante dans le sens du geste (`storyBeats`, `beatToSettle`), à l'envers aussi. Pas de `scroll-snap` CSS : il saccade avec les trackpads.
-- `lib/landing/demo.json` sort de `scripts/landing_demo.py`, à travers le vrai moteur, et il est public à vie une fois commité : l'owner le relit avant. Ne pas le modifier à la main.
-- Le guide des nouveaux arrivants (`components/elements/Guide.jsx`, étapes dans `lib/guide.js`) pointe les vrais écrans par `data-guide-step` et par des classes existantes (`.background-task`, `.poster__line`) : renommer l'une demande de changer l'étape. Pendant ses étapes, l'éditeur affiche ses champs vides (le brouillon garde ses valeurs par défaut dessous) et cache les recettes. La mascotte s'appelle « the thread » partout, comme sur la page d'accueil ; sur le Dashboard elle brûle en flamme.
-- Un artiste, un album ou un morceau affiché ouvre sa page Last.fm (`LastfmLink`, `lastfmUrl`), et une page qui montre des données Last.fm porte `LastfmCredit` : les conditions de l'API le demandent (§2.7).
-- `views/Privacy.jsx` décrit ce que le site garde et à qui il parle : une nouvelle donnée stockée, un cookie, un service tiers ou un journal doit y être ajouté dans la même PR, sinon la page ment. Elle promet aussi qu'aucune IP n'est gardée (pas de journal d'accès sur disque en prod).
-- `DESIGN.md` décrit le monde visuel, écrit depuis le Créateur. Les écrans pas encore refaits ne sont pas une référence.
+- JSX without TypeScript despite the TS dependency; imports through the `@/` alias.
+- `src/lib/api.js` is the only HTTP client (automatic JWT refresh). No second client. Every call gives up after 30 s; the preview, Run now and Re-run get 10 min (they report progress on a ticket).
+- Colours, type and motion come from the tokens in `src/index.css`, no hard-coded value in a new screen. The direction is in `PRODUCT.md`.
+- Pixel fonts: Tiny5 for titles and numbers, Jersey 20 for text, with no `letter-spacing` and no size outside the `--text-*` scale, or the letters blur. No weight exists: hierarchy comes from size and colour.
+- The pixel ribbon (`lib/pixelRibbon.js`) mounts once in `App` and has no reason to be remounted. Every content block carries `data-quiet` (12 at most on screen): the ribbon dissolves around it and never runs under text, except the Dashboard's forged name. A page carrying `data-ribbon-hot` heats it (a failing generation). An empty `data-chain="412,120,50"` element lays it straight in that band, with one width per stage of the chain.
+- The Dashboard drives the ribbon through `ribbonStage` and hands it back when leaving: it is the only screen that sets a track on it. Its cards live in `#under-ribbon`, under the canvas, mounted through a portal, as direct children: the layer's perspective only reaches those.
+- The landing page has its own canvas (`lib/landing/stage.js`) and the shader goes quiet under it (`silent` in its scene): the only exception to the single ribbon, because the thread must be able to come apart into pixels. The show follows the scroll with a slight smoothed delay, and when scrolling stops the page glides to the next beat in the direction of the gesture (`storyBeats`, `beatToSettle`), backwards too. No CSS `scroll-snap`: it stutters with trackpads.
+- `lib/landing/demo.json` comes out of `scripts/landing_demo.py`, through the real engine, and is public for good once committed: the owner reviews it first. Don't edit it by hand.
+- The newcomer's guide (`components/elements/Guide.jsx`, steps in `lib/guide.js`) points at the real screens through `data-guide-step` and existing classes (`.background-task`, `.poster__line`): renaming one means changing the step. During its steps the editor shows its fields empty (the draft keeps its defaults underneath) and hides the recipes. The mascot is called "the thread" everywhere, as on the landing page; on the Dashboard it burns as a flame.
+- An artist, album or track shown opens its Last.fm page (`LastfmLink`, `lastfmUrl`), and a page showing Last.fm data carries `LastfmCredit`: the API terms require it (§2.7).
+- `views/Privacy.jsx` describes what the site keeps and who it talks to: a new stored datum, cookie, third-party service or log must be added there in the same PR, or the page lies. It also promises that no IP is kept (no access log on disk in production).
+- `DESIGN.md` describes the visual world, written from the finished site.
 
-## Déploiement
+## Deployment
 
-`compose.yaml` à la racine, déployé par Coolify sur le serveur de l'owner : `backend/Dockerfile` (migre puis lance uvicorn, un seul worker, `--no-access-log`) et `frontend/Dockerfile` (build Vite servi par nginx, `frontend/nginx.conf`, qui relaie `/api`). Une nouvelle variable d'env va dans `compose.yaml`, `.env.example` et le tableau du README.
+`compose.yaml` at the root: `backend/Dockerfile` (migrates then runs uvicorn, one worker, `--no-access-log`) and `frontend/Dockerfile` (Vite build served by nginx, `frontend/nginx.conf`, which proxies `/api`). A new env variable goes into `compose.yaml`, `.env.example` and the README's table.
 
-## Base de données locale
+## Local database
 
-Postgres en Docker, conteneur `listfm-db` sur le port **5433**, bases `listfm` (dev) et `listfm_test` (tests). Après un reboot : `docker start listfm-db`. Après une nouvelle migration, migrer aussi la base de test : `DATABASE_URL=postgresql+asyncpg://listfm:listfm@localhost:5433/listfm_test alembic upgrade head` (depuis `backend/`) ; `ci-local.sh` ne le fait pas. Une erreur de connexion en test vient d'abord d'un conteneur arrêté.
+Postgres in Docker, container `listfm-db` on port **5433**, databases `listfm` (dev) and `listfm_test` (tests). After a reboot: `docker start listfm-db`. After a new migration, migrate the test database too: `DATABASE_URL=postgresql+asyncpg://listfm:listfm@localhost:5433/listfm_test alembic upgrade head` (from `backend/`); `ci-local.sh` doesn't. A connection error in tests comes first from a stopped container.

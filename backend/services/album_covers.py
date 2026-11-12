@@ -55,16 +55,16 @@ async def _walk_albums(db: AsyncSession, lists: list[list[Row]], needed: int, us
                     except (*PAGE_ERRORS, SQLAlchemyError) as exc:
                         await db.rollback()
                         failures += 1
-                        log_activity("pochettes", username, f"album ignoré : {type(exc).__name__}")
+                        log_activity("covers", username, f"album skipped: {type(exc).__name__}")
                         if failures == MAX_CONSECUTIVE_FAILURES:
-                            log_activity("pochettes", username, f"arrêt après {failures} échecs de suite, reprise à la prochaine visite")
+                            log_activity("covers", username, f"stopped after {failures} failures in a row, resumes on the next visit")
                             return
                         continue
             covers += images[album.id] is not None
             if covers == needed:
                 break
     if calls:
-        log_activity("pochettes", username, f"terminé, {calls} albums cherchés")
+        log_activity("covers", username, f"done, {calls} albums looked up")
 
 
 async def fill_album_covers(db: AsyncSession, user_id: str, username: str) -> None:
@@ -81,7 +81,7 @@ async def _fill_in_background(user_id: str, username: str, lists: list[list[Row]
             else:
                 await _walk_albums(db, lists, 1, username)
     except SQLAlchemyError as exc:
-        log_activity("pochettes", username, f"échec : {type(exc).__name__}, reprise à la prochaine visite")
+        log_activity("covers", username, f"failed: {type(exc).__name__}, resumes on the next visit")
     finally:
         _running.discard(user_id)
 

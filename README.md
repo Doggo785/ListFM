@@ -50,7 +50,7 @@ Put a reverse proxy with HTTPS in front of the `web` service (port 80). For exam
 
 Back up the `listfm-db` volume, for example with `docker compose exec db pg_dump -U listfm listfm`.
 
-If you run it for other people, rewrite `frontend/src/views/Privacy.jsx`: it describes this instance and names its publisher.
+If you run it for other people, rewrite `frontend/src/views/Privacy.jsx` before building: it describes the original instance, its mail provider and its host, and names its publisher and contact (`PUBLISHER`, `CONTACT`).
 
 ## Local dev
 

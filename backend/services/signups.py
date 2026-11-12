@@ -26,4 +26,4 @@ async def purge_stale_signups() -> None:
             logger.exception("purging unconfirmed sign-ups failed")
             return
     if gone:
-        log_activity("comptes", "", f"{gone} inscription(s) jamais confirmée(s) effacée(s)")
+        log_activity("account", "", f"{gone} unconfirmed sign-up(s) erased")

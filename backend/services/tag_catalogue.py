@@ -46,13 +46,13 @@ async def fill_tag_catalogue(db: AsyncSession, user_id: str, username: str) -> N
     if not artists:
         return
     started = time.monotonic()
-    log_activity("tags", username, f"début, {len(artists)} artistes à chercher")
+    log_activity("tags", username, f"start, {len(artists)} artists to look up")
     failures = 0
     key = tags_progress_key(user_id)
     for done, artist in enumerate(artists):
         progress_store.report(key, "tags", done, len(artists))
         if done and done % LOG_EVERY == 0:
-            log_activity("tags", username, f"{done}/{len(artists)} artistes")
+            log_activity("tags", username, f"{done}/{len(artists)} artists")
         # Another user's pass may have reached this shared artist meanwhile.
         already_fetched = await artist_tags_fetched_since(db, artist, stale_before)
         await db.commit()  # no connection held during the Last.fm call
@@ -66,11 +66,11 @@ async def fill_tag_catalogue(db: AsyncSession, user_id: str, username: str) -> N
         except (*PAGE_ERRORS, SQLAlchemyError) as exc:
             await db.rollback()
             failures += 1
-            log_activity("tags", username, f"artiste ignoré : {type(exc).__name__}")
+            log_activity("tags", username, f"artist skipped: {type(exc).__name__}")
             if failures == MAX_CONSECUTIVE_FAILURES:
-                log_activity("tags", username, f"arrêt après {failures} échecs de suite, reprise à la prochaine synchro")
+                log_activity("tags", username, f"stopped after {failures} failures in a row, resumes on the next sync")
                 return
-    log_activity("tags", username, f"terminé, {len(artists)} artistes  {format_duration(time.monotonic() - started)}")
+    log_activity("tags", username, f"done, {len(artists)} artists  {format_duration(time.monotonic() - started)}")
 
 
 async def _fill_in_background(user_id: str, username: str) -> None:
@@ -78,7 +78,7 @@ async def _fill_in_background(user_id: str, username: str) -> None:
         async with async_session() as db:
             await fill_tag_catalogue(db, user_id, username)
     except SQLAlchemyError as exc:
-        log_activity("tags", username, f"échec : {type(exc).__name__}, reprise à la prochaine synchro")
+        log_activity("tags", username, f"failed: {type(exc).__name__}, resumes on the next sync")
     finally:
         progress_store.finish(tags_progress_key(user_id))
         _running.discard(user_id)

@@ -26,13 +26,13 @@ def automation_label(name: str) -> str:
 
 def format_duration(seconds: float) -> str:
     if seconds < 60:
-        return f"{seconds:.1f} s".replace(".", ",")
+        return f"{seconds:.1f} s"
     minutes, rest = divmod(int(seconds), 60)
     return f"{minutes} min {rest} s"
 
 
 def pipeline_summary(result: dict, seconds: float) -> str:
     return (
-        f"{result['before_filter']} → {result['after_filter']} → {result['total']} morceaux"
+        f"{result['before_filter']} → {result['after_filter']} → {result['total']} tracks"
         f"  {format_duration(seconds)}"
     )

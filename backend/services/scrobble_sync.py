@@ -115,7 +115,7 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
             since = min((uts for _, _, uts, _ in read[pages]), default=since)
     key = progress_key(user_id)
     progress_store.report(key, "sync", 0, total, since=since, reached=reached)
-    log_activity("sync", username, f"début, {total} pages")
+    log_activity("sync", username, f"start, {total} pages")
     done = 0
     for time_from, time_to, older, pages, read in plans:
         for page in range(1, pages + 1) if older else range(pages, 0, -1):
@@ -135,7 +135,7 @@ async def _sync_listens(db: AsyncSession, user_id: str, username: str, page_size
                 reached = min((uts for _, _, uts, _ in listens), default=reached)
             progress_store.report(key, "sync", done, total, since=since, reached=reached)
             progress_store.bump_calls(key)
-            log_activity("sync", username, f"page {done}/{total}  +{len(listens)} écoutes")
+            log_activity("sync", username, f"page {done}/{total}  +{len(listens)} listens")
 
 
 async def _sync_loved(db: AsyncSession, user_id: str, username: str) -> None:
@@ -145,7 +145,7 @@ async def _sync_loved(db: AsyncSession, user_id: str, username: str) -> None:
         loved.extend(more)
     _check_current(user_id, username)
     await replace_loved(db, user_id, loved)
-    log_activity("sync", username, f"{len(loved)} morceaux aimés")
+    log_activity("sync", username, f"{len(loved)} loved tracks")
 
 
 async def sync_scrobbles(db: AsyncSession, user_id: str, username: str) -> None:
@@ -156,7 +156,7 @@ async def sync_scrobbles(db: AsyncSession, user_id: str, username: str) -> None:
     except PAGE_ERRORS as exc:
         if is_rate_limit_error(exc):
             raise
-        log_activity("sync", username, f"pages de {PAGE_SIZE} refusées, nouvel essai par {FALLBACK_PAGE_SIZE}")
+        log_activity("sync", username, f"pages of {PAGE_SIZE} refused, retrying with {FALLBACK_PAGE_SIZE}")
         await db.rollback()
         # Committed pages stay: the retry starts after the newest stored listen.
         await _sync_listens(db, user_id, username, FALLBACK_PAGE_SIZE)
@@ -168,7 +168,7 @@ async def sync_scrobbles(db: AsyncSession, user_id: str, username: str) -> None:
         user.scrobbles_synced_at = now
         user.scrobbles_complete_at = user.scrobbles_complete_at or now
     await db.commit()
-    log_activity("sync", username, f"terminé  {format_duration(time.monotonic() - started)}")
+    log_activity("sync", username, f"done  {format_duration(time.monotonic() - started)}")
     start_tag_catalogue(user_id, username)
 
 
@@ -186,9 +186,9 @@ async def _sync_in_background(user_id: str, username: str) -> None:
         for callback in after_sync:
             callback(user_id)
     except SyncSuperseded:
-        log_activity("sync", username, "annulé, un autre compte Last.fm a été lié")
+        log_activity("sync", username, "cancelled, another Last.fm account was linked")
     except (*PAGE_ERRORS, SQLAlchemyError) as exc:
-        log_activity("sync", username, f"échec : {type(exc).__name__}, reprise à la prochaine synchro")
+        log_activity("sync", username, f"failed: {type(exc).__name__}, resumes on the next sync")
         progress_store.finish(key, error="Listening history sync failed. It will resume on the next sync.")
     finally:
         if _running.get(user_id) == username:

@@ -419,7 +419,7 @@ async def _sync_before_run(db: AsyncSession, automation: Automation) -> None:
     try:
         await sync_scrobbles(db, automation.user_id, automation.lastfm_username)
     except (*PAGE_ERRORS, SyncSuperseded):
-        log_activity("sync", automation.lastfm_username, "échec, le run utilise les écoutes déjà en base")
+        log_activity("sync", automation.lastfm_username, "failed, the run uses the listens already stored")
         await db.rollback()
 
 
@@ -513,7 +513,7 @@ async def run_automation(
         await _check_ready(db, automation)
     except NOT_READY as exc:
         if history.status != "waiting":
-            log_activity("run", label, "en attente des écoutes" if isinstance(exc, HistoryLoading) else "en attente des tags")
+            log_activity("run", label, "waiting for listens" if isinstance(exc, HistoryLoading) else "waiting for tags")
         await _mark_waiting(db, history, exc, automation)
         if progress_key is not None:
             progress_store.finish(progress_key)
@@ -559,7 +559,7 @@ async def _run_and_record(
         )
     except Exception as exc:
         logger.exception("run failed for automation %s", automation.id)
-        log_activity("run", label, f"échec : {type(exc).__name__}")
+        log_activity("run", label, f"failed: {type(exc).__name__}")
         await _mark_failure(db, history, exc, automation)
         progress_store.finish(key, error=_public_error(exc))
         return history

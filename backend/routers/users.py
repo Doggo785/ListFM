@@ -37,7 +37,7 @@ def user_info(username: str = Depends(get_current_user_lastfm_username)):
         info = get_user_info(username)
         return UserInfo(**info)
     except Exception as e:  # noqa: BLE001 -- deliberate boundary: log then 502, never leak upstream internals
-        log_activity("lastfm", username, f"échec : {type(e).__name__}")
+        log_activity("lastfm", username, f"failed: {type(e).__name__}")
         raise HTTPException(status_code=502, detail=LASTFM_UNAVAILABLE_DETAIL)
 
 

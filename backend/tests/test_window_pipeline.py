@@ -162,7 +162,7 @@ async def test_run_prints_its_counts(activity_lines):
     async with _TestSessionLocal() as db:
         await run_automation(db, automation, scheduled_for=NOW)
         await db.commit()
-    assert activity_lines()[0].startswith('run    "t"       2 → 2 → 2 morceaux  ')
+    assert activity_lines()[0].startswith('run    "t"       2 → 2 → 2 tracks  ')
 
 
 @pytest.mark.asyncio

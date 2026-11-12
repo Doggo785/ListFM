@@ -1,15 +1,15 @@
-# Les filtres ne lisent que la base, un catalogue de tags se remplit à part
+# Filters only read the database; a tag catalogue fills up separately
 
-Filtrer sur un tag appelait Last.fm morceau par morceau pendant le run ou l'aperçu : jusqu'à 3000 appels et 12 minutes pour un seul filtre, ce qui rend un aperçu Live impossible. Les filtres et le pipeline ne font plus aucun appel Last.fm et ne lisent que la base. Une tâche de fond remplit un catalogue de tags par artiste, en commençant par les artistes les plus écoutés : un appel couvre tous les morceaux d'un artiste, et le catalogue est partagé entre utilisateurs.
+Filtering on a tag called Last.fm track by track during the run or the preview: up to 3000 calls and 12 minutes for a single filter, which makes a live preview impossible. Filters and the pipeline no longer make any Last.fm call and only read the database. A background task fills a catalogue of tags per artist, most played artists first: one call covers all of an artist's tracks, and the catalogue is shared between people.
 
 ## Considered Options
 
-- **Un appel par morceau, avec cache** : 26 968 appels pour un compte de 153 000 écoutes, contre 9 561 par artiste.
-- **Chercher sur clic avec une estimation d'appels** (décision initiale de l'aperçu) : même à un appel par artiste, 12 minutes pour une fenêtre de 3 mois.
+- **One call per track, with a cache**: 26,968 calls for an account of 153,000 listens, against 9,561 per artist.
+- **Look up on click with an estimate of the calls** (the preview's initial decision): even at one call per artist, 12 minutes for a 3-month window.
 
 ## Consequences
 
-- Une donnée jamais cherchée ne passe aucun filtre, pas même « ne contient pas » : inconnu n'est pas « sans tag ». Tant que le catalogue n'est pas plein, une playlist filtrée sur un tag peut sortir incomplète, et seul le taux de tags connus l'indique.
-- Les tags sont valables 90 jours : relire tous les artistes chaque semaine ferait tourner la tâche en continu.
-- Seuls les tags d'artiste sont proposés : un artiste qui change de style entre deux albums est mal classé jusqu'à l'arrivée des tags d'album (la synchro garde déjà l'album de chaque morceau).
-- Les filtres auditeurs et popularité mondiale sont retirés : ils demandent un appel par morceau, soit environ 2 h pour un compte de 150 000 écoutes, sans partage entre artistes.
+- Data never looked up passes no filter, not even "does not contain": unknown is not "no tag". Until the catalogue is full, a playlist filtered on a tag may come out incomplete, and only the share of known tags says so.
+- Tags are valid for 90 days: reading every artist again each week would keep the task running nonstop.
+- Only artist tags are offered: an artist who changes style between two albums is misfiled until album tags arrive (the sync already keeps each track's album).
+- Listener and global popularity filters are removed: they need one call per track, about 2 h for an account of 150,000 listens, with nothing shared between artists.
