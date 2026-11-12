@@ -35,7 +35,6 @@ async def test_protected_valid_token(client: AsyncClient):
         data = resp.json()
         assert data["email"] == email
         assert data["display_name"] == "Tester"
-        assert data["role"] == "user"
     finally:
         await _cleanup_user(email=email)
 

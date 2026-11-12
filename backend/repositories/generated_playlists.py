@@ -2,12 +2,13 @@ import uuid
 from datetime import UTC, datetime
 
 from models.album import Album
+from models.automation_history import AutomationHistory
 from models.generated_playlist import GeneratedPlaylist
 from models.playlist_track import PlaylistTrack
 from models.track import Track
 from repositories.tracks import get_or_create_track
 from schemas import GeneratedPlaylistCreate
-from sqlalchemy import Row, Select, select
+from sqlalchemy import Row, Select, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 COVERS_PER_PLAYLIST = 4
@@ -157,6 +158,24 @@ async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id:
     playlist.deleted_at = datetime.now(UTC)
     await db.flush()
     return True
+
+
+async def prune_automation_playlists(db: AsyncSession, automation_id: str, keep: int) -> None:
+    """Erase the automation's playlists past the `keep` newest, deleted ones included; their runs stay."""
+    older = (
+        select(GeneratedPlaylist.id)
+        .where(GeneratedPlaylist.automation_id == automation_id)
+        .order_by(GeneratedPlaylist.generated_at.desc(), GeneratedPlaylist.id.desc())
+        .offset(keep)
+    )
+    ids = list((await db.execute(older)).scalars())
+    if not ids:
+        return
+    await db.execute(
+        update(AutomationHistory).where(AutomationHistory.generated_playlist_id.in_(ids)).values(generated_playlist_id=None)
+    )
+    await db.execute(delete(PlaylistTrack).where(PlaylistTrack.playlist_id.in_(ids)))
+    await db.execute(delete(GeneratedPlaylist).where(GeneratedPlaylist.id.in_(ids)))
 
 
 async def get_tracks_of_recent_playlists(

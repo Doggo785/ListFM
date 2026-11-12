@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -70,7 +71,7 @@ async def get_latest_runs(db: AsyncSession, user_id: str) -> list[tuple[Automati
         select(AutomationHistory, Automation.enabled)
         .join(Automation, Automation.id == AutomationHistory.automation_id)
         .where(Automation.user_id == user_id, Automation.deleted_at.is_(None))
-        .distinct(AutomationHistory.automation_id)
+        .ext(distinct_on(AutomationHistory.automation_id))
         .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
     )
     return [(row, enabled) for row, enabled in result.all()]

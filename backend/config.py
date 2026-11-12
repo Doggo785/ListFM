@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     cookie_secure: bool = False
+    # Header the proxy in front sets to the visitor's IP (Cloudflare: CF-Connecting-IP). Empty: the socket peer.
+    trusted_ip_header: str = ""
     enable_scheduler: bool = False
 
     google_oauth_client_id: str = ""
@@ -38,7 +40,7 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def validate_cookie_secure(self) -> "Settings":
+    def validate_cookie_secure(self) -> Settings:
         if self.cookie_secure:
             return self
         local_hosts = {"localhost", "127.0.0.1", "::1"}

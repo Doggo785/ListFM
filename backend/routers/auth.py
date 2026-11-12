@@ -46,6 +46,7 @@ from services.auth import (
 )
 from services.rate_limit import (
     DUPLICATE_EMAIL_MESSAGE,
+    failed_login_limiter,
     login_limiter,
     rate_limit,
     rate_limit_by_key,
@@ -137,12 +138,13 @@ async def login(
 ):
     rate_limit(request, login_limiter)
     email = body.email.strip().lower()
+    # Checked before the password, or the answer to a blocked try would still tell a right guess.
+    account = rate_limit_email_key(email)
+    failed_login_limiter.refuse_if_full(account)
 
     user = await get_user_by_email(db, email)
-    if user is None or user.password_hash is None:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    if not verify_password(body.password, user.password_hash):
+    if user is None or user.password_hash is None or not verify_password(body.password, user.password_hash):
+        failed_login_limiter.record(account)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     await _establish_session(
@@ -270,7 +272,6 @@ async def me(
         "id": current_user.id,
         "email": current_user.email,
         "display_name": current_user.display_name,
-        "role": current_user.role,
         "lastfm_username": lastfm_username,
         "is_lastfm_linked": lastfm_username is not None,
         "timezone": current_user.timezone,

@@ -68,7 +68,6 @@ async def create_user(db: AsyncSession, data: UserCreate, password_hash: str) ->
         id=str(uuid.uuid4()),
         email=data.email,
         password_hash=password_hash,
-        role="user",
         email_verified=False,
         display_name=data.display_name,
         created_at=now,
@@ -172,7 +171,6 @@ async def _get_or_create_user_from_provider(
     user = User(
         id=str(uuid.uuid4()),
         email=email,
-        role="user",
         email_verified=email_verified,
         display_name=display_name,
         created_at=now,

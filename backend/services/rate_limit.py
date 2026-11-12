@@ -2,6 +2,7 @@ import hashlib
 import time
 from collections import defaultdict
 
+from config import get_settings
 from fastapi import HTTPException, Request
 
 # Shared across register / complete-email / provider-bind so the response body
@@ -36,10 +37,17 @@ class RateLimiter:
         self._requests.clear()
 
     def check(self, key: str) -> None:
-        now = time.monotonic()
-        self._clean(key, now)
+        self.refuse_if_full(key)
+        self.record(key)
+
+    def refuse_if_full(self, key: str) -> None:
+        """Raise 429 once the key used up its window, without counting this call."""
+        self._clean(key, time.monotonic())
         if len(self._requests[key]) >= self.max_requests:
             raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+
+    def record(self, key: str) -> None:
+        now = time.monotonic()
         self._requests[key].append(now)
         # Amortized full sweep: keeps the map bounded without an O(n) scan on
         # every request.
@@ -50,6 +58,8 @@ class RateLimiter:
 
 
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# Wrong passwords per account, whatever the IP: guessing one password from many IPs stops here.
+failed_login_limiter = RateLimiter(max_requests=20, window_seconds=3600)
 register_limiter = RateLimiter(max_requests=3, window_seconds=21600)
 # Per-email register guardrail: stops an attacker who rotates IPs but reuses
 # the same victim email. Keyed by sha256(email.lower()).
@@ -60,7 +70,11 @@ refresh_limiter = RateLimiter(max_requests=20, window_seconds=60)
 # external providers (Last.fm / Google / Discord) with the app's credentials.
 link_lastfm_limiter = RateLimiter(max_requests=10, window_seconds=60)
 oauth_login_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# Wrong passwords per account, whatever the IP: guessing one password from many IPs stops here.
+failed_login_limiter = RateLimiter(max_requests=20, window_seconds=3600)
 complete_email_limiter = RateLimiter(max_requests=10, window_seconds=60)
+# Run now and retry, per automation: each run writes a playlist and reads the whole window.
+manual_run_limiter = RateLimiter(max_requests=1, window_seconds=60)
 # The landing page's public route: two Last.fm calls per name, on the same budget
 # as the signed-in users' syncs. The total keeps it under a quarter of that budget.
 listener_limiter = RateLimiter(max_requests=5, window_seconds=60)
@@ -68,17 +82,16 @@ listener_total_limiter = RateLimiter(max_requests=30, window_seconds=60)
 
 
 def _client_ip(request: Request) -> str:
-    """Best-effort client IP: first entry of X-Forwarded-For when present,
-    else the socket peer address.
+    """The visitor's IP: the header the trusted proxy sets, else the socket peer.
 
-    Tradeoff: X-Forwarded-For is trusted — correct only when a trusted proxy
-    overwrites it (dev: no proxy → request.client.host; prod behind proxy →
-    XFF). Without this, every user behind the proxy shares the proxy IP and
-    the limiter either blocks everyone or throttles nobody.
+    X-Forwarded-For is never read: a visitor can write it, so a new fake IP per
+    try would get past every limit. In production Cloudflare sets
+    `CF-Connecting-IP` and overwrites any value the visitor sent
+    (`TRUSTED_IP_HEADER`); without it every visitor shares the proxy's address.
     """
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    header = get_settings().trusted_ip_header
+    if header and (value := request.headers.get(header)):
+        return value.strip()
     return request.client.host if request.client else "unknown"
 
 

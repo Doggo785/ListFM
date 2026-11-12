@@ -28,6 +28,7 @@ from repositories.automations import get_automations_by_ids
 from repositories.generated_playlists import (
     create_generated_playlist,
     get_tracks_of_recent_playlists,
+    prune_automation_playlists,
 )
 from repositories.scrobbles import (
     get_artist_ranks,
@@ -35,7 +36,7 @@ from repositories.scrobbles import (
     get_moment_plays,
     get_window_tracks,
 )
-from schemas import GeneratedPlaylistCreate, Track, cron_trigger
+from schemas import PLAYLISTS_KEPT, GeneratedPlaylistCreate, Track, cron_trigger
 from services.activity_log import automation_label, log_activity, pipeline_summary
 from services.filter_engine import apply_filters, conditions_on
 from services.lastfm import PAGE_ERRORS, is_rate_limit_error
@@ -49,6 +50,7 @@ from services.scrobble_sync import (
 )
 from services.tag_catalogue import after_pass, is_tagging
 from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -68,11 +70,6 @@ MAX_ATTEMPT = 4
 _in_flight: dict[str, dict[str, list]] = {}
 # A run often lasts a second, less than the app's 3 s between reads: an ended one stays listed this long, delivering.
 RUN_LINGER_SECONDS = 5
-
-
-# Tracks returned to the client next to the result, for the builder preview.
-# shortcut: the client refilters these; drop the field with filter-engine.js (phase C).
-SOURCE_TRACKS_SHOWN = 500
 
 
 def _months_back(at: datetime, months: int) -> datetime:
@@ -283,7 +280,6 @@ async def run_automation_pipeline_cached(
         # Rate of known tags: a tag filter sees only these artists (ADR 0003).
         "window_artists": len(window_artists),
         "known_tag_artists": len(window_artists & artist_tags.keys()),
-        "source_tracks": candidates[:SOURCE_TRACKS_SHOWN],
         # end is exclusive: 1 September 00:00 means up to 31 August.
         "period": {
             "start": start.date().isoformat() if start else None,
@@ -617,7 +613,7 @@ async def next_run_at(db: AsyncSession, user_id: str, timezone: str, now: dateti
                 select(AutomationHistory)
                 .where(AutomationHistory.automation_id.in_([a.id for a in automations]))
                 .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
-                .distinct(AutomationHistory.automation_id)
+                .ext(distinct_on(AutomationHistory.automation_id))
             )
         ).scalars().all()
         times += [
@@ -635,7 +631,7 @@ async def _persist_result_playlist(
     tracks = [
         Track(title=t["title"], artist=t["artist"]) for t in result["tracks"]
     ]
-    return await create_generated_playlist(
+    playlist = await create_generated_playlist(
         db,
         automation.user_id,
         automation.lastfm_username,
@@ -653,6 +649,8 @@ async def _persist_result_playlist(
         # wrote the real values already), so never stamp them as fetched.
         mark_fetched=False,
     )
+    await prune_automation_playlists(db, automation.id, PLAYLISTS_KEPT)
+    return playlist
 
 
 async def get_retryable_failures(
@@ -841,7 +839,7 @@ async def get_waiting_runs(db: AsyncSession, user_id: str | None = None) -> list
         .join(Automation, Automation.id == AutomationHistory.automation_id)
         .where(Automation.deleted_at.is_(None), Automation.enabled.is_(True))
         .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
-        .distinct(AutomationHistory.automation_id)
+        .ext(distinct_on(AutomationHistory.automation_id))
     )
     if user_id is not None:
         query = query.where(Automation.user_id == user_id)

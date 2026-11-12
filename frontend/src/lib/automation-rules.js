@@ -55,6 +55,7 @@ export function describeAutomation(auto) {
 export const DEFAULT_CRON = "0 0 1 * *";
 
 const CRON_RANGES = [[0, 59], [0, 23], [1, 31], [1, 12], [0, 7]];
+const isWhole = (part) => /^\d+$/.test(part);
 
 // Same reading as the server for numbers. Named values (`mon`, `last`) stay the server's to judge.
 function isValidCronField(field, [min, max]) {
@@ -65,16 +66,24 @@ function isValidCronField(field, [min, max]) {
   });
 }
 
+const isWellFormed = (parts) => parts.length === 5 && parts.every((part, i) => isValidCronField(part, CRON_RANGES[i]));
+const cronParts = (expr) => (typeof expr === "string" ? expr.trim().split(/\s+/) : []);
+
+/** Same rule as the server: well formed, and at most once a day (one minute, one hour). Cases in cron-cases.json. */
 export function isValidCron(expr) {
-  if (!expr || typeof expr !== "string") return false;
-  const parts = expr.trim().split(/\s+/);
-  return parts.length === 5 && parts.every((part, i) => isValidCronField(part, CRON_RANGES[i]));
+  const parts = cronParts(expr);
+  return isWellFormed(parts) && isWhole(parts[0]) && isWhole(parts[1]);
+}
+
+/** Well formed but more than once a day: the editor says why it refuses it. */
+export function runsTooOften(expr) {
+  const parts = cronParts(expr);
+  return isWellFormed(parts) && !(isWhole(parts[0]) && isWhole(parts[1]));
 }
 
 export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-const isWhole = (part) => /^\d+$/.test(part);
 // Each fire closes a whole season: December to February on 1 March, and so on.
 const SEASON_MONTHS = "3,6,9,12";
 
