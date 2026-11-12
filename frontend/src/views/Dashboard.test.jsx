@@ -167,6 +167,20 @@ describe("the poster", () => {
     await act(async () => root.unmount());
   });
 
+  it("says the covers come later instead of showing the ribbon alone during a first import", async () => {
+    getListeningStory.mockResolvedValue(STORY);
+    getListeningTotals.mockResolvedValue({ ...TOTALS, complete: false });
+    const importing = await renderDashboard();
+    expect(importing.container.querySelectorAll(".poster__cover-wait")).toHaveLength(1);
+    expect(importing.container.textContent).toContain("Covers come after the import");
+    await act(async () => importing.root.unmount());
+
+    getListeningTotals.mockResolvedValue(TOTALS);
+    const done = await renderDashboard();
+    expect(done.container.querySelector(".poster__cover-wait")).toBeNull();
+    await act(async () => done.root.unmount());
+  });
+
   it("says when there is nothing to tell yet", async () => {
     getListeningStory.mockResolvedValue({ moment: null, months: [], listens_last_day: 0, covers_pending: false });
     const { container, root } = await renderDashboard();
