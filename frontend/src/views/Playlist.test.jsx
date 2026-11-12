@@ -63,7 +63,7 @@ describe("Playlist", () => {
     await show();
     expect(host.querySelector("h1").textContent).toBe("Seasonal");
     expect(host.textContent).toContain("Jun 1 to Aug 31, 2026");
-    expect(host.querySelector("ol a").href).toBe("https://www.last.fm/music/A%2FB/_/One%20%26%20Two");
+    expect(host.querySelector("ol a").href).toBe("https://www.last.fm/music/A%2FB/_/One+%26+Two");
     expect(host.querySelector('a[href="/automations/a1"]').textContent).toBe("See automation");
   });
 

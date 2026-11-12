@@ -7,6 +7,7 @@ import Poster from "@/components/dashboard/Poster";
 import YearDeck from "@/components/dashboard/YearDeck";
 import { useAutomations } from "@/hooks/useAutomations";
 import { useListening } from "@/hooks/useListening";
+import { LastfmCredit } from "@/components/ui/Lastfm";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ export default function Dashboard() {
     <main ref={scroller} className="scroll-edge h-full w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto text-left">
       <Poster story={story} totals={totals} runs={runs} automations={automations} username={username} lineRef={line} reducedMotion={reducedMotion} />
       <YearDeck scrollerRef={scroller} lineRef={line} story={story} automations={automations} playlists={generatedPlaylists} runs={runs} reducedMotion={reducedMotion} />
+      <LastfmCredit className="w-fit px-4 pb-8 md:px-8" />
     </main>
   );
 }

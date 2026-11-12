@@ -12,6 +12,7 @@ import { cardCorners, cardPose, deckLayout, mix, monthsEnd, monthSeries, runsSer
 import { describeRun, RUN_TONES } from "@/lib/runs";
 import { FOCUS } from "@/lib/utils";
 import AlbumArt from "./AlbumArt";
+import { LastfmLink } from "@/components/ui/Lastfm";
 
 const CARD_SIZES = [448, 384, 320, 256, 192];
 const DECK_CHROME = 360; // The title row, the caption and the months around the cards.
@@ -56,6 +57,7 @@ function monthCards(months) {
     tick: SHORT_MONTH.format(monthDate(month.month)),
     title: MONTH_LABEL.format(monthDate(month.month)),
     name: month.artist,
+    artist: month.artist,
     lines: [
       `${month.artist_plays.toLocaleString("en-US")} of ${month.listens.toLocaleString("en-US")} listens${i === months.length - 1 ? " so far" : ""}`,
       month.album?.title,
@@ -109,7 +111,7 @@ function Caption({ card }) {
   return (
     <div className="min-w-0 pt-3">
       <p className="truncate font-heading text-4xl">{card.title}</p>
-      {card.name && <p className="truncate text-lg">{card.name}</p>}
+      {card.name && <p className="truncate text-lg">{card.artist ? <LastfmLink artist={card.artist}>{card.name}</LastfmLink> : card.name}</p>}
       {card.lines.map((line) => <p key={line} className="truncate text-xs text-(--text-muted)">{line}</p>)}
       {card.outcome && <p className={`truncate text-xs ${RUN_TONES[card.outcome.tone]}`}>{card.outcome.label}</p>}
       {card.to && <Link to={card.to} className={`${buttonVariants({ variant: "outline" })} mt-2`}>{card.action}</Link>}
