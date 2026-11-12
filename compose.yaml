@@ -50,6 +50,7 @@ services:
 
   web:
     build: ./frontend
+    expose: ["80"]
     restart: unless-stopped
     depends_on: [backend]
     <<: *logs
