@@ -2,32 +2,20 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AuthScreen, { FormError, TextField } from "@/components/elements/AuthScreen";
 import { Button } from "@/components/ui/button";
-import { readableError, request } from "@/lib/api";
+import { useMailLinkRequest } from "@/hooks/useMailLinkRequest";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
-  const [said, setSaid] = useState("");
-  const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
+  const { said, error, setError, sending, send } = useMailLinkRequest("/api/auth/password/forgot");
 
   useEffect(() => {
     document.title = "Forgot your password - ListFM";
   }, []);
 
-  const submit = async (event) => {
+  const submit = (event) => {
     event.preventDefault();
-    if (!email.trim()) {
-      setError("Enter the email you signed up with.");
-      return;
-    }
-    setError("");
-    setSending(true);
-    try {
-      setSaid((await request("/api/auth/password/forgot", { method: "POST", body: JSON.stringify({ email: email.trim() }) })).detail);
-    } catch (err) {
-      setError(readableError(err));
-    }
-    setSending(false);
+    if (!email.trim()) setError("Enter the email you signed up with.");
+    else send(email);
   };
 
   return (

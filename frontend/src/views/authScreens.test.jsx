@@ -168,6 +168,14 @@ describe("the screens before the site", () => {
       expect(host.querySelector('[role="status"]').textContent).toContain("a link is on its way");
     });
 
+    it("says why a link could not be asked for", async () => {
+      api.request.mockRejectedValue(new Error("API 429: Too many requests. Please try again later."));
+      await show("/forgot-password", <ForgotPassword />);
+      await fill({ "forgot-email": "me@example.com" });
+      await submit();
+      expect(alert()).toBe("Too many requests. Please try again later.");
+    });
+
     it("sets the new password and signs in", async () => {
       const resetPassword = vi.fn().mockResolvedValue();
       await show("/reset-password?token=abc", <ResetPassword />, { resetPassword });
