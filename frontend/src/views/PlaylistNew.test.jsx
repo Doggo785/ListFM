@@ -187,6 +187,20 @@ describe("creator", () => {
     expect(previewAutomation.mock.calls[0][0].filterGroups[0].conditions[0]).toMatchObject({ field: "userloved", value: true });
   });
 
+  it("stops saying it updates when a change is undone before the pause ends (#171)", async () => {
+    const container = await render();
+    const field = container.querySelector('input[placeholder="None"]');
+    await type(field, "2");
+    await wait(400);
+    previewAutomation.mockClear();
+    await type(field, "1");
+    await wait(100);
+    await type(field, "2");
+    await wait(1000);
+    expect(previewAutomation).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Updating");
+  });
+
   it("never runs two previews at once, and ends on the latest settings", async () => {
     let finish;
     previewAutomation.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(result({ total: 1 })); }));

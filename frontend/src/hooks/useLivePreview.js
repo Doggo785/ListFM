@@ -16,7 +16,12 @@ export function useLivePreview(draft, automationId) {
 
   useEffect(() => {
     wanted.current = signature;
-    if (!signature || signature === done.current) return undefined;
+    if (!signature) return undefined;
+    if (signature === done.current) {
+      // A change undone within the delay sends nothing: the result shown is already the right one.
+      if (!busy.current) setState((s) => (s.loading ? { ...s, loading: false } : s));
+      return undefined;
+    }
     setState((s) => ({ ...s, loading: true }));
     const timer = setTimeout(async () => {
       if (busy.current || wanted.current === done.current) return;
