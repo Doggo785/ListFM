@@ -29,7 +29,10 @@ export default function TopNav() {
   return (
     <header className="top-nav">
       <div className="top-nav__main" data-quiet>
-        <Link to="/dashboard" className="top-nav__logo">ListFM</Link>
+        <span className="top-nav__brand">
+          <Link to="/dashboard" className="top-nav__logo">ListFM</Link>
+          <span className="top-nav__version">v{import.meta.env.APP_VERSION}</span>
+        </span>
         <nav ref={nav} className="top-nav__links" aria-label="Main">
           {LINKS.map(({ label, to }) => (
             <NavLink key={to} to={to}>{label}</NavLink>

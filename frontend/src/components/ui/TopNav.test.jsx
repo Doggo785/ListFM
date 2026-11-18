@@ -47,6 +47,12 @@ describe("TopNav", () => {
     expect(host.querySelector(".top-nav__marker").style.opacity).toBe("1");
   });
 
+  it("shows the version released, beside the logo", async () => {
+    await show("/dashboard");
+    const pkg = await import("../../../package.json");
+    expect(host.querySelector(".top-nav__version").textContent).toBe(`v${pkg.version}`);
+  });
+
   it("tells the playlists from the automations", async () => {
     await show("/playlists/abc");
     expect(current()).toBe("Playlists");
