@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 import { fileURLToPath } from 'url'
+// release-please bumps this version with each release (release-please-config.json).
+import pkg from './package.json' with { type: 'json' }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -11,6 +13,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  define: {
+    'import.meta.env.APP_VERSION': JSON.stringify(pkg.version),
+  },
   // Explicit so vitest's esbuild fallback uses the same runtime as babel.
   esbuild: {
     jsx: "automatic",

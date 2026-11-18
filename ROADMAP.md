@@ -87,6 +87,10 @@ Each PR wires the ribbon to the screen's real data and deletes the old code it r
 6. *(done)* Server side: mail domain (SPF, DKIM, DMARC), backups with an encrypted offsite copy, monitoring, Google and Discord redirect URIs, secrets.
 7. *(done, 2026-11-12)* A private deploy, a full test, then the public address (https://listfm.doggolabs.fr) and `Release-As: 1.0.0`. The production database started empty.
 
+## After v1.0.0
+
+- *(done)* **Version shown**: beside the logo in the app and in the landing page's footer. release-please bumps `frontend/package.json` with each release and Vite bakes it into the build.
+
 ## Later (owner's go-ahead required)
 
 Accounts: sign in with Last.fm, change email, link or unlink Google and Discord from Settings.

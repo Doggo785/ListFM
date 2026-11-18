@@ -457,6 +457,17 @@ html, body, #root {
   font: 400 32px/1 var(--font-display);
 }
 
+.top-nav__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.top-nav__version {
+  font: 400 var(--text-xs)/1 var(--font-display);
+  color: var(--text-muted);
+}
+
 .top-nav__links {
   position: relative;
   display: flex;
