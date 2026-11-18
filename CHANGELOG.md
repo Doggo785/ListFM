@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Doggo785/ListFM/compare/v1.0.0...v1.0.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **ui:** stop the preview saying it updates after an undone change ([8a53b28](https://github.com/Doggo785/ListFM/commit/8a53b28691bf42a1d4520ce185259902913e3b91)), closes [#171](https://github.com/Doggo785/ListFM/issues/171)
+
 ## [1.0.0](https://github.com/Doggo785/ListFM/compare/v0.7.0...v1.0.0) (2026-11-12)
 
 
