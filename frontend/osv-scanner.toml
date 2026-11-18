@@ -1,0 +1,7 @@
+# shortcut: no fixed picomatch exists yet (4.0.7 is the latest). It is a build-time
+# dependency (Vite/Vitest), never shipped to the browser. Remove this entry with the
+# Dependabot bump; the date makes the scan fail again if nobody did.
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-18
+reason = "picomatch ReDoS, no patched release yet; build-time only (#171)"
