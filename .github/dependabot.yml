@@ -5,6 +5,8 @@
 # - Version updates below: weekly Monday group PRs (minor+patch only, so
 #   majors like vitest 4 keep coming as separate PRs needing real review).
 # - Nothing auto-merges, ever (repo rule: the agent never merges either).
+# - A PR closed unmerged gets its branch deleted by
+#   workflows/prune-dependabot-branches.yml (merged ones by the repo setting).
 # - Caveat: npm `overrides` pins in frontend/package.json sometimes need a
 #   manual touch-up when Dependabot only bumps the lockfile. If that
 #   friction bites, Renovate handles overrides better (to evaluate later).

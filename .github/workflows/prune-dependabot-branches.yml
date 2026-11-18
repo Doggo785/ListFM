@@ -1,0 +1,26 @@
+name: prune-dependabot-branches
+
+# GitHub deletes a head branch on merge (repo setting), but not when a PR is
+# closed unmerged: Dependabot's branches would pile up. pull_request_target
+# runs main's copy of this file and never checks out the PR's code.
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    if: >-
+      !github.event.pull_request.merged
+      && startsWith(github.event.pull_request.head.ref, 'dependabot/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the closed PR's branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        # Dependabot may have deleted it already when it closed a superseded PR.
+        run: gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${BRANCH}" || echo "already gone"
