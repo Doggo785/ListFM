@@ -75,3 +75,13 @@ async def get_latest_runs(db: AsyncSession, user_id: str) -> list[tuple[Automati
         .order_by(AutomationHistory.automation_id, AutomationHistory.started_at.desc(), AutomationHistory.id.desc())
     )
     return [(row, enabled) for row, enabled in result.all()]
+
+
+async def get_run_status_by_date(db: AsyncSession, automation_ids: list[str]) -> dict[tuple[str, datetime], str]:
+    """The latest run's status for each (automation, scheduled date): what became of a period started."""
+    result = await db.execute(
+        select(AutomationHistory.automation_id, AutomationHistory.scheduled_for, AutomationHistory.status)
+        .where(AutomationHistory.automation_id.in_(automation_ids))
+        .order_by(AutomationHistory.started_at)
+    )
+    return {(automation_id, scheduled_for): status for automation_id, scheduled_for, status in result.all()}

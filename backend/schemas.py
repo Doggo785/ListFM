@@ -5,7 +5,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from apscheduler.triggers.cron import CronTrigger
 from filter_types import AutomationWindow, FilterGroups, WindowSpan, check_group_depth
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 LASTFM_USERNAME_REGEX = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
@@ -424,6 +431,19 @@ class RunRequest(BaseModel):
     """Optional body for POST /automations/{id}/run (all fields optional)."""
 
     progress_token: str | None = Field(default=None, max_length=64)
+    # A past moment to run as of: the run covers the period the schedule closed then (or the window up to it).
+    as_of: AwareDatetime | None = None
+
+
+class PastPeriodRead(BaseModel):
+    """A period an automation's schedule closed and no playlist covers: Run now with ``as_of`` makes it."""
+
+    automation_id: str
+    as_of: datetime
+    start: str | None
+    end: str
+    # "missing" when never started, else the latest run's status for it (empty, failed, running, waiting).
+    status: str
 
 
 class AutomationUpdate(BaseModel):

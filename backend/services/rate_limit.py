@@ -79,6 +79,8 @@ mail_link_limiter = RateLimiter(max_requests=3, window_seconds=3600)
 mail_link_use_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # Run now and retry, per automation: each run writes a playlist and reads the whole window.
 manual_run_limiter = RateLimiter(max_requests=1, window_seconds=60)
+# Past periods, per account: one click per missing period on a shelf. They read the database only, never Last.fm.
+past_run_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # The landing page's public route: two Last.fm calls per name, on the same budget
 # as the signed-in users' syncs. The total keeps it under a quarter of that budget.
 listener_limiter = RateLimiter(max_requests=5, window_seconds=60)

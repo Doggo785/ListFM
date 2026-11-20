@@ -29,6 +29,7 @@ from services.rate_limit import (
     mail_link_use_limiter,
     manual_run_limiter,
     oauth_login_limiter,
+    past_run_limiter,
     refresh_limiter,
     register_email_limiter,
     register_limiter,
@@ -103,6 +104,7 @@ async def _cleanup_db():
         complete_email_limiter,
         failed_login_limiter,
         manual_run_limiter,
+        past_run_limiter,
         mail_link_limiter,
         mail_link_use_limiter,
     ):

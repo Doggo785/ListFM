@@ -1,6 +1,6 @@
 import logging
 import time
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from config import get_settings
 from database import get_db
@@ -8,13 +8,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from models.automation import Automation
 from models.automation_history import AutomationHistory
 from models.user import User
-from repositories.automation_history import get_automation_history, get_latest_runs
+from repositories.automation_history import (
+    get_automation_history,
+    get_latest_runs,
+    get_run_status_by_date,
+)
 from repositories.automations import (
     create_automation,
     delete_automation,
     get_automations,
     update_automation,
 )
+from repositories.generated_playlists import get_made_periods
 from repositories.scrobbles import get_earliest_played_at
 from routers.deps import (
     get_current_active_user,
@@ -23,10 +28,12 @@ from routers.deps import (
 )
 from schemas import (
     LASTFM_USERNAME_REGEX,
+    PLAYLISTS_KEPT,
     AutomationCreate,
     AutomationHistoryRead,
     AutomationRead,
     AutomationUpdate,
+    PastPeriodRead,
     PreviewRequest,
     ProgressRead,
     RunRequest,
@@ -35,6 +42,7 @@ from services.activity_log import automation_label, log_activity, pipeline_summa
 from services.automation_runner import (
     MAX_ATTEMPT,
     RETRY_DELAYS,
+    closed_periods,
     last_fire_time,
     next_fire_time,
     run_automation,
@@ -42,7 +50,7 @@ from services.automation_runner import (
     window_bounds,
 )
 from services.progress import store as progress_store
-from services.rate_limit import manual_run_limiter, rate_limit_by_key
+from services.rate_limit import manual_run_limiter, past_run_limiter, rate_limit_by_key
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -203,6 +211,34 @@ async def list_latest_runs(
     return [_read_run(row, retries_pending=enabled) for row, enabled in await get_latest_runs(db, current_user.id)]
 
 
+@router.get("/automations/past-periods", response_model=list[PastPeriodRead])
+async def list_past_periods(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The periods each schedule closed and no live playlist covers, newest first.
+
+    Back to the first listen, and no further than the PLAYLISTS_KEPT latest
+    periods: an older one would be pruned as soon as made. Monthly schedules and
+    slower only. ``status`` is what became of a run started for it, if any.
+    Run now with its ``as_of`` makes it.
+    """
+    earliest = await get_earliest_played_at(db, current_user.id)
+    automations = [a for a in await get_automations(db, current_user.id) if a.cron]
+    if earliest is None or not automations:
+        return []
+    made = await get_made_periods(db, current_user.id)
+    statuses = await get_run_status_by_date(db, [a.id for a in automations])
+    now = datetime.now(UTC)
+    zone = current_user.timezone or "UTC"
+    return [
+        PastPeriodRead(automation_id=a.id, as_of=fire, status=statuses.get((a.id, fire), "missing"), **period)
+        for a in automations
+        for fire, period in closed_periods(a.cron, a.window, zone, now, earliest, PLAYLISTS_KEPT)
+        if (a.id, date.fromisoformat(period["end"])) not in made
+    ]
+
+
 @router.get("/automations", response_model=list[AutomationRead])
 async def list_automations(
     username: str = Depends(get_current_user_lastfm_username),
@@ -287,12 +323,22 @@ async def run_automation_now(
 
     With body.progress_token, progress reports to a client ticket
     (GET run-progress?token=); otherwise to the legacy run:{id} ticket.
+
+    With body.as_of, the run happens as of that past moment instead: the
+    period the schedule had closed then (see past-periods). Those have their
+    own limit, per account, so a shelf's missing periods can be made in a row.
     """
-    await _lock_or_409(db, automation)
-    rate_limit_by_key(manual_run_limiter, f"run:{automation.id}")
     now = datetime.now(UTC)
+    at = body.as_of if body and body.as_of else now
+    if at > now:
+        raise HTTPException(status_code=422, detail="A run can't cover the future")
+    await _lock_or_409(db, automation)
+    if at < now:
+        rate_limit_by_key(past_run_limiter, f"past:{automation.user_id}")
+    else:
+        rate_limit_by_key(manual_run_limiter, f"run:{automation.id}")
     zone = await db.scalar(select(User.timezone).where(User.id == automation.user_id)) or "UTC"
-    scheduled_for = (last_fire_time(automation.cron, now, zone) if automation.cron else None) or now
+    scheduled_for = (last_fire_time(automation.cron, at, zone) if automation.cron else None) or at
     return await _run_and_commit(db, automation, scheduled_for, 1, body)
 
 
