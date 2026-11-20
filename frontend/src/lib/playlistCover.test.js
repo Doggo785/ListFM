@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { COVER_CELLS, COVER_SIZE, albumAddresses, coverPng, coverShape, drawCover, ribbonCells, siteColors } from "./playlistCover";
+import { COVER_CELLS, COVER_SIZE, albumAddresses, burnFronts, coverPng, coverShape, drawCover, drawHoles, ribbonCells, siteColors } from "./playlistCover";
 
 const ID = "6f1c2a70-90aa-4a0e-9c55-1f7f6a1b0c11";
 const ids = Array.from({ length: 40 }, (_, i) => `6f1c2a70-90aa-4a0e-9c55-1f7f6a1b0c${String(i).padStart(2, "0")}`);
@@ -96,5 +96,42 @@ describe("coverPng", () => {
     stub((done) => done(null));
     await expect(coverPng(ID, [])).rejects.toThrow("no cover");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("burnFronts", () => {
+  const seeds = Array.from({ length: 40 }, (_, i) => `playlist-${i}`);
+
+  it("burns along the edges, more of them as it grows, and never deep enough to reach the middle", () => {
+    for (const seed of seeds) {
+      expect(burnFronts(seed, 1 / 6)).toHaveLength(2);
+      const fronts = burnFronts(seed, 1);
+      expect(fronts).toHaveLength(7);
+      expect(new Set(fronts.map((front) => front.edge)).size).toBe(4);
+      for (const front of fronts) expect(front.depth).toBeLessThanOrEqual(14);
+    }
+  });
+
+  it("keeps the same burns as the fire grows, longer and deeper, the first one across the whole edge at the end", () => {
+    expect(burnFronts("p", 0)).toEqual([]);
+    const [early] = burnFronts("p", 1 / 6);
+    const [late] = burnFronts("p", 1);
+    expect(late.edge).toBe(early.edge);
+    expect(late.centre).toBe(early.centre);
+    expect(late.half).toBeGreaterThan(early.half);
+    expect(late.depth).toBeGreaterThan(early.depth);
+    expect(late.half * 2).toBeGreaterThanOrEqual(COVER_CELLS);
+  });
+
+  it("eats through the cover at the edge and leaves the middle drawn", () => {
+    const cleared = [];
+    const context = { clearRect: (x, y) => cleared.push([x, y]), fillRect: () => {}, set fillStyle(_) {} };
+    drawHoles(context, burnFronts("p", 1), { ember: Array(9).fill("#f00") });
+    expect(cleared.length).toBeGreaterThan(0);
+    const cell = COVER_SIZE / COVER_CELLS;
+    for (const [x, y] of cleared) {
+      const fromEdge = Math.min(x, y, COVER_SIZE - cell - x, COVER_SIZE - cell - y) / cell;
+      expect(fromEdge).toBeLessThan(15);
+    }
   });
 });

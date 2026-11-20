@@ -154,8 +154,73 @@ export function siteColors() {
   return { ground: token("--ink"), ember: Array.from({ length: 9 }, (_, i) => token(`--ember-${i + 1}`)) };
 }
 
-/** Paints a whole cover. With no album, the ribbon alone on the site's ground. */
-export function drawCover(context, shape, albums, colors) {
+const EDGES = 4;
+const FRONTS = 7; // Burns at burn 1: some edges carry two.
+const DEEPEST = 14; // Cells a burn eats in at its deepest: the middle stays whole.
+
+/**
+ * How a cover burns, more as `burn` goes from 0 to 1: the playlist that goes next. Burns run along the edges,
+ * a new one every so often, each longer and deeper as it goes; at 1 the first one spans the whole edge.
+ * The same burns at every `burn`, only grown.
+ */
+export function burnFronts(seed, burn) {
+  if (!burn) return [];
+  const random = randomFrom(`${seed}:burn`);
+  const first = Math.floor(random() * EDGES);
+  return Array.from({ length: FRONTS }, (_, i) => ({
+    edge: (first + i) % EDGES,
+    centre: random() * COVER_CELLS,
+    reach: i === 0 ? 1 : 0.4 + random() * 0.5, // Of the edge's length, at burn 1.
+    waves: [random() * 6.28, random() * 6.28, random() * 6.28],
+    phase: random() * 6.28,
+    grown: Math.min(1, burn * FRONTS - i), // Each starts once the one before has.
+  }))
+    .filter((front) => front.grown > 0)
+    .map(({ grown, reach, ...front }) => ({
+      ...front,
+      half: (reach * COVER_CELLS * (0.4 + 0.6 * grown) * (0.5 + 0.5 * burn)) / 2 + 2,
+      depth: 3 + (DEEPEST - 3) * grown * (0.5 + 0.5 * burn),
+    }));
+}
+
+/** How far a front has eaten in at `along` cells down its edge: ragged, deepest at its centre, nothing past its ends. */
+function eaten({ centre, half, depth, waves }, along) {
+  const from = Math.abs(along - centre) / half;
+  if (from >= 1) return 0;
+  const ragged = 0.65 + 0.2 * Math.sin(along * 0.45 + waves[0]) + 0.1 * Math.sin(along * 1.3 + waves[1]) + 0.05 * Math.sin(along * 3.1 + waves[2]);
+  return depth * (1 - from * from) * ragged;
+}
+
+/** The burns: eaten through (the page shows), an ember rim along each front, which glows and dims with `time` (seconds). */
+export function drawHoles(context, fronts, colors, time = 0) {
+  const cells = new Map(); // "x,y" -> rim glow (0 to 1), or null once burnt through.
+  for (const front of fronts) {
+    for (let along = 0; along < COVER_CELLS; along++) {
+      const depth = eaten(front, along);
+      if (!depth) continue;
+      for (let into = 0; into <= Math.ceil(depth) + 1; into++) {
+        const [x, y] = [[along, into], [COVER_CELLS - 1 - into, along], [along, COVER_CELLS - 1 - into], [into, along]][front.edge];
+        const key = `${x},${y}`;
+        // The dither frays the front cell by cell.
+        const left = depth - into - b4(x, y) * 0.9;
+        if (left > 0.6) cells.set(key, null);
+        else if (left > -0.6 && cells.get(key) !== null) cells.set(key, 0.5 + 0.5 * Math.sin(time * 2.5 + front.phase + along * 0.5));
+      }
+    }
+  }
+  for (const [key, glow] of cells) {
+    const [x, y] = key.split(",").map(Number);
+    if (glow === null) {
+      context.clearRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    } else {
+      context.fillStyle = colors.ember[4 + Math.round(glow * 4)];
+      context.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+  }
+}
+
+/** Paints a whole cover. With no album, the ribbon alone on the site's ground. Holes burn through it last. */
+export function drawCover(context, shape, albums, colors, holes = []) {
   context.imageSmoothingQuality = "high";
   context.fillStyle = colors.ground;
   context.fillRect(0, 0, COVER_SIZE, COVER_SIZE);
@@ -172,6 +237,7 @@ export function drawCover(context, shape, albums, colors) {
     context.fillStyle = ramp[tone];
     context.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
   }
+  drawHoles(context, holes, colors);
 }
 
 /** A cover as a PNG file. It waits for its albums, which the one on screen may still be loading. */
