@@ -99,16 +99,16 @@ describe("progress endpoints", () => {
     expect(url).toContain("/api/automations/a1/run-progress");
   });
 
-  it("runAutomationNow omits the body without a token", async () => {
+  it("runAutomationNow sends the past moment to run as of", async () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 200,
       json: async () => ({ id: "h1", status: "completed" }),
     });
-    await runAutomationNow("a1");
+    await runAutomationNow("a1", "t1", "2026-03-01T00:00:00Z");
     const [, options] = globalThis.fetch.mock.calls[0];
     expect(options.method).toBe("POST");
-    expect(options.body).toBeUndefined();
+    expect(JSON.parse(options.body)).toEqual({ progress_token: "t1", as_of: "2026-03-01T00:00:00Z" });
   });
 
   it("newProgressToken falls back without randomUUID", () => {

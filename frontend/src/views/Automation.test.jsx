@@ -27,7 +27,8 @@ vi.mock("@/lib/api", () => ({
 const auth = vi.hoisted(() => ({ user: { lastfm_username: "doggo" } }));
 const sync = vi.hoisted(() => ({ value: { complete: true } }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => auth }));
-vi.mock("@/hooks/useAutomations", () => ({ useAutomations: () => ({ generatedPlaylists: [] }) }));
+const lists = vi.hoisted(() => ({ value: { generatedPlaylists: [], pastPeriods: [] } }));
+vi.mock("@/hooks/useAutomations", () => ({ useAutomations: () => lists.value }));
 vi.mock("@/hooks/useScrobbleSync", () => ({ useScrobbleSync: () => sync.value }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -71,6 +72,7 @@ beforeEach(() => {
   sync.value = { complete: true };
   getAutomation.mockResolvedValue(AUTOMATION);
   getAutomationHistory.mockResolvedValue([]);
+  lists.value = { generatedPlaylists: [], pastPeriods: [] };
 });
 
 afterEach(async () => {
@@ -145,6 +147,19 @@ describe("Automation history", () => {
 });
 
 describe("Automation actions", () => {
+  it("points to the past periods still to make on its shelf, and warns near the playlists kept", async () => {
+    const period = (end, status = "missing") => ({ automation_id: "a1", as_of: `${end}T00:00:00Z`, start: "2026-01-01", end, status });
+    lists.value = {
+      generatedPlaylists: Array.from({ length: 46 }, (_, i) => ({ id: `p${i}`, automation_id: "a1" })),
+      pastPeriods: [period("2026-05-31"), period("2026-02-28"), period("2025-11-30", "empty"), { ...period("2025-08-31"), automation_id: "other" }],
+    };
+    getAutomation.mockResolvedValue({ ...AUTOMATION, cron: "0 0 1 3,6,9,12 *" });
+    await show();
+    expect(text()).toContain("2 past seasons aren't made yet · See them");
+    expect(text()).toContain("46 of 50 playlists kept");
+    expect([...host.querySelectorAll("a")].find((el) => el.textContent === "See them").getAttribute("href")).toBe("/playlists");
+  });
+
   it("runs from a new line on top, and says why a run was refused", async () => {
     let finish;
     runAutomationNow.mockImplementation(() => new Promise((_, reject) => { finish = reject; }));

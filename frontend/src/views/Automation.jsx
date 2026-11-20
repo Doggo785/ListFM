@@ -21,7 +21,8 @@ import {
   runAutomationNow,
 } from "@/lib/api";
 import { RUNS_DONE, timeLeft } from "@/lib/backgroundWork";
-import { describeAutomation, describeSchedule, describeWaiting } from "@/lib/automation-rules";
+import { describeAutomation, describeSchedule, describeWaiting, periodUnit } from "@/lib/automation-rules";
+import { plural, shelfLoad } from "@/lib/playlists";
 import { RUN_TONES, chainsOf, daysOf, describeRun, timeOf } from "@/lib/runs";
 import { FOCUS } from "@/lib/utils";
 
@@ -64,6 +65,23 @@ function waitingFor(head, listens) {
   const eta = !listens ? null : listens.complete ? listens.tags_eta_seconds : listens.eta_seconds;
   const left = timeLeft(eta);
   return left ? `${head.error_message} It starts by itself, ${left}.` : `${head.error_message} It starts by itself.`;
+}
+
+/** How this automation's shelf stands: the past periods it could still make, and how close it is to the playlists kept. */
+function ShelfNote({ automation, kept, missing }) {
+  const { warning } = shelfLoad(kept);
+  if (!missing && !warning) return null;
+  return (
+    <div className="pt-4 text-sm">
+      {missing > 0 && (
+        <p className="text-(--text-muted)">
+          {plural(missing, `past ${periodUnit(automation.cron)}`)} {missing === 1 ? "isn't" : "aren't"} made yet ·{" "}
+          <Link to="/playlists" state={{ shelf: automation.id }} className={`text-(--ember) underline underline-offset-4 ${FOCUS}`}>See them</Link>
+        </p>
+      )}
+      {warning && <p className="text-(--ember)">{warning}</p>}
+    </div>
+  );
 }
 
 function RunRow({ chain, progress, retryable, busy, onRetry, listens }) {
@@ -156,7 +174,7 @@ export default function Automation() {
   const { user } = useAuth();
   const username = user?.lastfm_username;
   const { automation, isLoading, error, update, refetch } = useAutomation(username ? id : null);
-  const { generatedPlaylists } = useAutomations(username);
+  const { generatedPlaylists, pastPeriods } = useAutomations(username);
   // A run waiting for the listens or the tags says how long they should take.
   const listensSync = useScrobbleSync(Boolean(username));
 
@@ -254,6 +272,8 @@ export default function Automation() {
 
   const paused = automation.enabled === false;
   const cover = generatedPlaylists.find((playlist) => playlist.automation_id === id);
+  const kept = generatedPlaylists.filter((playlist) => playlist.automation_id === id).length;
+  const missing = pastPeriods.filter((period) => period.automation_id === id && period.status === "missing").length;
   const name = automation.name || "Untitled";
 
   return (
@@ -291,6 +311,7 @@ export default function Automation() {
           </div>
           {arrival?.notice && !actionError && <p role="status" className="pt-2 text-sm text-(--ember)">{arrival.notice}</p>}
           {actionError && <p role="alert" className="pt-2 text-sm text-(--ember)">{actionError}</p>}
+          <ShelfNote automation={automation} kept={kept} missing={missing} />
         </header>
 
         <section data-quiet aria-labelledby="history-title" className="min-w-0 max-w-2xl">

@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
   setSessionExpiredHandler: vi.fn(),
   getAutomations: vi.fn(),
   getGeneratedPlaylists: vi.fn(),
+  getPastPeriods: vi.fn(async () => []),
   getLatestRuns: vi.fn(),
   getListeningTotals: vi.fn(),
   getListeningStory: vi.fn(),

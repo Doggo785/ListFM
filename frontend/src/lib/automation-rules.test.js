@@ -17,6 +17,8 @@ import {
   describeAutomationWithSchedule,
   describeCron,
   describePeriod,
+  namePeriod,
+  periodUnit,
   isValidCron,
   runsTooOften,
   usesTagFilter,
@@ -150,6 +152,31 @@ describe("describePeriod", () => {
     expect(describePeriod({ start: "2025-12-01", end: "2026-02-28" })).toBe("Dec 1, 2025 to Feb 28, 2026");
     expect(describePeriod({ start: null, end: "2026-08-31" })).toBe("all your listens up to Aug 31, 2026");
     expect(describePeriod(undefined)).toBeNull();
+  });
+});
+
+describe("namePeriod", () => {
+  it("names a whole month, season or year, and dates anything else", () => {
+    expect(namePeriod({ start: "2026-10-01", end: "2026-10-31" })).toBe("October 2026");
+    expect(namePeriod({ start: "2026-06-01", end: "2026-08-31" })).toBe("Summer 2026");
+    expect(namePeriod({ start: "2025-12-01", end: "2026-02-28" })).toBe("Winter 2025–26");
+    expect(namePeriod({ start: "2023-12-01", end: "2024-02-29" })).toBe("Winter 2023–24");
+    expect(namePeriod({ start: "2025-01-01", end: "2025-12-31" })).toBe("2025");
+    expect(namePeriod({ start: "2026-01-20", end: "2026-04-19" })).toBe("Jan 20 to Apr 19, 2026");
+    expect(namePeriod({ start: "2026-01-01", end: "2026-03-31" })).toBe("Jan–Mar 2026");
+    expect(namePeriod({ start: "2025-11-01", end: "2026-01-31" })).toBe("Nov 2025–Jan 2026");
+    expect(namePeriod({ start: "2025-09-01", end: "2026-08-31" })).toBe("Sep 2025–Aug 2026");
+    expect(namePeriod({ start: "2026-02-01", end: "2026-02-27" })).toBe("Feb 1 to Feb 27, 2026");
+    expect(namePeriod({ start: null, end: "2026-04-19" })).toBe("All listens up to Apr 19, 2026");
+  });
+});
+
+describe("periodUnit", () => {
+  it("calls a schedule's period by its cadence", () => {
+    expect(periodUnit("0 0 1 3,6,9,12 *")).toBe("season");
+    expect(periodUnit("0 8 1 * *")).toBe("month");
+    expect(periodUnit("0 8 1 */3 *")).toBe("quarter");
+    expect(periodUnit("0 8 1 1 *")).toBe("year");
   });
 });
 

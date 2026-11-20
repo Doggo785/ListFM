@@ -137,6 +137,40 @@ export function describePeriod(period) {
   return `${formatDay(period.start, period.start.slice(0, 4) !== period.end.slice(0, 4))} to ${formatDay(period.end)}`;
 }
 
+// Meteorological seasons, as the Seasonal recipe: winter runs from December to February.
+const SEASON_NAMES = { 3: "Spring", 6: "Summer", 9: "Autumn", 12: "Winter" };
+
+/** How many whole months a period spans, from the 1st of one to the last day of another, or 0. */
+function wholeMonths(start, end) {
+  const [startYear, startMonth, startDay] = start.split("-").map(Number);
+  const [endYear, endMonth, endDay] = end.split("-").map(Number);
+  if (startDay !== 1 || endDay !== new Date(endYear, endMonth, 0).getDate()) return 0;
+  return (endYear - startYear) * 12 + endMonth - startMonth + 1;
+}
+
+const shortMonth = (month) => MONTHS[month - 1].slice(0, 3);
+
+/** A period's name, as calendars say it: a month, a season, a year, or a run of months. Anything else by its dates. */
+export function namePeriod({ start, end }) {
+  if (!start) return `All listens up to ${formatDay(end)}`;
+  const [year, month] = start.split("-").map(Number);
+  const months = wholeMonths(start, end);
+  if (months === 1) return `${MONTHS[month - 1]} ${year}`;
+  if (months === 3 && SEASON_NAMES[month]) return month === 12 ? `Winter ${year}–${String(year + 1).slice(2)}` : `${SEASON_NAMES[month]} ${year}`;
+  if (months === 12 && month === 1) return String(year);
+  if (months > 1) {
+    const [endYear, endMonth] = end.split("-").map(Number);
+    return endYear === year ? `${shortMonth(month)}–${shortMonth(endMonth)} ${year}` : `${shortMonth(month)} ${year}–${shortMonth(endMonth)} ${endYear}`;
+  }
+  const dates = describePeriod({ start, end });
+  return dates[0].toUpperCase() + dates.slice(1);
+}
+
+const PERIOD_UNITS = { monthly: "month", quarterly: "quarter", seasonal: "season", yearly: "year" };
+
+/** What one period of a schedule is called: a month, a season… */
+export const periodUnit = (cron) => PERIOD_UNITS[readSchedule(cron).frequency] ?? "period";
+
 /** The two ways to start, before the preview has answered too. */
 export function describeOutcome(cron, { period, next_run: nextRun } = {}) {
   if (!cron) return "Nothing runs until you start it.";
