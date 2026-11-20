@@ -1,5 +1,5 @@
 """What keeps one account from wearing out the home server, and what the outside can see of the API."""
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -61,6 +61,25 @@ async def test_only_the_newest_playlists_of_an_automation_stay(client: AsyncClie
         run = await db.get(AutomationHistory, "h0")
         assert run is not None and run.generated_playlist_id is None
         assert await db.scalar(select(func.count()).select_from(AutomationHistory)) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_oldest_period_goes_first_even_when_made_last(client: AsyncClient):
+    await _register_and_login(client, _unique_email())
+    made = datetime(2026, 9, 1, tzinfo=UTC)
+    ends = {"summer": date(2026, 8, 31), "spring": date(2026, 5, 31), "winter": date(2024, 2, 29)}
+    async with _TestSessionLocal() as db:
+        user_id = (await db.execute(select(User.id))).scalars().one()
+        db.add(Automation(id="a1", user_id=user_id, lastfm_username="x", name="Seasonal", window=WINDOW, sort="random"))
+        await db.flush()
+        for i, (name, end) in enumerate(ends.items()):
+            # The past winter is made last, from its shelf.
+            db.add(GeneratedPlaylist(id=name, user_id=user_id, automation_id="a1", lastfm_username="x", track_count=0, period_end=end, generated_at=made + timedelta(days=i)))
+        await db.flush()
+        await prune_automation_playlists(db, "a1", keep=2)
+        await db.commit()
+        kept = (await db.execute(select(GeneratedPlaylist.id).order_by(GeneratedPlaylist.id))).scalars().all()
+        assert kept == ["spring", "summer"]
 
 
 @pytest.mark.asyncio

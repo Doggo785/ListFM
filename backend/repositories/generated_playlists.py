@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from models.album import Album
 from models.automation_history import AutomationHistory
@@ -160,12 +160,32 @@ async def delete_generated_playlist(db: AsyncSession, playlist_id: str, user_id:
     return True
 
 
+async def get_made_periods(db: AsyncSession, user_id: str) -> set[tuple[str, date]]:
+    """(automation_id, last day) of each live playlist an automation made: the periods already made."""
+    result = await db.execute(
+        select(GeneratedPlaylist.automation_id, GeneratedPlaylist.period_end).where(
+            GeneratedPlaylist.user_id == user_id,
+            GeneratedPlaylist.deleted_at.is_(None),
+            GeneratedPlaylist.automation_id.is_not(None),
+            GeneratedPlaylist.period_end.is_not(None),
+        )
+    )
+    return {(automation_id, end) for automation_id, end in result.all()}
+
+
 async def prune_automation_playlists(db: AsyncSession, automation_id: str, keep: int) -> None:
-    """Erase the automation's playlists past the `keep` newest, deleted ones included; their runs stay."""
+    """Erase the automation's playlists past the `keep` latest periods, deleted ones included; their runs stay.
+
+    By period, not by date made: a past period made today is still the one to go first.
+    """
     older = (
         select(GeneratedPlaylist.id)
         .where(GeneratedPlaylist.automation_id == automation_id)
-        .order_by(GeneratedPlaylist.generated_at.desc(), GeneratedPlaylist.id.desc())
+        .order_by(
+            GeneratedPlaylist.period_end.desc().nulls_last(),
+            GeneratedPlaylist.generated_at.desc(),
+            GeneratedPlaylist.id.desc(),
+        )
         .offset(keep)
     )
     ids = list((await db.execute(older)).scalars())
