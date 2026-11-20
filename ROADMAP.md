@@ -89,6 +89,7 @@ Each PR wires the ribbon to the screen's real data and deletes the old code it r
 
 ## After v1.0.0
 
+- *(done, #172)* **Past periods on the shelf**: a scheduled automation (monthly or slower) shows on its shelf the periods it closed and never made, back to the first listen, each one made on the spot as the schedule would have made it then. Shelves go by period and name it ("Summer 2026"); from 45 playlists the shelf warns and the cover of the oldest period burns, and the limit of 50 drops the oldest period first.
 - *(done)* **Version shown**: beside the logo in the app and in the landing page's footer. release-please bumps `frontend/package.json` with each release and Vite bakes it into the build.
 
 ## Later (owner's go-ahead required)

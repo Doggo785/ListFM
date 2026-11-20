@@ -4,7 +4,7 @@ Last reviewed: 2026-11-03 (solo + agents).
 Read before writing code. Never weaken this file to get a change through.
 Mode: **Block** — any failure of the baseline or of an enforced dimension blocks the task.
 Non-negotiable rule: the agent never merges on its own. It opens the PR, gets CI green and waits for the owner.
-Only exception: a "go merge #N" from the owner naming the PR. The agent then squash-merges, checks that the remote branch is deleted and deletes the local branch.
+Only exception: a "go merge #N" from the owner naming the PR. The agent then merges, checks that the remote branch is deleted and deletes the local branch. Squash by default; rebase when the PR's commits are atomic and each deserves its own changelog line (the owner says so on the PR).
 
 ## Baseline (always enforced, no setup)
 
