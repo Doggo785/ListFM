@@ -94,6 +94,14 @@ def window_bounds(window: dict, at: datetime) -> tuple[datetime | None, datetime
     return start, end
 
 
+def period_days(start: datetime | None, end: datetime) -> dict:
+    """Window bounds as the days they cover, both included: end is exclusive, 1 September 00:00 means up to 31 August."""
+    return {
+        "start": start.date().isoformat() if start else None,
+        "end": (end - timedelta(microseconds=1)).date().isoformat(),
+    }
+
+
 # Not a security need (shuffling a playlist); it costs nothing and keeps scanners quiet.
 _rng = random.SystemRandom()
 
@@ -280,11 +288,7 @@ async def run_automation_pipeline_cached(
         # Rate of known tags: a tag filter sees only these artists (ADR 0003).
         "window_artists": len(window_artists),
         "known_tag_artists": len(window_artists & artist_tags.keys()),
-        # end is exclusive: 1 September 00:00 means up to 31 August.
-        "period": {
-            "start": start.date().isoformat() if start else None,
-            "end": (end - timedelta(microseconds=1)).date().isoformat(),
-        },
+        "period": period_days(start, end),
     }
 
 
@@ -347,6 +351,32 @@ def last_fire_time(cron: str, now: datetime, timezone: str) -> datetime | None:
         if last is not None:
             return last
     return None
+
+
+# Closer fires than this (daily, weekly) make too many periods to offer each one: no past periods for them.
+_MIN_PERIOD_GAP = timedelta(days=28)
+
+
+def closed_periods(
+    cron: str, window: dict, timezone: str, now: datetime, earliest: datetime, limit: int
+) -> list[tuple[datetime, dict]]:
+    """(fire, days covered) of the periods the schedule closed, newest first, back to the first listen.
+
+    Empty for a schedule firing more often than monthly, or without a usable schedule.
+    """
+    zone = ZoneInfo(timezone)
+    periods: list[tuple[datetime, dict]] = []
+    fire = last_fire_time(cron, now, timezone)
+    while fire is not None and len(periods) < limit:
+        previous = last_fire_time(cron, fire - timedelta(seconds=1), timezone)
+        if previous is not None and fire - previous < _MIN_PERIOD_GAP:
+            return []
+        start, end = window_bounds(window, fire.astimezone(zone))
+        if end <= earliest:
+            break
+        periods.append((fire, period_days(start, end)))
+        fire = previous
+    return periods
 
 
 def next_fire_time(cron: str, now: datetime, timezone: str) -> datetime | None:

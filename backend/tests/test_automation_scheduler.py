@@ -9,6 +9,7 @@ Covers:
 """
 
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -800,6 +801,73 @@ async def test_run_now_starts_fresh_chain(client: AsyncClient):
         assert entry["scheduled_for"] is not None
     finally:
         await _cleanup_user_with_automations(client, email)
+
+def test_closed_periods_go_back_to_the_first_listen_and_skip_frequent_schedules():
+    from services.automation_runner import closed_periods
+
+    month = {"length": {"amount": 1, "unit": "month"}}
+    now = datetime(2026, 11, 20, tzinfo=UTC)
+    first_listen = datetime(2026, 6, 15, tzinfo=UTC)
+    periods = closed_periods("0 0 1 * *", month, "UTC", now, first_listen, 50)
+    assert [p["start"] for _, p in periods] == ["2026-10-01", "2026-09-01", "2026-08-01", "2026-07-01", "2026-06-01"]
+    assert periods[0][1]["end"] == "2026-10-31"
+    assert len(closed_periods("0 0 1 * *", month, "UTC", now, first_listen, 2)) == 2
+    # A daily or weekly schedule would offer hundreds of periods: none.
+    assert closed_periods("0 8 * * *", month, "UTC", now, first_listen, 50) == []
+    assert closed_periods("0 8 * * 1", month, "UTC", now, first_listen, 50) == []
+
+
+@pytest.mark.asyncio
+async def test_a_shelf_offers_the_periods_not_made_and_makes_them_in_a_row(client: AsyncClient):
+    email = _unique_email()
+    try:
+        await _register_login_link(client, email)
+        body = {**_create_body(), "window": {"length": {"amount": 1, "unit": "month"}}}
+        automation_id = (await client.post("/api/automations", json=body)).json()["id"]
+        await client.post("/api/automations", json={**_create_body(), "name": "Daily", "cron": "0 8 * * *"})
+        earliest = datetime.now(UTC) - timedelta(days=100)
+
+        async def periods():
+            with patch("routers.automations.get_earliest_played_at", return_value=earliest):
+                return (await client.get("/api/automations/past-periods")).json()
+
+        listed = await periods()
+        # Monthly only: the daily automation offers none. Newest first, back to the first listen.
+        assert {p["automation_id"] for p in listed} == {automation_id}
+        assert all(p["status"] == "missing" for p in listed)
+        assert all(older["end"] < newer["start"] for newer, older in pairwise(listed))
+        assert listed[-1]["start"] <= earliest.date().isoformat()
+
+        read = []
+
+        async def window_tracks(db, user_id, start, end):
+            read.append((start, end))
+            return [] if len(read) == 2 else [{"artist": "Artist A", "first_played": 0, "title": "Song A"}]
+
+        made, nothing = listed[1], listed[2]
+        with patch("services.automation_runner.get_window_tracks", window_tracks):
+            first = await client.post(f"/api/automations/{automation_id}/run", json={"as_of": made["as_of"]})
+            # Past periods share a limit per account, not Run now's minute per automation.
+            second = await client.post(f"/api/automations/{automation_id}/run", json={"as_of": nothing["as_of"]})
+        assert first.status_code == 200 and second.status_code == 200
+        assert datetime.fromisoformat(first.json()["scheduled_for"]) == datetime.fromisoformat(made["as_of"])
+        start, end = read[0]
+        assert start.date().isoformat() == made["start"]
+        assert (end - timedelta(microseconds=1)).date().isoformat() == made["end"]
+
+        after = {p["as_of"]: p["status"] for p in await periods()}
+        assert made["as_of"] not in after
+        assert after[nothing["as_of"]] == "empty"
+        assert after[listed[0]["as_of"]] == "missing"
+
+        future = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+        assert (await client.post(f"/api/automations/{automation_id}/run", json={"as_of": future})).status_code == 422
+        # A moment without its zone would be read on an unknown clock.
+        naive = (datetime.now(UTC) - timedelta(days=40)).replace(tzinfo=None).isoformat()
+        assert (await client.post(f"/api/automations/{automation_id}/run", json={"as_of": naive})).status_code == 422
+    finally:
+        await _cleanup_user_with_automations(client, email)
+
 
 SEASONS = "0 0 1 3,6,9,12 *"
 
