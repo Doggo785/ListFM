@@ -12,7 +12,7 @@ import { Gone, LoadFailed, StatePage } from "@/components/elements/PageStates";
 import { deleteGeneratedPlaylist, getGeneratedPlaylistTracks } from "@/lib/api";
 import { glide, glideArrived } from "@/lib/glide";
 import { coverPng } from "@/lib/playlistCover";
-import { describeCoverage, describeMade, plural, tracksAsText } from "@/lib/playlists";
+import { coverageDates, describeCoverage, describeMade, plural, tracksAsText } from "@/lib/playlists";
 import { FOCUS } from "@/lib/utils";
 import { lastfmUrl } from "@/lib/lastfm";
 import { LastfmCredit } from "@/components/ui/Lastfm";
@@ -257,8 +257,7 @@ export default function Playlist() {
               <h1 ref={title} tabIndex={-1} className="w-fit max-w-full text-2xl break-words outline-none md:text-4xl" style={{ viewTransitionName: "playlist-title" }}>{name}</h1>
               <p className="w-fit pt-1 text-base" style={{ viewTransitionName: "playlist-period" }}>{describeCoverage(playlist)}</p>
               <p className="text-sm text-(--text-muted)">
-                {plural(playlist.track_count, "track")}
-                {playlist.period_end ? ` · ${describeMade(playlist)}` : ""}
+                {[coverageDates({ start: playlist.period_start, end: playlist.period_end }), plural(playlist.track_count, "track"), playlist.period_end && describeMade(playlist)].filter(Boolean).join(" · ")}
               </p>
             </div>
           </div>

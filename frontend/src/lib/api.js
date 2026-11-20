@@ -160,12 +160,18 @@ export async function getAutomationHistory(id) {
   return request(`/api/automations/${id}/history`);
 }
 
-export async function runAutomationNow(id, progressToken) {
+/** With asOf (a past moment from getPastPeriods), the run makes the period the schedule had closed then. */
+export async function runAutomationNow(id, progressToken, asOf) {
   return request(`/api/automations/${id}/run`, {
     method: "POST",
     timeoutMs: LONG_TIMEOUT_MS,
-    ...(progressToken ? { body: JSON.stringify({ progress_token: progressToken }) } : {}),
+    body: JSON.stringify({ progress_token: progressToken, ...(asOf && { as_of: asOf }) }),
   });
+}
+
+/** The periods the account's schedules closed and no playlist covers yet, each with the as_of that makes it. */
+export async function getPastPeriods() {
+  return request("/api/automations/past-periods");
 }
 
 export async function retryRun(id, historyId, progressToken) {

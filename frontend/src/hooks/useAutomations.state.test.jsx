@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAutomations, getGeneratedPlaylists } from "@/lib/api";
 import { forgetPlaylist, useAutomations } from "./useAutomations";
 
-vi.mock("@/lib/api", () => ({ getAutomations: vi.fn(), getGeneratedPlaylists: vi.fn() }));
+vi.mock("@/lib/api", () => ({ getAutomations: vi.fn(), getGeneratedPlaylists: vi.fn(), getPastPeriods: vi.fn(async () => []) }));
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 

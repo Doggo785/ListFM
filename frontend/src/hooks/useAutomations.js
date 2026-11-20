@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getAutomations, getGeneratedPlaylists } from "@/lib/api";
+import { getAutomations, getGeneratedPlaylists, getPastPeriods } from "@/lib/api";
 import { RUNS_DONE } from "@/lib/backgroundWork";
 
 export function countByAutomation(generatedPlaylists = []) {
@@ -28,6 +28,7 @@ export function useAutomations(username) {
   const kept = username && seen?.username === username ? seen : null;
   const [automations, setAutomations] = useState(kept?.automations ?? []);
   const [generatedPlaylists, setGeneratedPlaylists] = useState(kept?.generatedPlaylists ?? []);
+  const [pastPeriods, setPastPeriods] = useState(kept?.pastPeriods ?? []);
   const [counts, setCounts] = useState(() => countByAutomation(kept?.generatedPlaylists));
   // Whose lists are on screen: loading is having none yet for this name.
   const [loadedFor, setLoadedFor] = useState(kept ? username : null);
@@ -36,8 +37,8 @@ export function useAutomations(username) {
   const isLoading = Boolean(username) && loadedFor !== username;
 
   const load = useCallback(
-    () => Promise.allSettled([getAutomations(), getGeneratedPlaylists()])
-      .then(([autosResult, generatedResult]) => {
+    () => Promise.allSettled([getAutomations(), getGeneratedPlaylists(), getPastPeriods()])
+      .then(([autosResult, generatedResult, pastResult]) => {
         if (autosResult.status === "rejected") {
           throw autosResult.reason;
         }
@@ -49,10 +50,13 @@ export function useAutomations(username) {
             ? generatedResult.value
             : [];
         const generatedFailed = generatedResult.status === "rejected";
-        if (!generatedFailed) seen = { username, automations: autoList, generatedPlaylists: generatedList };
+        // Missing periods are an extra: when they can't load, the shelves show what was made.
+        const pastList = pastResult.status === "fulfilled" && Array.isArray(pastResult.value) ? pastResult.value : [];
+        if (!generatedFailed) seen = { username, automations: autoList, generatedPlaylists: generatedList, pastPeriods: pastList };
         setPlaylistsFailed(generatedFailed);
         setAutomations(autoList);
         setGeneratedPlaylists(generatedList);
+        setPastPeriods(pastList);
         setCounts(countByAutomation(generatedList));
         setError(null);
       })
@@ -79,8 +83,8 @@ export function useAutomations(username) {
   }, [username, load]);
 
   if (!username) {
-    return { automations: NOTHING, generatedPlaylists: NOTHING, counts: NO_COUNTS, isLoading: false, error: null, playlistsFailed, refetch };
+    return { automations: NOTHING, generatedPlaylists: NOTHING, pastPeriods: NOTHING, counts: NO_COUNTS, isLoading: false, error: null, playlistsFailed, refetch };
   }
 
-  return { automations, generatedPlaylists, counts, isLoading, error, playlistsFailed, refetch };
+  return { automations, generatedPlaylists, pastPeriods, counts, isLoading, error, playlistsFailed, refetch };
 }
