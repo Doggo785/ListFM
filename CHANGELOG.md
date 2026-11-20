@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.0](https://github.com/Doggo785/ListFM/compare/v1.0.1...v1.1.0) (2026-11-20)
+
+
+### Features
+
+* **automations:** drop the oldest period first when an automation's playlists are pruned ([3bfb957](https://github.com/Doggo785/ListFM/commit/3bfb9575e13de3e829eb53825b7540e3c2e72360))
+* **automations:** run an automation as of a past moment, and list the periods its schedules never made ([20cda77](https://github.com/Doggo785/ListFM/commit/20cda774f3845c6fa095cae65fb09d9450ba0cf1))
+* **ui:** burn the edges of the cover of the playlist that goes next ([dc88aba](https://github.com/Doggo785/ListFM/commit/dc88abac9ca1dc97aa7ee9e720f3c85de92d7fa5))
+* **ui:** name periods as calendars do, and make an automation's missing periods from its shelf ([9f42c8a](https://github.com/Doggo785/ListFM/commit/9f42c8aba3e3d81f3d5a62fdfce6558085e3dca3))
+* **ui:** show the running version beside the logo and in the landing footer ([c1c0dc6](https://github.com/Doggo785/ListFM/commit/c1c0dc64d935f5cac7ff3f97d304e4ea19abf86f))
+
 ## [1.0.1](https://github.com/Doggo785/ListFM/compare/v1.0.0...v1.0.1) (2026-11-18)
 
 
