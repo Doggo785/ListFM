@@ -16,6 +16,10 @@ _Avoid_: Generated playlist (when the context is clear), automation
 One execution of an automation, scheduled or manual, which produces at most one playlist and leaves a line in the history.
 _Avoid_: Execution, generation, job
 
+**Missing period**:
+A period a schedule closed, monthly or slower, that no playlist of the automation covers: before the automation existed, or deleted. Its shelf shows it in place, and making it runs the automation as the schedule would have then.
+_Avoid_: Backfill, gap, ghost
+
 **History**:
 The list of an automation's runs: when, how many tracks, and the error when one failed.
 _Avoid_: Listening history (say Listens)
@@ -57,7 +61,7 @@ _Avoid_: Mascot, line, wave
 ## An automation's chain
 
 **Window**:
-Which listens an automation looks at, counted from the run's planned date, that is the last slot of its schedule even when the run starts late or by hand (a retry keeps the same window; with no schedule, it counts from now): sliding ("the last 30 days"), shifted ("the same month a year ago") or all listens.
+Which listens an automation looks at, counted from the run's planned date, that is the last slot of its schedule even when the run starts late or by hand (a retry keeps the same window; with no schedule, it counts from now): sliding ("the last 30 days"), shifted ("the same month a year ago") or all listens. A run started for a past period counts from that past date instead.
 _Avoid_: Period, date range, source
 
 **Filter**:
