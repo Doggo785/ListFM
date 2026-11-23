@@ -1,25 +1,25 @@
-annotated-doc==0.0.6
+annotated-doc==0.0.7
 annotated-types==0.8.0
 anyio==4.16.0
 certifi==2026.10.23
 click==8.5.1
-fastapi==0.163.1
+fastapi==0.165.0
 h11==0.16.0
 httpcore==1.0.9
 httpx==0.28.1
 idna==3.20
-pydantic==2.14.3
+pydantic==2.14.4
 pydantic-settings==2.16.3
-pydantic_core==2.50.4
-pylast==7.2.0
+pydantic_core==2.50.5
+pylast==7.3.0
 python-dotenv==1.2.4
-ruff==0.17.5
+ruff==0.17.6
 starlette==1.10.0
 typing-inspection==0.4.5
 typing_extensions==4.16.0
 uvicorn==0.54.0
 asyncpg==0.32.0
-sqlalchemy[asyncio]==2.1.8
+sqlalchemy[asyncio]==2.1.9
 alembic==1.20.1
 PyJWT==2.15.1
 passlib[bcrypt]==1.7.4
@@ -27,11 +27,11 @@ bcrypt==4.0.1
 pytest==9.2.0
 pytest-asyncio==1.5.0
 pytest-cov==7.1.0
-diff-cover==11.0.2
+diff-cover==11.0.4
 httpx-oauth==0.17.0
 apscheduler==3.11.3
 # Explicit floor for a transitive dep (via pytest): fixes PYSEC-2023-117 / PYSEC-2026-2987.
 pygments==2.21.0
 # Explicit pins for transitive deps (via pylast): osv resolves httpx2>=2.9.1, which has PYSEC-2026-3844/3845/3846.
-httpx2==2.16.0
-httpcore2==2.16.0
+httpx2==2.16.2
+httpcore2==2.16.2
